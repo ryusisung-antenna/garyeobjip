@@ -29,6 +29,7 @@ body{
   background:var(--paper);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
   font-size:16px;line-height:1.65;letter-spacing:-.01em;padding-bottom:86px;
+  word-break:keep-all;overflow-wrap:break-word;
 }
 h1,h2,h3,h4{font-weight:700;letter-spacing:-.02em;margin:0}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
@@ -43,12 +44,15 @@ input,textarea,select{font-family:inherit;font-size:16px;color:var(--ink)}
 /* 머리 */
 header{padding:20px 20px 12px;position:sticky;top:0;z-index:30;
   background:linear-gradient(var(--paper) 80%,rgba(251,248,241,0))}
-.brand{display:flex;align-items:center;gap:9px}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
 .brand .leaf{width:26px;height:26px;flex:none}
-.brand .mark{font-size:23px;font-weight:800;color:var(--moss-deep);letter-spacing:-.03em}
-.brand .sub{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
-.sync-dot{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-soft)}
-.sync-dot i{width:7px;height:7px;border-radius:50%;background:var(--clay);display:inline-block}
+.brand-text{min-width:0}
+.brand .mark{font-size:23px;font-weight:800;color:var(--moss-deep);letter-spacing:-.03em;line-height:1.25}
+.brand .sub{font-size:11.5px;color:var(--ink-soft);margin-top:1px;word-break:keep-all}
+.me-row{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;
+  font-size:11px;color:var(--ink-soft);margin-top:7px;cursor:pointer;word-break:keep-all}
+.sync-dot{display:flex;align-items:center;gap:5px;flex:none}
+.sync-dot i{width:7px;height:7px;border-radius:50%;background:var(--clay);display:inline-block;flex:none}
 .sync-dot.live i{background:var(--moss)}
 
 main{padding:2px 18px 20px;max-width:680px;margin:0 auto}
@@ -56,12 +60,14 @@ main{padding:2px 18px 20px;max-width:680px;margin:0 auto}
 .view.on{display:block}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
-.view-head{display:flex;align-items:flex-end;justify-content:space-between;margin:8px 2px 16px;position:relative}
-.view-head .t{font-size:22px;font-weight:800;color:var(--sky)}
-.view-head .d{font-size:12px;color:var(--ink-soft);margin-top:2px}
+.view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:8px 2px 16px;position:relative}
+.view-head>div:first-child{min-width:0}
+.view-head .t{font-size:22px;font-weight:800;color:var(--sky);word-break:keep-all}
+.view-head .d{font-size:12px;color:var(--ink-soft);margin-top:2px;word-break:keep-all}
 
 .btn{background:var(--moss);color:#fff;border-radius:12px;padding:9px 15px;font-size:14px;font-weight:700;
-  display:inline-flex;align-items:center;gap:5px;transition:transform .12s,filter .2s;box-shadow:0 2px 8px rgba(142,176,78,.3)}
+  display:inline-flex;align-items:center;gap:5px;transition:transform .12s,filter .2s;box-shadow:0 2px 8px rgba(142,176,78,.3);
+  flex:none;white-space:nowrap}
 .btn:active{transform:scale(.95)}
 .btn.ghost{background:transparent;color:var(--moss-deep);border:1.5px solid var(--line);padding:8px 14px;box-shadow:none}
 .btn.clay{background:var(--clay);box-shadow:0 2px 8px rgba(208,139,99,.3)}
@@ -293,11 +299,14 @@ nav button .ic.blob i{font-size:16px}
 <header>
   <div class="brand">
     <svg class="leaf" viewBox="0 0 24 24" fill="none"><path d="M12 21c0-6 0-10 6-13-1 6-3 9-6 13z" fill="#8FB04E"/><path d="M12 21c0-5 0-8-5-11 1 5 2 7 5 11z" fill="#6E8C3A"/></svg>
-    <div>
+    <div class="brand-text">
       <div class="mark">가볍집 집사</div>
       <div class="sub">가볍게 왔다 가볍게 가는 집</div>
     </div>
-    <span class="sync-dot" id="syncDot" onclick="changeMe()" style="cursor:pointer"><i></i><span id="meLabel"></span><span id="syncTxt" style="margin-left:4px"></span></span>
+  </div>
+  <div class="me-row" onclick="changeMe()">
+    <span id="meLabel"></span>
+    <span class="sync-dot" id="syncDot"><i></i><span id="syncTxt"></span></span>
   </div>
 </header>
 
@@ -519,6 +528,13 @@ function fmtDate(iso){if(!iso)return"";const p=iso.split("-");return p.length<3?
 function dow(iso){return ["일","월","화","수","목","금","토"][new Date(iso+"T00:00").getDay()];}
 function todayISO(){const t=new Date();const o=t.getTimezoneOffset();return new Date(t-o*60000).toISOString().slice(0,10);}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+// 예전 방식으로 저장된 구글드라이브 사진 주소를 안정적인 미리보기 형식으로 되돌림
+function driveThumb(url){
+  if(!url) return url;
+  const m = url.match(/drive\.google\.com.*[?&]id=([^&]+)/);
+  if(m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1000`;
+  return url;
+}
 /* ============================================================
    화면 0 — 홈 (요약)
    ============================================================ */
@@ -850,7 +866,7 @@ function eventRow(e){
   if(e.type==="visit"){
     return `<div class="vrow" onclick="openVisit('${e.id}')">
       <span class="swatch" style="background:${e.color}"></span>
-      <div class="vmain"><div class="vwho">${esc(e.who)} 방문${e.guest?` <span class="vguest">+${esc(e.guest)}</span>`:""}</div>
+      <div class="vmain"><div class="vwho">${esc(e.who)}${e.guest?` <span class="vguest">+${esc(e.guest)}</span>`:""}</div>
       <div class="vwhen">${span} · ${visitMeta(e)}</div></div></div>`;
   }
   // 회의 이벤트
@@ -876,7 +892,7 @@ function dayPeek(iso){
     if(e.type==="visit"){
       h+=`<div class="vrow" onclick="closeModal();openVisit('${e.id}')">
         <span class="swatch" style="background:${e.color}"></span>
-        <div class="vmain"><div class="vwho">${esc(e.who)} 방문${e.guest?` <span class="vguest">+${esc(e.guest)}</span>`:""}</div>
+        <div class="vmain"><div class="vwho">${esc(e.who)}${e.guest?` <span class="vguest">+${esc(e.guest)}</span>`:""}</div>
         <div class="vwhen">${fmtDate(e.start)} ~ ${fmtDate(e.end)} · ${visitMeta(e)}</div></div></div>`;
     }else if(e.type==="meeting"||e.type==="meeting-next"){
       const clk=e.mid?`onclick="closeModal();readMinute('${e.mid}')"`:"";
@@ -1002,7 +1018,7 @@ function careActive(){
   PHOTO4.forEach(p=>{
     const img=log.photos[p.key];total++;if(img)done++;
     h+=`<div class="photo-slot${img?" filled":""}" onclick="${img?`removePhoto('${log.id}','${p.key}')`:`document.getElementById('cam-${p.key}').click()`}">
-      ${img?`<img src="${img}"><div class="pcheck">✓</div>`:`<span class="pemoji">📷</span><span>${esc(p.label)}</span>${p.sub?`<span style="font-size:10px;opacity:.7;line-height:1.2">${esc(p.sub)}</span>`:""}`}
+      ${img?`<img src="${driveThumb(img)}"><div class="pcheck">✓</div>`:`<span class="pemoji">📷</span><span>${esc(p.label)}</span>${p.sub?`<span style="font-size:10px;opacity:.7;line-height:1.2">${esc(p.sub)}</span>`:""}`}
       <input type="file" id="cam-${p.key}" accept="image/*" capture="environment" style="display:none" onchange="addPhoto('${log.id}','${p.key}',this)"></div>`;
   });
   h+=`</div></div>`;
@@ -1095,7 +1111,7 @@ function viewCareLog(id){
   h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">4가지 단속 사진 — ${pc}/4</div>
     <div class="photo4">`;
   PHOTO4.forEach(p=>{const img=log.photos[p.key];
-    h+=`<div class="photo-slot${img?" filled":""}" ${img?`onclick="openPhoto('${img.replace(/'/g,"")}')"`:""}>${img?`<img src="${img}"><div class="pcheck">✓</div>`:`<span class="pemoji" style="color:var(--clay)">✗</span><span style="color:#A85E38">${esc(p.label)}</span>`}</div>`;});
+    h+=`<div class="photo-slot${img?" filled":""}" ${img?`onclick="openPhoto('${driveThumb(img).replace(/'/g,"")}')"`:""}>${img?`<img src="${driveThumb(img)}"><div class="pcheck">✓</div>`:`<span class="pemoji" style="color:var(--clay)">✗</span><span style="color:#A85E38">${esc(p.label)}</span>`}</div>`;});
   h+=`</div><div class="modal-actions"><button class="btn ghost" onclick="delCareLog('${id}')">삭제</button><button class="btn ghost" onclick="reopenCare('${id}')">수정</button><button class="btn" onclick="closeModal()">닫기</button></div>`;
   showModal(h);
 }
@@ -1104,7 +1120,7 @@ function reopenCare(id){
   log.closed=false;syncUpsert("visitLogs",log);closeModal();careTab="checklist";renderCare();goTab("care");
 }
 function openPhoto(src){
-  showModal(`<div class="grab"></div><img src="${src}" style="width:100%;border-radius:14px"><div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>`);
+  showModal(`<div class="grab"></div><img src="${driveThumb(src)}" style="width:100%;border-radius:14px"><div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>`);
 }
 function delCareLog(id){if(!confirm("이 정리 기록을 삭제할까요?"))return;visitLogs=visitLogs.filter(l=>l.id!==id);syncDelete("visitLogs",id);closeModal();renderCare();}
 
@@ -1165,7 +1181,7 @@ function renderNotes(){
   else{
     [...notes].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).forEach(n=>{
       h+=`<div class="card note-card">
-        ${n.photo?`<img src="${n.photo}" class="note-img" onclick="openPhoto('${n.photo.replace(/'/g,"")}')">`:""}
+        ${n.photo?`<img src="${driveThumb(n.photo)}" class="note-img" onclick="openPhoto('${driveThumb(n.photo).replace(/'/g,"")}')">`:""}
         <div class="note-text">${esc(n.text)}</div>
         <div class="note-meta"><span>${n.who?esc(n.who):"이름 없는 마음"}</span>
           <span>${fmtShort(n.createdAt.slice(0,10))}</span>
