@@ -467,18 +467,27 @@ let me = ""; // 현재 접속한 집사 이름
 let calRef = new Date();
 let careTab = "checklist";
 
-/* ── 저장/동기화 — 항목 하나씩 주고받기 (충돌 방지) ── */
+/* ── 저장/동기화 — 항목 하나씩 주고받기 (충돌·경합 방지) ── */
 let syncBusy=false;
+const CACHE_KEY="garyeobjip_cache_v1";
+
+// 방금 이 기기에서 만들거나 고친 항목엔 표시를 남겨서,
+// 서버가 아직 못 받았을 때 20초 주기가 그걸 지워버리지 않게 막음
+function markPending(item){ item.__pending=Date.now(); }
+
 async function syncUpsert(resource,item){
+  saveCache(); // 네트워크 결과와 상관없이 지금 이 기기 상태는 바로 저장해둠
   if(!SYNC_URL)return;
   syncBusy=true;setSync(null,"보내는 중");
   try{
     await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource,op:"upsert",item,actor:me})});
-    setSync(true,"동기화됨");
+    delete item.__pending; // 서버가 받았으니 이제 20초 주기가 덮어써도 안전
+    setSync(true,"동기화됨");saveCache();
   }catch(e){setSync(false,"동기화 실패 — 다음에 자동으로 다시 시도해요");}
   syncBusy=false;
 }
 async function syncDelete(resource,id){
+  saveCache();
   if(!SYNC_URL)return;
   syncBusy=true;setSync(null,"보내는 중");
   try{
@@ -487,14 +496,25 @@ async function syncDelete(resource,id){
   }catch(e){setSync(false,"동기화 실패 — 다음에 자동으로 다시 시도해요");}
   syncBusy=false;
 }
+// 서버 데이터로 갱신하되, 아직 서버에 못 간(__pending) 로컬 항목은 지키기
+function mergeKeepPending(localArr, serverArr){
+  const map=new Map();
+  (serverArr||[]).forEach(it=>map.set(it.id,it));
+  (localArr||[]).forEach(it=>{ if(it.__pending) map.set(it.id,it); });
+  return Array.from(map.values());
+}
 async function syncPullAll(silent){
   if(!SYNC_URL)return;
   try{
     const r=await fetch(SYNC_URL);const d=await r.json();
-    if(d.timelineManual)timelineManual=d.timelineManual;
-    if(d.minutes)minutes=d.minutes;if(d.visits)visits=d.visits;if(d.activities)activities=d.activities;
-    if(d.visitLogs)visitLogs=d.visitLogs;if(d.todos)todos=d.todos;if(d.notes)notes=d.notes;
-    setSync(true,"동기화됨");renderAll();
+    if(d.timelineManual)timelineManual=mergeKeepPending(timelineManual,d.timelineManual);
+    if(d.minutes)minutes=mergeKeepPending(minutes,d.minutes);
+    if(d.visits)visits=mergeKeepPending(visits,d.visits);
+    if(d.activities)activities=mergeKeepPending(activities,d.activities);
+    if(d.visitLogs)visitLogs=mergeKeepPending(visitLogs,d.visitLogs);
+    if(d.todos)todos=mergeKeepPending(todos,d.todos);
+    if(d.notes)notes=mergeKeepPending(notes,d.notes);
+    setSync(true,"동기화됨");renderAll();saveCache();
   }catch(e){if(!silent)setSync(false,"동기화 실패");}
 }
 async function syncUploadPhoto(dataUrl,filename){
@@ -516,11 +536,32 @@ function setSync(live,txt){
 // 다른 집사가 올린 내용을 주기적으로 받아옴 (앱을 켜둔 동안)
 function startPolling(){
   if(!SYNC_URL)return;
-  setInterval(()=>{ if(!syncBusy) syncPullAll(true); }, 20000); // 20초마다
+  setInterval(()=>{ if(!syncBusy) syncPullAll(true); }, 25000); // 25초마다
   document.addEventListener("visibilitychange",()=>{
     if(document.visibilityState==="visible") syncPullAll(true);
   });
 }
+// 폰에 마지막 상태를 저장해뒀다가, 새로고침 시 먼저 보여주고
+// 뒤에서 조용히 최신화 — 앱이 "초기화됐다 다시 뜨는" 느낌을 없앰
+function saveCache(){
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      timelineManual,minutes,visits,activities,visitLogs,todos,notes
+    }));
+  }catch(e){} // 용량 문제 등은 조용히 무시 — 캐시는 있으면 좋은 것일 뿐
+}
+function loadCache(){
+  try{
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(d.timelineManual)timelineManual=d.timelineManual;
+    if(d.minutes)minutes=d.minutes;if(d.visits)visits=d.visits;if(d.activities)activities=d.activities;
+    if(d.visitLogs)visitLogs=d.visitLogs;if(d.todos)todos=d.todos;if(d.notes)notes=d.notes;
+    return true;
+  }catch(e){ return false; }
+}
+
 
 /* ── 유틸 ── */
 function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
@@ -685,9 +726,10 @@ function openTL(id){
 function saveTL(id){
   const o={date:val("tl-date"),t:val("tl-t").trim(),n:val("tl-n").trim()};
   if(!o.t){alert("무슨 일이 있었는지 적어주세요.");return;}
-  if(id)Object.assign(timelineManual.find(t=>t.id===id),o);
-  else{o.id=uid();timelineManual.push(o);}
-  syncUpsert("timelineManual",o);closeModal();renderTimeline();
+  let item;
+  if(id){ item=timelineManual.find(t=>t.id===id); Object.assign(item,o); }
+  else{ o.id=uid(); timelineManual.push(o); item=o; }
+  markPending(item);syncUpsert("timelineManual",item);closeModal();renderTimeline();
 }
 function delTL(id){if(!confirm("이 기록을 지울까요?"))return;
   timelineManual=timelineManual.filter(t=>t.id!==id);syncDelete("timelineManual",id);closeModal();renderTimeline();}
@@ -759,9 +801,10 @@ function saveMinute(id){
   const o={date:val("f-date"),kind:val("f-kind"),host:val("f-host"),
     heartOpen:val("f-heartOpen"),notice:val("f-notice"),agenda:val("f-agenda"),heartClose:val("f-heartClose"),
     nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote")};
-  if(id)Object.assign(minutes.find(x=>x.id===id),o);
-  else{o.id=uid();minutes.push(o);}
-  syncUpsert("minutes",o);closeModal();renderMinutes();renderTimeline();renderVisits();
+  let item;
+  if(id){ item=minutes.find(x=>x.id===id); Object.assign(item,o); }
+  else{ o.id=uid(); minutes.push(o); item=o; }
+  markPending(item);syncUpsert("minutes",item);closeModal();renderMinutes();renderTimeline();renderVisits();
 }
 function delMinute(id){if(!confirm("이 회의록을 삭제할까요?"))return;
   minutes=minutes.filter(x=>x.id!==id);syncDelete("minutes",id);closeModal();renderMinutes();renderTimeline();renderVisits();}
@@ -940,8 +983,10 @@ function saveVisit(id){
   const o={who:val("v-who").trim(),guest:val("v-guest").trim(),start:val("v-start"),end:val("v-end"),note:val("v-note").trim(),color:window._pc||SWATCHES[0]};
   if(!o.who){alert("집사 이름을 적어주세요.");return;}
   if(o.end<o.start)o.end=o.start;
-  if(id)Object.assign(visits.find(x=>x.id===id),o);else{o.id=uid();visits.push(o);}
-  syncUpsert("visits",o);closeModal();renderVisits();renderHome();
+  let item;
+  if(id){ item=visits.find(x=>x.id===id); Object.assign(item,o); }
+  else{ o.id=uid(); visits.push(o); item=o; }
+  markPending(item);syncUpsert("visits",item);closeModal();renderVisits();renderHome();
 }
 function delVisit(id){if(!confirm("이 방문을 삭제할까요?"))return;visits=visits.filter(x=>x.id!==id);syncDelete("visits",id);closeModal();renderVisits();renderHome();}
 
@@ -965,8 +1010,10 @@ function saveActivity(id){
   const o={title:val("a-title").trim(),start:val("a-start"),end:val("a-end"),note:val("a-note").trim()};
   if(!o.title){alert("무슨 모임·활동인지 적어주세요.");return;}
   if(o.end<o.start)o.end=o.start;
-  if(id)Object.assign(activities.find(x=>x.id===id),o);else{o.id=uid();activities.push(o);}
-  syncUpsert("activities",o);closeModal();renderVisits();renderHome();
+  let item;
+  if(id){ item=activities.find(x=>x.id===id); Object.assign(item,o); }
+  else{ o.id=uid(); activities.push(o); item=o; }
+  markPending(item);syncUpsert("activities",item);closeModal();renderVisits();renderHome();
 }
 function delActivity(id){if(!confirm("이 모임·활동을 삭제할까요?"))return;activities=activities.filter(x=>x.id!==id);syncDelete("activities",id);closeModal();renderVisits();renderHome();}
 /* ============================================================
@@ -1030,15 +1077,15 @@ function careActive(){
 }
 function startCare(){
   const log={id:uid(),date:todayISO(),who:me||"",checks:{},photos:{},closed:false};
-  visitLogs.push(log);syncUpsert("visitLogs",log);renderCare();renderHome();
+  visitLogs.push(log);markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
 }
 function editCareWho(id){
   const log=visitLogs.find(l=>l.id===id);
   const n=prompt("정리한 집사 이름",log.who||"");
-  if(n!==null){log.who=n.trim();syncUpsert("visitLogs",log);renderCare();renderHome();}
+  if(n!==null){log.who=n.trim();markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();}
 }
 function toggleChk(id,k){
-  const log=visitLogs.find(l=>l.id===id);log.checks[k]=!log.checks[k];syncUpsert("visitLogs",log);renderCare();renderHome();
+  const log=visitLogs.find(l=>l.id===id);log.checks[k]=!log.checks[k];markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
 }
 function addPhoto(id,key,input){
   const f=input.files[0];if(!f)return;
@@ -1052,21 +1099,21 @@ function addPhoto(id,key,input){
       c.getContext("2d").drawImage(img,0,0,c.width,c.height);
       const dataUrl=c.toDataURL("image/jpeg",0.7);
       const log=visitLogs.find(l=>l.id===id);
-      log.photos[key]=dataUrl;renderCare();renderHome(); // 우선 이 기기에 바로 보이게
+      log.photos[key]=dataUrl;markPending(log);renderCare();renderHome(); // 우선 이 기기에 바로 보이게, 업로드 끝날 때까지 보호
       const url=await syncUploadPhoto(dataUrl,`care_${id}_${key}.jpg`);
       if(url)log.photos[key]=url; // 업로드되면 드라이브 주소로 교체 — 다른 집사도 보임
-      syncUpsert("visitLogs",log);renderCare();
+      markPending(log);syncUpsert("visitLogs",log);renderCare();
     };img.src=e.target.result;
   };r.readAsDataURL(f);
 }
 function removePhoto(id,key){
   if(!confirm("이 사진을 지울까요?"))return;
-  const log=visitLogs.find(l=>l.id===id);delete log.photos[key];syncUpsert("visitLogs",log);renderCare();renderHome();
+  const log=visitLogs.find(l=>l.id===id);delete log.photos[key];markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
 }
 function closeCare(id){
   const log=visitLogs.find(l=>l.id===id);
   if(!log.who){if(!confirm("정리한 집사 이름이 비어 있어요. 그래도 마칠까요?"))return;}
-  log.closed=true;syncUpsert("visitLogs",log);careTab="history";renderCare();
+  log.closed=true;markPending(log);syncUpsert("visitLogs",log);careTab="history";renderCare();
 }
 function careHistory(){
   const closed=visitLogs.filter(l=>l.closed).sort((a,b)=>b.date.localeCompare(a.date));
@@ -1117,7 +1164,7 @@ function viewCareLog(id){
 }
 function reopenCare(id){
   const log=visitLogs.find(l=>l.id===id);
-  log.closed=false;syncUpsert("visitLogs",log);closeModal();careTab="checklist";renderCare();goTab("care");
+  log.closed=false;markPending(log);syncUpsert("visitLogs",log);closeModal();careTab="checklist";renderCare();goTab("care");
 }
 function openPhoto(src){
   showModal(`<div class="grab"></div><img src="${driveThumb(src)}" style="width:100%;border-radius:14px"><div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>`);
@@ -1159,13 +1206,13 @@ function saveTodo(){
   const text=val("t-text").trim();if(!text){alert("필요한 일을 적어주세요.");return;}
   const o={id:uid(),text,who:val("t-who").trim(),done:false,doneBy:"",createdAt:new Date().toISOString()};
   todos.push(o);
-  syncUpsert("todos",o);closeModal();renderTodo();renderHome();
+  markPending(o);syncUpsert("todos",o);closeModal();renderTodo();renderHome();
 }
 function toggleTodo(id){
   const t=todos.find(x=>x.id===id);
   if(!t.done){const n=prompt("해결한 집사 이름 (선택)","");t.doneBy=n?n.trim():"";t.done=true;}
   else{t.done=false;t.doneBy="";}
-  syncUpsert("todos",t);renderTodo();renderHome();
+  markPending(t);syncUpsert("todos",t);renderTodo();renderHome();
 }
 function delTodo(id){if(!confirm("이 항목을 지울까요?"))return;todos=todos.filter(t=>t.id!==id);syncDelete("todos",id);renderTodo();renderHome();}
 
@@ -1216,13 +1263,13 @@ function notephoto(input){
 async function saveNote(){
   const text=val("n-text").trim();if(!text&&!window._notePhoto){alert("마음이나 사진을 남겨주세요.");return;}
   const o={id:uid(),who:val("n-who").trim(),text,photo:window._notePhoto||"",createdAt:new Date().toISOString()};
-  notes.push(o);
+  notes.push(o);markPending(o);
   closeModal();renderNotes();renderHome(); // 우선 이 기기에 바로 보이게
   if(o.photo){
     const url=await syncUploadPhoto(o.photo,`note_${o.id}.jpg`);
     if(url){o.photo=url;renderNotes();}
   }
-  syncUpsert("notes",o);
+  markPending(o);syncUpsert("notes",o);
 }
 function delNote(id){if(!confirm("이 글을 지울까요?"))return;notes=notes.filter(n=>n.id!==id);syncDelete("notes",id);renderNotes();renderHome();}
 
@@ -1270,10 +1317,11 @@ document.querySelectorAll("nav button").forEach(b=>{
 });
 
 loadMe();
+loadCache(); // 폰에 저장해둔 마지막 상태를 먼저 보여줌 — "초기화됐다 다시 뜨는" 느낌 없애기
 renderAll();
 updateHeaderMe();
 if(!me)openNameGate(false);
-if(SYNC_URL){ syncPullAll(); startPolling(); }
+if(SYNC_URL){ syncPullAll(); startPolling(); } // 초기 1회는 실패시 알려줌, 이후 주기적 폴링만 조용히
 </script>
 </body>
 </html>
