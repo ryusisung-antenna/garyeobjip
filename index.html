@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>가볍집 집사</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --paper:#FBF8F1;       /* 안내서 한지빛 바탕 */
+  --paper-2:#F4EFE4;     /* 약간 짙은 한지 */
+  --ink:#3A352E;         /* 먹빛 */
+  --ink-soft:#7A7263;    /* 옅은 먹 */
+  --line:#E6DECF;        /* 선 */
+  --lilac:#C9B6DC;       /* 안내서 보라꽃 */
+  --lilac-deep:#9B7FB8;
+  --moss:#8FB04E;        /* 안내서 잎새 연두 */
+  --moss-deep:#6E8C3A;
+  --clay:#D08B63;        /* 안내서 흙빛 열매 */
+  --clay-deep:#B5694180; 
+  --sky:#5FA9D6;         /* 안내서 하늘빛 제목 */
+  --sun:#F4C430;         /* 안내서 햇살 */
+  --card:#FFFFFF;
+  --shadow:0 1px 2px rgba(58,53,46,.04),0 10px 30px rgba(58,53,46,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
+  font-size:16px;line-height:1.65;letter-spacing:-.01em;padding-bottom:86px;
+  word-break:keep-all;overflow-wrap:break-word;
+}
+h1,h2,h3,h4{font-weight:700;letter-spacing:-.02em;margin:0}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{font-family:inherit;font-size:16px;color:var(--ink)}
+
+/* 햇살 장식 (안내서 모티프) */
+.sunburst{position:absolute;width:40px;height:40px;pointer-events:none;opacity:.9}
+.sunburst::before,.sunburst::after{content:"";position:absolute;inset:0;background:var(--sun);
+  clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.sunburst::after{transform:rotate(20deg);opacity:.55}
+
+/* 머리 */
+header{padding:20px 20px 12px;position:sticky;top:0;z-index:30;
+  background:linear-gradient(var(--paper) 80%,rgba(251,248,241,0))}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.brand .leaf{width:26px;height:26px;flex:none}
+.brand-text{min-width:0}
+.brand .mark{font-size:23px;font-weight:800;color:var(--moss-deep);letter-spacing:-.03em;line-height:1.25}
+.brand .sub{font-size:11.5px;color:var(--ink-soft);margin-top:1px;word-break:keep-all}
+.me-row{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;
+  font-size:11px;color:var(--ink-soft);margin-top:7px;cursor:pointer;word-break:keep-all}
+.sync-dot{display:flex;align-items:center;gap:5px;flex:none}
+.sync-dot i{width:7px;height:7px;border-radius:50%;background:var(--clay);display:inline-block;flex:none}
+.sync-dot.live i{background:var(--moss)}
+
+main{padding:2px 18px 20px;max-width:680px;margin:0 auto}
+.view{display:none;animation:rise .3s cubic-bezier(.2,.7,.3,1)}
+.view.on{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:8px 2px 16px;position:relative}
+.view-head>div:first-child{min-width:0}
+.view-head .t{font-size:22px;font-weight:800;color:var(--sky);word-break:keep-all}
+.view-head .d{font-size:12px;color:var(--ink-soft);margin-top:2px;word-break:keep-all}
+
+.btn{background:var(--moss);color:#fff;border-radius:12px;padding:9px 15px;font-size:14px;font-weight:700;
+  display:inline-flex;align-items:center;gap:5px;transition:transform .12s,filter .2s;box-shadow:0 2px 8px rgba(142,176,78,.3);
+  flex:none;white-space:nowrap}
+.btn:active{transform:scale(.95)}
+.btn.ghost{background:transparent;color:var(--moss-deep);border:1.5px solid var(--line);padding:8px 14px;box-shadow:none}
+.btn.clay{background:var(--clay);box-shadow:0 2px 8px rgba(208,139,99,.3)}
+.btn.lilac{background:var(--lilac-deep);box-shadow:0 2px 8px rgba(155,127,184,.3)}
+.btn.sm{padding:6px 11px;font-size:13px;border-radius:9px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 17px;box-shadow:var(--shadow);margin-bottom:12px}
+.empty{text-align:center;color:var(--ink-soft);padding:46px 20px;font-size:14px}
+.empty .big{font-size:34px;margin-bottom:10px;opacity:.45}
+
+/* 탭 */
+nav{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(251,248,241,.94);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);display:flex;padding:7px 4px calc(7px + env(safe-area-inset-bottom))}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0;color:var(--ink-soft);
+  font-size:10px;font-weight:700;transition:color .2s}
+nav button .ic{font-size:19px;line-height:1;transition:transform .2s}
+nav button.on{color:var(--moss-deep)}
+nav button.on .ic{transform:translateY(-2px) scale(1.08)}
+nav button .ic.blob{
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  margin-bottom:1px;transition:transform .2s,filter .2s;filter:saturate(.75);
+}
+nav button.on .ic.blob{transform:translateY(-2px) scale(1.08);filter:saturate(1.15)}
+nav button .ic.blob i{font-size:16px}
+.blob-a{border-radius:46% 54% 58% 42% / 48% 44% 56% 52%;background:#E8E0F0;color:#7A5FA6}
+.blob-b{border-radius:52% 48% 44% 56% / 42% 58% 46% 54%;background:#EAF0DD;color:#6E8C3A}
+.blob-c{border-radius:44% 56% 52% 48% / 56% 42% 58% 44%;background:#F3E4D6;color:#B5713F}
+.blob-d{border-radius:56% 44% 48% 52% / 44% 56% 42% 58%;background:#E0EDF6;color:#3F7CA0}
+.blob-e{border-radius:48% 52% 42% 58% / 58% 46% 52% 44%;background:#FBEFD2;color:#A67D0D}
+.blob-f{border-radius:50% 50% 46% 54% / 54% 48% 52% 46%;background:#EAF0DD;color:#6E8C3A}
+.blob-g{border-radius:54% 46% 50% 50% / 46% 54% 48% 52%;background:#EAF0DD;color:#6E8C3A}
+.blob-h{border-radius:50% 50% 54% 46% / 48% 52% 46% 54%;background:#E8E0F0;color:#7A5FA6}
+.blob-a-alt{border-radius:44% 56% 50% 50% / 52% 48% 54% 46%;background:#EAF0DD;color:#6E8C3A}
+.hc-emoji.blob{width:30px;height:30px;display:flex;align-items:center;justify-content:center;filter:saturate(.85)}
+.hc-emoji.blob i{font-size:14px}
+.arch-btn .blob{width:34px;height:34px;display:flex;align-items:center;justify-content:center}
+.arch-btn .blob i{font-size:16px}
+/* 타임라인 */
+.tl-year{display:flex;align-items:center;gap:12px;margin:22px 2px 14px}
+.tl-year .y{font-size:28px;font-weight:800;color:var(--lilac-deep);letter-spacing:-.03em}
+.tl-year .kw{font-size:11.5px;color:var(--ink-soft);flex:1;border-top:1.5px dashed var(--line);padding-top:6px}
+.tl-item{position:relative;padding:0 0 2px 24px;margin-bottom:13px}
+.tl-item::before{content:"";position:absolute;left:5px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--moss);box-shadow:0 0 0 4px var(--paper)}
+.tl-item::after{content:"";position:absolute;left:9px;top:18px;bottom:-13px;width:1.5px;background:var(--line)}
+.tl-item:last-child::after{display:none}
+.tl-item.fromMt::before{background:var(--lilac)}
+.tl-item.manual::before{background:var(--clay)}
+.tl-date{font-size:11.5px;font-weight:700;color:var(--clay)}
+.tl-body{font-size:14px;margin-top:1px;line-height:1.5}
+.tl-note{font-size:12px;color:var(--ink-soft);margin-top:3px;padding-left:9px;border-left:2px solid var(--line)}
+.tl-src{display:inline-block;font-size:10px;color:var(--lilac-deep);background:rgba(201,182,220,.18);padding:1px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
+
+/* 회의록 */
+.mt-card{cursor:pointer;transition:border-color .2s,transform .12s}
+.mt-card:active{transform:scale(.99)}
+.mt-top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.mt-date{font-size:16px;font-weight:800}
+.mt-kind{font-size:11px;padding:2px 8px;border-radius:7px;background:rgba(95,169,214,.13);color:var(--sky)}
+.mt-host{font-size:12px;color:var(--ink-soft);margin-left:auto}
+.mt-prev{font-size:13px;color:var(--ink-soft);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mt-next-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--moss-deep);background:rgba(142,176,78,.12);padding:5px 10px;border-radius:9px;margin-top:8px}
+
+/* 방문 */
+.cal-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px}
+.cal-nav button{font-size:19px;color:var(--ink-soft);padding:4px 12px;border-radius:8px}
+.cal-nav button:active{background:var(--paper-2)}
+.cal-nav .mlabel{font-size:16px;font-weight:800;min-width:120px;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-grid .dow{text-align:center;font-size:10.5px;color:var(--ink-soft);padding:3px 0;font-weight:700}
+.cal-cell{aspect-ratio:1;border-radius:10px;padding:4px 0 0;position:relative;font-size:12.5px;text-align:center;background:transparent;transition:background .15s}
+.cal-cell:active{background:var(--paper-2)}
+.cal-cell.pad{opacity:0;pointer-events:none}
+.cal-cell.today{background:rgba(142,176,78,.13);font-weight:800}
+.cal-cell .dots{display:flex;justify-content:center;gap:2px;margin-top:2px;flex-wrap:wrap;padding:0 3px}
+.cal-cell .dots i{width:5px;height:5px;border-radius:50%}
+.cal-cell.sun{color:var(--clay)}
+.cal-num{position:relative;z-index:1}
+.cal-cell .cal-bar{position:absolute;top:3px;left:50%;transform:translateX(-50%);width:60%;height:3px;border-radius:2px}
+.cal-cell.has-gather{padding-top:9px}
+.legend{display:flex;gap:16px;justify-content:center;margin-bottom:12px;font-size:11.5px;color:var(--ink-soft)}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.legend .lg-visit{background:var(--moss);border-radius:50%}
+.legend .lg-meet{background:var(--lilac-deep);width:14px;height:3px;border-radius:2px}
+.legend .lg-act{background:var(--sky);width:14px;height:3px;border-radius:2px}
+.sect-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;color:var(--ink);margin:4px 2px 6px}
+.sect-label .sl-dot{width:9px;height:9px;border-radius:50%}
+.grp{border-radius:18px;padding:4px 15px 8px;margin-bottom:14px;border:1px solid var(--line)}
+.grp-visit{background:rgba(142,176,78,.07);border-color:rgba(142,176,78,.25)}
+.grp-gather{background:rgba(95,169,214,.07);border-color:rgba(95,169,214,.25)}
+.grp-head{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;padding:12px 2px 4px}
+.grp-visit .grp-head{color:var(--moss-deep)}
+.grp-gather .grp-head{color:#3F7CA0}
+.grp .vrow{border-bottom-color:rgba(58,53,46,.06)}
+.preset-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.preset-chips button{font-size:12px;background:var(--paper-2);color:var(--ink-soft);border-radius:8px;padding:5px 10px;font-weight:600;transition:.15s}
+.preset-chips button:active{background:var(--sky);color:#fff}
+.vlist{margin-top:14px}
+.vrow{display:flex;align-items:center;gap:11px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.vrow:last-child{border-bottom:none}
+.vrow .swatch{width:11px;height:11px;border-radius:50%;flex:none}
+.vrow .vmain{flex:1;min-width:0}
+.vrow .vwho{font-size:14px;font-weight:700}
+.vrow .vwhen{font-size:12px;color:var(--ink-soft)}
+.vrow .vguest{font-size:12px;color:var(--clay);font-weight:400}
+.overlap-warn{background:rgba(208,139,99,.1);border:1px solid rgba(208,139,99,.35);color:#A85E38;border-radius:12px;padding:10px 13px;font-size:13px;margin-top:12px;display:flex;gap:8px;align-items:flex-start}
+
+/* 살림(체크리스트) */
+.seg{display:flex;gap:6px;margin-bottom:14px;background:var(--paper-2);padding:4px;border-radius:12px}
+.seg button{flex:1;padding:8px;border-radius:9px;font-size:13px;font-weight:700;color:var(--ink-soft);transition:.2s}
+.seg button.on{background:var(--card);color:var(--moss-deep);box-shadow:var(--shadow)}
+.chk-group h4{font-size:13px;color:var(--clay);margin:16px 2px 8px;display:flex;align-items:center;gap:7px}
+.chk-group h4::before{content:"";width:13px;height:2px;background:var(--clay);border-radius:2px}
+.chk-item{display:flex;align-items:center;gap:11px;padding:11px 13px;background:var(--card);border:1px solid var(--line);border-radius:13px;margin-bottom:7px;cursor:pointer;transition:.15s}
+.chk-item:active{transform:scale(.99)}
+.chk-item.done{background:var(--paper-2);border-color:transparent}
+.chk-box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;transition:.15s}
+.chk-item.done .chk-box{background:var(--moss);border-color:var(--moss);color:#fff}
+.chk-label{font-size:14px;flex:1}
+.chk-item.done .chk-label{color:var(--ink-soft);text-decoration:line-through}
+.chk-sub{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
+.photo4{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.photo-slot{aspect-ratio:1;border-radius:13px;border:2px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--ink-soft);font-size:12px;background:var(--card);cursor:pointer;overflow:hidden;position:relative}
+.photo-slot.filled{border-style:solid;border-color:var(--moss)}
+.photo-slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo-slot .pemoji{font-size:24px}
+.photo-slot .pcheck{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--moss);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+.visit-log-card{cursor:pointer}
+.vlog-prog{height:6px;background:var(--paper-2);border-radius:3px;overflow:hidden;margin-top:8px}
+.vlog-prog i{display:block;height:100%;background:var(--moss);border-radius:3px;transition:width .3s}
+
+/* 할 일 게시판 */
+.todo-item{display:flex;align-items:flex-start;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:9px}
+.todo-item.done{opacity:.55}
+.todo-check{width:24px;height:24px;border-radius:8px;border:2px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;margin-top:1px}
+.todo-item.done .todo-check{background:var(--clay);border-color:var(--clay);color:#fff}
+.todo-main{flex:1;min-width:0}
+.todo-text{font-size:14.5px;line-height:1.45}
+.todo-item.done .todo-text{text-decoration:line-through;color:var(--ink-soft)}
+.todo-meta{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
+.todo-meta .who{color:var(--moss-deep);font-weight:600}
+.todo-del{color:var(--ink-soft);font-size:18px;padding:2px 6px;flex:none}
+
+/* 모달 */
+.modal-bg{position:fixed;inset:0;background:rgba(58,53,46,.42);z-index:60;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+.modal-bg.on{display:flex}
+.modal{background:var(--paper);width:100%;max-width:680px;max-height:92vh;overflow-y:auto;border-radius:24px 24px 0 0;padding:8px 20px 28px;animation:slideup .3s cubic-bezier(.2,.7,.3,1)}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:none}}
+.modal .grab{width:38px;height:4px;background:var(--line);border-radius:3px;margin:8px auto 16px}
+.modal h3{font-size:18px;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:5px;font-weight:700}
+.field input,.field textarea,.field select{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--card);outline:none;transition:border-color .2s}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--moss)}
+.field textarea{resize:vertical;min-height:70px;line-height:1.6}
+.field .hint{font-size:11px;color:var(--ink-soft);margin-top:4px}
+.row2{display:flex;gap:10px}.row2>*{flex:1}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.modal-actions .btn{flex:1;justify-content:center;padding:13px}
+.swatch-pick{display:flex;gap:9px;flex-wrap:wrap}
+.swatch-pick button{width:30px;height:30px;border-radius:50%;border:2.5px solid transparent;transition:transform .12s}
+.swatch-pick button.sel{border-color:var(--ink);transform:scale(1.12)}
+.mt-read h4{font-size:13px;color:var(--moss-deep);font-weight:700;margin:18px 0 7px;display:flex;align-items:center;gap:7px}
+.mt-read h4::before{content:"";width:14px;height:2px;background:var(--moss);border-radius:2px}
+.mt-read .body{white-space:pre-wrap;font-size:14.5px;line-height:1.7}
+.fade-note{font-size:11.5px;color:var(--ink-soft);text-align:center;margin:18px 0 4px;line-height:1.6}
+.tip{background:rgba(95,169,214,.08);border:1px solid rgba(95,169,214,.2);border-radius:12px;padding:11px 13px;font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;line-height:1.55}
+.log-line{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:11px;margin-bottom:6px;font-size:14px}
+.log-line.ok{background:rgba(142,176,78,.12)}
+.log-line.no{background:rgba(208,139,99,.13)}
+.log-mark{width:22px;height:22px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
+.log-line.ok .log-mark{background:var(--moss)}
+.log-line.no .log-mark{background:var(--clay)}
+.log-line.ok .log-txt{color:var(--ink)}
+.log-line.no .log-txt{color:#A85E38;font-weight:600}
+
+/* 홈 */
+.home-hello{padding:10px 4px 18px}
+.hh-greet{font-size:23px;font-weight:800;color:var(--moss-deep);letter-spacing:-.02em}
+.hh-sub{font-size:13px;color:var(--ink-soft);margin-top:3px}
+.home-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px 16px;box-shadow:var(--shadow);margin-bottom:11px;cursor:pointer;transition:transform .12s}
+.home-card:active{transform:scale(.99)}
+.hc-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.hc-emoji{font-size:17px}
+.hc-title{font-size:14.5px;font-weight:800}
+.hc-badge{background:var(--clay);color:#fff;font-size:11px;font-weight:700;min-width:19px;height:19px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.hc-go{margin-left:auto;color:var(--ink-soft);font-size:18px}
+.hc-empty{font-size:13px;color:var(--ink-soft);padding:2px 0}
+.hc-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13.5px}
+.hc-when{font-size:11.5px;color:var(--ink-soft);min-width:54px;font-weight:600}
+.hc-when.now{color:var(--clay)}
+.hc-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.hc-ic{font-size:16px;flex:none;width:20px;text-align:center;color:var(--ink-soft)}
+.ic-inline{font-size:14px;vertical-align:-1.5px;color:var(--lilac-deep)}
+.ic-inline.ti-cup{color:var(--sky)}
+.grp-head i{font-size:16px}
+.grp-visit .grp-head i{color:var(--moss-deep)}
+.grp-gather .grp-head i{color:#3F7CA0}
+.hc-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-arch{display:flex;gap:10px;margin-top:6px}
+.arch-btn{flex:1;background:transparent;border:1.5px dashed var(--line);border-radius:14px;padding:13px;font-size:13px;font-weight:700;color:var(--ink-soft);display:flex;flex-direction:column;align-items:center;gap:5px}
+.arch-btn span:not(.blob){font-size:18px}
+.arch-btn:active{background:var(--paper-2)}
+.home-card.pending{opacity:.72;border-style:dashed}
+.hc-soon{margin-left:auto;font-size:10.5px;color:var(--lilac-deep);background:rgba(201,182,220,.18);padding:2px 8px;border-radius:7px;font-weight:700}
+
+/* 사랑방 */
+.note-card{padding:0;overflow:hidden}
+.note-img{width:100%;display:block;max-height:280px;object-fit:cover;cursor:pointer}
+.note-text{white-space:pre-wrap;font-size:14.5px;line-height:1.6;padding:14px 16px 0}
+.note-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-soft);padding:8px 16px 14px}
+.note-meta span:first-child{color:var(--lilac-deep);font-weight:700}
+.note-del{margin-left:auto;color:var(--ink-soft);font-size:18px;padding:0 4px}
+
+/* 이름 게이트 */
+.name-gate{position:fixed;inset:0;z-index:80;background:var(--paper);display:none;align-items:center;justify-content:center;padding:24px}
+.name-gate.on{display:flex}
+.gate-box{text-align:center;max-width:340px;animation:rise .4s cubic-bezier(.2,.7,.3,1)}
+.gate-leaf{font-size:40px;margin-bottom:14px}
+.gate-title{font-size:21px;font-weight:800;color:var(--moss-deep)}
+.gate-sub{font-size:13px;color:var(--ink-soft);margin-top:8px;line-height:1.55}
+.gate-names{display:flex;flex-direction:column;gap:9px;margin:22px 0 14px}
+.gate-names button{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;font-size:16px;font-weight:700;color:var(--ink);transition:.15s}
+.gate-names button:active{background:var(--moss);color:#fff;border-color:var(--moss);transform:scale(.98)}
+.gate-skip{font-size:13px;color:var(--ink-soft);text-decoration:underline;padding:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg class="leaf" viewBox="0 0 24 24" fill="none"><path d="M12 21c0-6 0-10 6-13-1 6-3 9-6 13z" fill="#8FB04E"/><path d="M12 21c0-5 0-8-5-11 1 5 2 7 5 11z" fill="#6E8C3A"/></svg>
+    <div class="brand-text">
+      <div class="mark">가볍집 집사</div>
+      <div class="sub">가볍게 왔다 가볍게 가는 집</div>
+    </div>
+  </div>
+  <div class="me-row" onclick="changeMe()">
+    <span id="meLabel"></span>
+    <span class="sync-dot" id="syncDot"><i></i><span id="syncTxt"></span></span>
+  </div>
+</header>
+
+<div class="name-gate" id="nameGate"></div>
+
+<main>
+  <section class="view on" id="view-home"></section>
+  <section class="view" id="view-visits"></section>
+  <section class="view" id="view-care"></section>
+  <section class="view" id="view-todo"></section>
+  <section class="view" id="view-notes"></section>
+  <section class="view" id="view-timeline"></section>
+  <section class="view" id="view-minutes"></section>
+</main>
+
+<nav>
+  <button class="on" data-tab="home"><span class="ic blob blob-a"><i class="ti ti-home-2"></i></span>홈</button>
+  <button data-tab="visits"><span class="ic blob blob-b"><i class="ti ti-calendar-event"></i></span>일정</button>
+  <button data-tab="care"><span class="ic blob blob-c"><i class="ti ti-sparkles"></i></span>살림</button>
+  <button data-tab="todo"><span class="ic blob blob-d"><i class="ti ti-checklist"></i></span>할 일</button>
+  <button data-tab="notes"><span class="ic blob blob-e"><i class="ti ti-flower"></i></span>사랑방</button>
+</nav>
+
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalBox"></div></div>
+
+<script>
+/* ============================================================
+   가볍집 집사 앱 — Phase 1.5
+   걸어온 길 · 회의록 · 방문 · 살림(체크리스트+퇴실사진) · 할 일
+   저장: 지금은 이 기기. SYNC_URL 채우면 동기화 전환.
+   ============================================================ */
+const SYNC_URL = "https://script.google.com/macros/s/AKfycbzsoEA0W9w7B62qQ2V8K4UyRRHus8bqzUJlEns62IzZEOUh6mow0dLmpZtxGuRRV3f7/exec"; // 가볍집 공용 구글시트
+
+/* ── 고정 타임라인 (2023~2024, 지난 기록) ── */
+const TIMELINE_FIXED = [
+  { year:2023, kw:"소개 · 탐색 · 비전 · 방향 · 가치", items:[
+    {d:"9.13", t:"이은주 선생님으로부터 소개받다", n:"은주쌤께 두고두고 감사를"},
+    {d:"9.18", t:"1차 답사 — 정혜림쌤과 집을 둘러보다", n:"혜림쌤께도 고마움을"},
+    {d:"10.20", t:"2차 답사 — 하동 여기저기를 가보다"},
+    {d:"10.22", t:"단톡방을 만들어 의견을 나누기 시작하다"},
+    {d:"11.8", t:"3차 답사 — 추구할 가치의 지도를 그리다", n:"20~30년 뒤 문제를 공부 · 하동·구례·남원 이야기 · 화합의 지혜"},
+    {d:"12.15", t:"온라인 1차 회의"},
+    {d:"12.29~31", t:"4차 답사 · 2차 회의 — 공통의 가치를 나누다", n:"치유 여유 사유 자유 공유 · 자연 마음 공생 자기"},
+  ]},
+  { year:2024, kw:"계약·입주 · 공간윤리 · 손님 · 위빳사나", items:[
+    {d:"1.10~11", t:"5차 답사 — 도심마을 집을 보고 계약하다"},
+    {d:"2.6", t:"4차 회의 — 왜 이 모임을 하는지 다시 묻다", n:"구례=이론 화개=수행 남원=공유 사이버=연대 사람"},
+    {d:"2.28~3.1", t:"하동집 본계약 · 입주해 청소하고 정리하다"},
+    {d:"4.10", t:"7차 회의 — 중간정산 · 논어 워크샵 · 공간윤리"},
+    {d:"5.5", t:"이사떡 · 공통의 룰 연습 · 첫 숙박손님(김한라)", n:"끝까지 듣기 · 먼저 자신에게 되돌려 보기"},
+    {d:"7월", t:"공통 텍스트 〈위빳사나〉 · 삼의제 회의방식 · 진행 돌아가며"},
+    {d:"8월", t:"안내서 이미지화 · 첫 명상수련 · 프로그램 구상"},
+    {d:"10월", t:"청년주거비 지원 선정 · 흥선쌤·현진이 숙박"},
+    {d:"11월", t:"한기호쌤 · 신항서원 김장캠프 참여"},
+    {d:"12월", t:"2024를 돌아보고 2025 운영방향 고민 · 고엔카 〈위빳사나〉"},
+  ]},
+];
+
+/* ── 손으로 추가하는 굵직한 기록 (2025~) ── */
+let timelineManual = [
+  {id:"tm1", date:"2025-02-16", t:"가볍집 기부 시작 — 매달 5만원, 자주기금부터", n:""},
+  {id:"tm2", date:"2025-03-20", t:"2025 〈토지〉 읽기 모임 시작 (김해숙)", n:"'가볍다·생명·자연·치유'로 풀어가기"},
+  {id:"tm3", date:"2025-05", t:"비움 프로젝트 — 옷캔 통한 안 입는 옷 기부 (류시성)", n:""},
+];
+
+/* ── 회의록: 다섯 칸 반구조 ── */
+// 입력·표시 순서: 여는 마음 → 안건과 협의 → 공지사항 → (다음 회의) → 닫는 나누기
+const MT_BLOCKS_BEFORE = [
+  {key:"heartOpen", label:"여는 마음 (첫마음 나누기)"},
+  {key:"agenda",    label:"안건과 협의"},
+  {key:"notice",    label:"공지사항"},
+];
+const MT_BLOCKS_AFTER = [
+  {key:"heartClose",label:"닫는 나누기"},
+];
+const MT_BLOCKS = [...MT_BLOCKS_BEFORE, ...MT_BLOCKS_AFTER];
+
+let minutes = [
+  { id:"m1", date:"2024-12-29", kind:"오프라인", host:"",
+    heartOpen:"자리를 잡아가고 있음 — 가볍집 사용설명서 보람차다.\n준비된 것 위에서 우리가 지향하는 방향으로 조금 나아가보는 연습.\n하드웨어가 갖춰졌으니 이제 소프트웨어를 고민하자.",
+    notice:"",
+    agenda:"· 기부 — 매달 5만원. 자주기금/나마스떼하동 중 결정\n· 사용평가 설문서로 연락처 수집 → 활동 홍보 루트\n· 공동 울력 달력(2월 대청소 / 4월 찻잎 / 6월 매실 / 8월 침구 / 10월 감 / 12월 비누·치약)\n· 회의: 온1·오프1 유지, 진행 매달 돌아가며\n· 회의 기록 저장소 — 구글독스",
+    heartClose:"",
+    nextDate:"2025-02-02", nextHost:"송혜경", nextNote:"고엔카 책 3~6장 읽어오기" },
+  { id:"m2", date:"2025-02-02", kind:"온라인", host:"송혜경",
+    heartOpen:"",
+    notice:"",
+    agenda:"〈고엔카의 위빳사나〉 3~6장 나눔.\n· 기부 — 16일 류시성 제안서\n· 〈토지〉 온라인 모임 아이디어(김해숙)\n· 가볍집 운영원칙 — '가볍다'를 치유·여유·사유·자유·공유와 연결(송혜경 보완)\n· 감정 나누기 — 포살과 자자(류시성)/다른 방안(유성희)",
+    heartClose:"",
+    nextDate:"2025-02-16", nextHost:"", nextNote:"오프라인 · 제안서 가져오기" },
+  { id:"m3", date:"2025-02-16", kind:"오프라인", host:"",
+    heartOpen:"30분 명상 후 — 가볍고 편안합니다.",
+    notice:"",
+    agenda:"· 기부 제안서(류시성) — 매달 5만원, 자주기금부터. 운영은 자주서당과 가볍집 회계\n· 〈토지〉 읽기 모임(김해숙) — '가볍다·생명·자연·치유'로\n· 비움 프로젝트(류시성) — 옷캔 기부, 여름 1박2일\n· 감정 해소 — 가볍집만의 계율? 적용범위는 집사까지. 퀘이커 신뢰위원회 연구(김해숙)",
+    heartClose:"",
+    nextDate:"2025-03-11", nextHost:"유성희", nextNote:"온라인 / 오프라인 3/16 대청소" },
+  { id:"m4", date:"2025-03-11", kind:"온라인", host:"유성희",
+    heartOpen:"",
+    notice:"",
+    agenda:"〈고엔카〉 9장~끝 나눔. 신성한 무관심과 무관심의 차이. 감정이 일어나고 사라짐을 바라보기. 기름 사러간 3형제 이야기. '오늘 굶었나, 벗고 잤나, 길에서 잤나 — 실제는 문제 없는데 불편 하나에 매몰되었네'.",
+    heartClose:"",
+    nextDate:"", nextHost:"", nextNote:"" },
+];
+
+/* ── 방문 ── */
+let visits = [];
+const SWATCHES = ["#8FB04E","#D08B63","#5FA9D6","#9B7FB8","#C9925E","#7AA88C"];
+
+/* ── 활동 일정 (집사 공동 — 매실 따기, 대청소, 울력 등) ── */
+let activities = [
+  // {id, title, start, end, note}
+];
+const ACTIVITY_COLOR = "#5FA9D6"; // 활동은 하늘빛
+// 울력 달력 씨앗 (회의록에서: 2월 대청소 / 4월 찻잎 / 6월 매실 / 8월 침구 / 10월 감 / 12월 비누·치약)
+
+/* ── 살림: 청소 체크리스트 템플릿 (안내서 '공간을 청정하게' 기반) ── */
+const CARE_TEMPLATE = [
+  {group:"마당·바깥", items:[
+    {t:"마당 풀 뽑기"},
+    {t:"감나무 밑 정리"},
+    {t:"담장 너머 길 청소"},
+    {t:"외부 창고 문 단속"},
+  ]},
+  {group:"부엌", items:[
+    {t:"냉동실 맨 아래칸 얼음 제거 (큰칼 추천)"},
+    {t:"음식물 쓰레기 처리"},
+    {t:"싱크대 거름망 세척 후 뒤집어 놓기"},
+  ]},
+  {group:"방·침구", items:[
+    {t:"무방 침구류 정리 (세탁 필요 여부 확인)"},
+    {t:"방마다 불 다 껐는지 최종 확인"},
+    {t:"창문 닫았는지 확인"},
+  ]},
+  {group:"화장실", items:[
+    {t:"욕조 및 바닥 머리카락 제거"},
+    {t:"세면대·하수구·변기 청소"},
+  ]},
+];
+const PHOTO4 = [
+  {key:"gas",   label:"주방 가스밸브 잠근"},
+  {key:"wifi",  label:"와이파이 코드 꽂은", sub:"제습기 원격조정용"},
+  {key:"boiler",label:"보일러 전원 끈"},
+  {key:"elec",  label:"복도 전기판넬 코드 뺀"},
+];
+let visitLogs = []; // {id, date, who, checks:{}, photos:{}}
+
+/* ── 할 일 게시판 ── */
+let todos = []; // {id, text, who, done, createdAt}
+
+/* ── 사랑방 (머물다 느낀 것·추천·사진) ── */
+let notes = []; // {id, who, text, photo, createdAt}
+
+/* ── 집사 (이 기기에 기억) ── */
+const CARETAKERS = ["류시성","유성희","송혜경","이흥선","김해숙"];
+let me = ""; // 현재 접속한 집사 이름
+
+/* ── 상태 ── */
+let calRef = new Date();
+let careTab = "checklist";
+
+/* ── 저장/동기화 — 항목 하나씩 주고받기 (충돌·경합 방지) ── */
+let syncBusy=false;
+const CACHE_KEY="garyeobjip_cache_v1";
+
+// 방금 이 기기에서 만들거나 고친 항목엔 표시를 남겨서,
+// 서버가 아직 못 받았을 때 20초 주기가 그걸 지워버리지 않게 막음
+function markPending(item){ item.__pending=Date.now(); }
+
+async function syncUpsert(resource,item){
+  saveCache(); // 네트워크 결과와 상관없이 지금 이 기기 상태는 바로 저장해둠
+  if(!SYNC_URL)return;
+  syncBusy=true;setSync(null,"보내는 중");
+  try{
+    await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource,op:"upsert",item,actor:me})});
+    delete item.__pending; // 서버가 받았으니 이제 20초 주기가 덮어써도 안전
+    setSync(true,"동기화됨");saveCache();
+  }catch(e){setSync(false,"동기화 실패 — 다음에 자동으로 다시 시도해요");}
+  syncBusy=false;
+}
+async function syncDelete(resource,id){
+  saveCache();
+  if(!SYNC_URL)return;
+  syncBusy=true;setSync(null,"보내는 중");
+  try{
+    await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource,op:"delete",item:{id},actor:me})});
+    setSync(true,"동기화됨");
+  }catch(e){setSync(false,"동기화 실패 — 다음에 자동으로 다시 시도해요");}
+  syncBusy=false;
+}
+// 서버 데이터로 갱신하되, 아직 서버에 못 간(__pending) 로컬 항목은 지키기
+function mergeKeepPending(localArr, serverArr){
+  const map=new Map();
+  (serverArr||[]).forEach(it=>map.set(it.id,it));
+  (localArr||[]).forEach(it=>{ if(it.__pending) map.set(it.id,it); });
+  return Array.from(map.values());
+}
+async function syncPullAll(silent){
+  if(!SYNC_URL)return;
+  try{
+    const r=await fetch(SYNC_URL);const d=await r.json();
+    if(d.timelineManual)timelineManual=mergeKeepPending(timelineManual,d.timelineManual);
+    if(d.minutes)minutes=mergeKeepPending(minutes,d.minutes);
+    if(d.visits)visits=mergeKeepPending(visits,d.visits);
+    if(d.activities)activities=mergeKeepPending(activities,d.activities);
+    if(d.visitLogs)visitLogs=mergeKeepPending(visitLogs,d.visitLogs);
+    if(d.todos)todos=mergeKeepPending(todos,d.todos);
+    if(d.notes)notes=mergeKeepPending(notes,d.notes);
+    setSync(true,"동기화됨");renderAll();saveCache();
+  }catch(e){if(!silent)setSync(false,"동기화 실패");}
+}
+async function syncUploadPhoto(dataUrl,filename){
+  if(!SYNC_URL)return null;
+  try{
+    const [head,base64]=dataUrl.split(",");
+    const mime=(head.match(/data:(.*?);/)||[])[1]||"image/jpeg";
+    const r=await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"photo",op:"upload",filename,mime,dataBase64:base64})});
+    const d=await r.json();
+    return d.url||null;
+  }catch(e){return null;}
+}
+function setSync(live,txt){
+  const dot=document.getElementById("syncDot");
+  if(dot)dot.classList.toggle("live",live===true);
+  const t=document.getElementById("syncTxt");
+  if(t)t.textContent=txt?`· ${txt}`:(SYNC_URL?"":"");
+}
+// 다른 집사가 올린 내용을 주기적으로 받아옴 (앱을 켜둔 동안)
+function startPolling(){
+  if(!SYNC_URL)return;
+  setInterval(()=>{ if(!syncBusy) syncPullAll(true); }, 25000); // 25초마다
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="visible") syncPullAll(true);
+  });
+}
+// 폰에 마지막 상태를 저장해뒀다가, 새로고침 시 먼저 보여주고
+// 뒤에서 조용히 최신화 — 앱이 "초기화됐다 다시 뜨는" 느낌을 없앰
+function saveCache(){
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      timelineManual,minutes,visits,activities,visitLogs,todos,notes
+    }));
+  }catch(e){} // 용량 문제 등은 조용히 무시 — 캐시는 있으면 좋은 것일 뿐
+}
+function loadCache(){
+  try{
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(d.timelineManual)timelineManual=d.timelineManual;
+    if(d.minutes)minutes=d.minutes;if(d.visits)visits=d.visits;if(d.activities)activities=d.activities;
+    if(d.visitLogs)visitLogs=d.visitLogs;if(d.todos)todos=d.todos;if(d.notes)notes=d.notes;
+    return true;
+  }catch(e){ return false; }
+}
+
+
+/* ── 유틸 ── */
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function fmtDate(iso){if(!iso)return"";const p=iso.split("-");return p.length<3?iso:`${p[0]}. ${+p[1]}. ${+p[2]}`;}
+function dow(iso){return ["일","월","화","수","목","금","토"][new Date(iso+"T00:00").getDay()];}
+function todayISO(){const t=new Date();const o=t.getTimezoneOffset();return new Date(t-o*60000).toISOString().slice(0,10);}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+// 예전 방식으로 저장된 구글드라이브 사진 주소를 안정적인 미리보기 형식으로 되돌림
+function driveThumb(url){
+  if(!url) return url;
+  const m = url.match(/drive\.google\.com.*[?&]id=([^&]+)/);
+  if(m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1000`;
+  return url;
+}
+/* ============================================================
+   화면 0 — 홈 (요약)
+   ============================================================ */
+function renderHome(){
+  const v=document.getElementById("view-home");
+  const today=todayISO();
+  let h=`<div class="home-hello">
+    <div class="hh-greet">${me?`${esc(me)} 집사님,`:"가볍집 집사님,"}</div>
+    <div class="hh-sub">오늘도 가볍게. 지금 가볍집은 이래요.</div></div>`;
+
+  // 다가오는 일정 (방문+회의) 최대 3
+  const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,3);
+  h+=`<div class="home-card" onclick="goTab('visits')">
+    <div class="hc-head"><span class="hc-emoji blob blob-b"><i class="ti ti-calendar-event"></i></span><span class="hc-title">다가오는 일정</span><span class="hc-go">›</span></div>`;
+  if(!up.length)h+=`<div class="hc-empty">예정된 일정이 없어요.</div>`;
+  else up.forEach(e=>{
+    const when=e.start===today?"오늘":(e.start<today?"진행 중":fmtShort(e.start));
+    const icon=e.type==="visit"?'<i class="ti ti-user" style="color:var(--moss-deep)"></i>':(e.type==="activity"?'<i class="ti ti-cup" style="color:var(--sky)"></i>':'<i class="ti ti-clipboard-text" style="color:var(--lilac-deep)"></i>');
+    const label=e.type==="visit"?`${esc(e.who)} 방문${e.guest?` +${esc(e.guest)}`:""}`
+      :(e.type==="activity"?esc(e.who):esc(e.who));
+    h+=`<div class="hc-row"><span class="hc-when ${e.start===today?'now':''}">${when}</span>
+      <span class="hc-ic">${icon}</span><span class="hc-label">${label}</span></div>`;
+  });
+  h+=`</div>`;
+
+  // 오늘 살림
+  const todayLog=visitLogs.find(l=>l.date===today&&!l.closed);
+  h+=`<div class="home-card" onclick="goTab('care')">
+    <div class="hc-head"><span class="hc-emoji blob blob-c"><i class="ti ti-sparkles"></i></span><span class="hc-title">살림</span><span class="hc-go">›</span></div>`;
+  if(todayLog){
+    let tot=0,dn=0;
+    CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{tot++;if(todayLog.checks[`${gi}-${ii}`])dn++;}));
+    PHOTO4.forEach(p=>{tot++;if(todayLog.photos[p.key])dn++;});
+    h+=`<div class="hc-row"><span class="hc-label">오늘 정리 진행 중 — ${dn}/${tot}</span></div>`;
+  }else{
+    const lastClosed=visitLogs.filter(l=>l.closed).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    h+=`<div class="hc-empty">${lastClosed?`마지막 정리: ${fmtShort(lastClosed.date)} ${esc(lastClosed.who||"")}`:"아직 정리 기록이 없어요."}</div>`;
+  }
+  h+=`</div>`;
+
+  // 안 끝난 할 일
+  const open=todos.filter(t=>!t.done);
+  h+=`<div class="home-card" onclick="goTab('todo')">
+    <div class="hc-head"><span class="hc-emoji blob blob-d"><i class="ti ti-checklist"></i></span><span class="hc-title">할 일</span><span class="hc-badge">${open.length}</span><span class="hc-go">›</span></div>`;
+  if(!open.length)h+=`<div class="hc-empty">필요한 일이 없어요. 깨끗합니다.</div>`;
+  else open.slice(0,3).forEach(t=>h+=`<div class="hc-row"><span class="hc-label">· ${esc(t.text)}</span></div>`);
+  h+=`</div>`;
+
+  // 사랑방 최신
+  const recentNote=[...notes].sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
+  if(recentNote){
+    h+=`<div class="home-card" onclick="goTab('notes')">
+      <div class="hc-head"><span class="hc-emoji blob blob-e"><i class="ti ti-flower"></i></span><span class="hc-title">사랑방 새 소식</span><span class="hc-go">›</span></div>
+      <div class="hc-row"><span class="hc-label">${esc(recentNote.text.slice(0,40))}${recentNote.text.length>40?"…":""}</span></div></div>`;
+  }
+
+  // 방문자 앱 연동 자리 (동기화 켜면 채워짐)
+  h+=`<div class="home-card pending" onclick="showSyncInfo('신청')">
+    <div class="hc-head"><span class="hc-emoji blob blob-f"><i class="ti ti-mail"></i></span><span class="hc-title">방문 신청</span><span class="hc-soon">동기화 후</span></div>
+    <div class="hc-empty">방문자 앱에서 들어온 신청을 여기서 승인합니다.</div></div>`;
+  h+=`<div class="home-card pending" onclick="showSyncInfo('후기')">
+    <div class="hc-head"><span class="hc-emoji blob blob-g"><i class="ti ti-message-circle"></i></span><span class="hc-title">방문자 후기</span><span class="hc-soon">동기화 후</span></div>
+    <div class="hc-empty">머물다 간 분들의 후기가 여기 모입니다.</div></div>`;
+
+  // 아카이브 입구
+  h+=`<div class="home-arch">
+    <button class="arch-btn" onclick="goTab('timeline')"><span class="blob blob-a-alt"><i class="ti ti-seedling"></i></span>걸어온 길</button>
+    <button class="arch-btn" onclick="goTab('minutes')"><span class="blob blob-h"><i class="ti ti-notebook"></i></span>회의록</button>
+  </div>`;
+  v.innerHTML=h;
+}
+function fmtShort(iso){const p=iso.split("-");return p.length<3?iso:`${+p[1]}.${+p[2]} (${dow(iso)})`;}
+function showSyncInfo(what){
+  showModal(`<div class="grab"></div><h3>${what}은 동기화 후에 켜져요</h3>
+    <div style="font-size:14px;line-height:1.7;color:var(--ink)">
+    방문자 앱과 집사 앱이 <b>같은 구글 시트</b>를 함께 보게 되면, 방문자가 남긴 ${what}이 이 자리에 자동으로 모입니다.<br><br>
+    지금은 집사 앱을 충분히 써보시는 단계예요. 화면이 손에 익고 나면, 구글 시트를 한 번 연결해 ${what} 취합까지 한꺼번에 켜겠습니다.</div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">알겠어요</button></div>`);
+}
+function goTab(tab){
+  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));
+  const navBtn=document.querySelector(`nav button[data-tab="${tab}"]`);
+  if(navBtn)navBtn.classList.add("on");
+  document.getElementById("view-"+tab).classList.add("on");
+  window.scrollTo(0,0);
+}
+
+/* ============================================================
+   화면 1 — 걸어온 길 (고정 + 회의록 자동 + 손추가)
+   ============================================================ */
+function buildTimeline(){
+  // 회의록에서 연도별 자동 항목 생성
+  const mtItems = minutes.map(m=>({
+    date:m.date, year:+m.date.slice(0,4),
+    d:m.date.slice(5).replace("-","."),
+    t:`${m.kind} 회의${m.host?` (진행 ${m.host})`:""}`,
+    n:(m.agenda||m.heartOpen||"").split("\n")[0].slice(0,46),
+    src:"회의록"
+  }));
+  const manItems = timelineManual.map(x=>({
+    date:x.date, year:+x.date.slice(0,4),
+    d:x.date.slice(5).replace("-","."), t:x.t, n:x.n, src:"기록", manual:true, id:x.id
+  }));
+  // 연도별 묶기 (2025~)
+  const dynYears={};
+  [...mtItems,...manItems].forEach(it=>{(dynYears[it.year]=dynYears[it.year]||[]).push(it);});
+  Object.values(dynYears).forEach(arr=>arr.sort((a,b)=>a.date.localeCompare(b.date)));
+  return dynYears;
+}
+function renderTimeline(){
+  const v=document.getElementById("view-timeline");
+  let h=`<div class="view-head"><div><div class="t">걸어온 길</div>
+    <div class="d">시간의 흐름 속에서 무엇이든 발견할 수 있기를</div></div>
+    <button class="btn clay sm" onclick="openTL()">＋ 기록</button></div>`;
+  h+=`<div class="tip">회의록을 남기면 그 회의가 이 길에 저절로 한 줄 얹힙니다 <span style="color:var(--lilac-deep)">●</span>. 그 밖의 굵직한 일은 <span style="color:var(--clay)">＋ 기록</span>으로 더하세요 <span style="color:var(--clay)">●</span>.</div>`;
+  // 고정 연도
+  TIMELINE_FIXED.forEach(yr=>{
+    h+=`<div class="tl-year"><span class="y">${yr.year}</span><span class="kw">${esc(yr.kw)}</span></div>`;
+    yr.items.forEach(it=>{h+=tlRow(it);});
+  });
+  // 동적 연도(2025~)
+  const dyn=buildTimeline();
+  Object.keys(dyn).sort().forEach(y=>{
+    h+=`<div class="tl-year"><span class="y">${y}</span><span class="kw">함께 만들어가는 중</span></div>`;
+    dyn[y].forEach(it=>{h+=tlRow(it);});
+  });
+  v.innerHTML=h;
+}
+function tlRow(it){
+  const cls=it.manual?"manual":(it.src==="회의록"?"fromMt":"");
+  return `<div class="tl-item ${cls}"${it.manual?` onclick="openTL('${it.id}')"`:""}>
+    <div class="tl-date">${esc(it.d)}${it.src?`<span class="tl-src">${it.src}</span>`:""}</div>
+    <div class="tl-body">${esc(it.t)}</div>
+    ${it.n?`<div class="tl-note">${esc(it.n)}</div>`:""}</div>`;
+}
+function openTL(id){
+  const x=id?timelineManual.find(t=>t.id===id):{id:"",date:todayISO(),t:"",n:""};
+  let h=`<div class="grab"></div><h3>${id?"기록 수정":"걸어온 길에 기록 더하기"}</h3>
+    <div class="field"><label>날짜</label><input type="date" id="tl-date" value="${x.date}"></div>
+    <div class="field"><label>무슨 일이 있었나요</label><input id="tl-t" value="${esc(x.t)}" placeholder="예: 첫 명상수련을 열다"></div>
+    <div class="field"><label>한 줄 메모 <span style="font-weight:400">(선택)</span></label><input id="tl-n" value="${esc(x.n)}" placeholder="기억하고 싶은 한 마디"></div>
+    <div class="modal-actions">
+      ${id?`<button class="btn ghost" onclick="delTL('${id}')">삭제</button>`:""}
+      <button class="btn clay" onclick="saveTL('${x.id}')">저장</button></div>`;
+  showModal(h);
+}
+function saveTL(id){
+  const o={date:val("tl-date"),t:val("tl-t").trim(),n:val("tl-n").trim()};
+  if(!o.t){alert("무슨 일이 있었는지 적어주세요.");return;}
+  let item;
+  if(id){ item=timelineManual.find(t=>t.id===id); Object.assign(item,o); }
+  else{ o.id=uid(); timelineManual.push(o); item=o; }
+  markPending(item);syncUpsert("timelineManual",item);closeModal();renderTimeline();
+}
+function delTL(id){if(!confirm("이 기록을 지울까요?"))return;
+  timelineManual=timelineManual.filter(t=>t.id!==id);syncDelete("timelineManual",id);closeModal();renderTimeline();}
+
+/* ============================================================
+   화면 2 — 회의록 (다섯 칸 + 다음 회의)
+   ============================================================ */
+function renderMinutes(){
+  const v=document.getElementById("view-minutes");
+  let h=`<div class="view-head"><div><div class="t">회의록</div>
+    <div class="d">매달 한 번, 마음과 안건을 남깁니다</div></div>
+    <button class="btn" onclick="openMinute()">＋ 새 회의록</button></div>`;
+  // 다음 회의 안내(가장 최근 회의록의 next)
+  const latest=[...minutes].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  if(latest&&latest.nextDate){
+    h+=`<div class="tip" style="border-color:rgba(142,176,78,.3);background:rgba(142,176,78,.07)">
+      📌 다음 회의 — <b>${fmtDate(latest.nextDate)} (${dow(latest.nextDate)})</b>
+      ${latest.nextHost?` · 진행 ${esc(latest.nextHost)}`:""}${latest.nextNote?`<br>${esc(latest.nextNote)}`:""}</div>`;
+  }
+  if(!minutes.length){h+=`<div class="empty"><div class="big">📝</div>아직 회의록이 없습니다.</div>`;}
+  else{
+    [...minutes].sort((a,b)=>b.date.localeCompare(a.date)).forEach(m=>{
+      const prev=[m.heartOpen,m.notice,m.agenda,m.heartClose].filter(Boolean).join(" · ").slice(0,84);
+      h+=`<div class="card mt-card" onclick="readMinute('${m.id}')">
+        <div class="mt-top"><span class="mt-date">${fmtDate(m.date)}</span>
+          ${m.kind?`<span class="mt-kind">${esc(m.kind)}</span>`:""}
+          ${m.host?`<span class="mt-host">진행 ${esc(m.host)}</span>`:""}</div>
+        <div class="mt-prev">${esc(prev)||"내용 없음"}</div></div>`;
+    });
+  }
+  v.innerHTML=h;
+}
+function readMinute(id){
+  const m=minutes.find(x=>x.id===id);
+  let h=`<div class="grab"></div>
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px">
+      <h3 style="margin:0">${fmtDate(m.date)}</h3>
+      ${m.kind?`<span class="mt-kind">${esc(m.kind)}</span>`:""}
+      <button class="btn ghost sm" style="margin-left:auto" onclick="openMinute('${id}')">수정</button></div>
+    ${m.host?`<div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:6px">진행 ${esc(m.host)}</div>`:""}
+    <div class="mt-read">`;
+  MT_BLOCKS_BEFORE.forEach(b=>{if(m[b.key])h+=`<h4>${b.label}</h4><div class="body">${esc(m[b.key])}</div>`;});
+  if(m.nextDate)h+=`<h4>다음 회의</h4><div class="body">${fmtDate(m.nextDate)} (${dow(m.nextDate)})${m.nextHost?` · 진행 ${esc(m.nextHost)}`:""}${m.nextNote?`\n${esc(m.nextNote)}`:""}</div>`;
+  MT_BLOCKS_AFTER.forEach(b=>{if(m[b.key])h+=`<h4>${b.label}</h4><div class="body">${esc(m[b.key])}</div>`;});
+  h+=`</div>`;
+  showModal(h);
+}
+function openMinute(id){
+  const m=id?minutes.find(x=>x.id===id):{id:"",date:todayISO(),kind:"온라인",host:"",heartOpen:"",notice:"",agenda:"",heartClose:"",nextDate:"",nextHost:"",nextNote:""};
+  let h=`<div class="grab"></div><h3>${id?"회의록 수정":"새 회의록"}</h3>
+    <div class="row2">
+      <div class="field"><label>날짜</label><input type="date" id="f-date" value="${m.date}"></div>
+      <div class="field"><label>형식</label><select id="f-kind">
+        <option ${m.kind==="온라인"?"selected":""}>온라인</option>
+        <option ${m.kind==="오프라인"?"selected":""}>오프라인</option></select></div></div>
+    <div class="field"><label>진행한 사람</label><input id="f-host" value="${esc(m.host)}" placeholder="이번 달 진행 집사"></div>`;
+  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
+  h+=`<div class="field"><label>📅 다음 회의 <span style="font-weight:400">— 등록하면 일정 캘린더에 자동으로 올라갑니다</span></label>
+    <div class="row2"><input type="date" id="f-nextDate" value="${m.nextDate||""}">
+    <input id="f-nextHost" value="${esc(m.nextHost)}" placeholder="진행자"></div>
+    <input id="f-nextNote" value="${esc(m.nextNote)}" placeholder="메모 (예: 오프라인, 무엇을 준비)" style="margin-top:8px"></div>`;
+  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
+  h+=`<div class="modal-actions">
+      ${id?`<button class="btn ghost" onclick="delMinute('${id}')">삭제</button>`:""}
+      <button class="btn" onclick="saveMinute('${m.id}')">저장</button></div>`;
+  showModal(h);
+}
+function saveMinute(id){
+  const o={date:val("f-date"),kind:val("f-kind"),host:val("f-host"),
+    heartOpen:val("f-heartOpen"),notice:val("f-notice"),agenda:val("f-agenda"),heartClose:val("f-heartClose"),
+    nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote")};
+  let item;
+  if(id){ item=minutes.find(x=>x.id===id); Object.assign(item,o); }
+  else{ o.id=uid(); minutes.push(o); item=o; }
+  markPending(item);syncUpsert("minutes",item);closeModal();renderMinutes();renderTimeline();renderVisits();
+}
+function delMinute(id){if(!confirm("이 회의록을 삭제할까요?"))return;
+  minutes=minutes.filter(x=>x.id!==id);syncDelete("minutes",id);closeModal();renderMinutes();renderTimeline();renderVisits();}
+/* ============================================================
+   화면 3 — 일정 (방문 + 회의가 한 캘린더에)
+   ============================================================ */
+const MEETING_COLOR = "#9B7FB8"; // 회의는 보랏빛
+
+// 회의록 → 회의 일정 이벤트로 파생 (nextDate 기준 + 이미 열린 회의 자체)
+function meetingEvents(){
+  const evs=[];
+  // 1) 회의록 자체가 열린 날 = 지난/예정 회의 (회의록 id 연결)
+  minutes.forEach(m=>{
+    if(m.date) evs.push({type:"meeting",mid:m.id,who:`${m.kind} 회의`,host:m.host||"",
+      start:m.date,end:m.date,color:MEETING_COLOR,note:m.host?`진행 ${m.host}`:""});
+  });
+  // 2) 가장 최근 회의록의 '다음 회의' = 아직 회의록이 없는 예정 회의
+  const latest=[...minutes].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  if(latest&&latest.nextDate){
+    const exists=minutes.some(m=>m.date===latest.nextDate);
+    if(!exists) evs.push({type:"meeting-next",mid:"",who:"예정 회의",host:latest.nextHost||"",
+      start:latest.nextDate,end:latest.nextDate,color:MEETING_COLOR,
+      note:[latest.nextHost?`진행 ${latest.nextHost}`:"",latest.nextNote].filter(Boolean).join(" · ")});
+  }
+  return evs;
+}
+// 통합 이벤트 (방문 + 회의 + 활동)
+function activityEvents(){
+  return activities.map(a=>({type:"activity",aid:a.id,who:a.title,
+    start:a.start,end:a.end,color:ACTIVITY_COLOR,note:a.note||""}));
+}
+function allEvents(){
+  const vis=visits.map(v=>({...v,type:"visit"}));
+  return [...vis,...meetingEvents(),...activityEvents()];
+}
+// 모임(집사 활동) = 회의 + 활동 / 방문 = visit
+function isGathering(e){return e.type==="meeting"||e.type==="meeting-next"||e.type==="activity";}
+function eventsOnDay(iso){return allEvents().filter(e=>iso>=e.start&&iso<=e.end);}
+function rangeOverlaps(s1,e1,s2,e2){return s1<=e2&&s2<=e1;}
+function renderVisits(){
+  const v=document.getElementById("view-visits");
+  const y=calRef.getFullYear(),mo=calRef.getMonth();
+  const startDow=new Date(y,mo,1).getDay(),days=new Date(y,mo+1,0).getDate();
+  let h=`<div class="view-head"><div><div class="t">일정</div>
+    <div class="d">방문과 모임을 한눈에</div></div>
+    <div style="display:flex;gap:7px">
+      <button class="btn sm" onclick="openVisit()">＋ 방문</button>
+      <button class="btn sm" style="background:var(--sky)" onclick="openActivity()">＋ 모임</button>
+    </div></div>`;
+  // 범례
+  h+=`<div class="legend">
+    <span><i class="lg-visit"></i>방문</span>
+    <span><i class="lg-meet"></i>회의</span>
+    <span><i class="lg-act"></i>활동·울력</span></div>`;
+  h+=`<div class="card"><div class="cal-nav">
+    <button onclick="moveMonth(-1)">‹</button>
+    <span class="mlabel">${y}년 ${mo+1}월</span>
+    <button onclick="moveMonth(1)">›</button></div>
+    <div class="cal-grid">${["일","월","화","수","목","금","토"].map(d=>`<div class="dow">${d}</div>`).join("")}`;
+  for(let i=0;i<startDow;i++)h+=`<div class="cal-cell pad"></div>`;
+  for(let d=1;d<=days;d++){
+    const iso=`${y}-${String(mo+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const evs=eventsOnDay(iso),isToday=iso===todayISO(),isSun=new Date(iso+"T00:00").getDay()===0;
+    const visitN=evs.filter(e=>e.type==="visit").length;
+    const gather=evs.filter(isGathering);
+    // 방문=아래 색점, 모임=상단 색막대
+    let marks="";
+    if(gather.length)marks+=`<span class="cal-bar" style="background:${gather[0].color}"></span>`;
+    if(visitN)marks+=`<span class="dots">${evs.filter(e=>e.type==="visit").slice(0,3).map(x=>`<i style="background:${x.color}"></i>`).join("")}</span>`;
+    h+=`<div class="cal-cell${isToday?" today":""}${isSun?" sun":""}${gather.length?" has-gather":""}" onclick="dayPeek('${iso}')">
+      <span class="cal-num">${d}</span>${marks}</div>`;
+  }
+  h+=`</div></div>`;
+  const today=todayISO();
+  const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>a.start.localeCompare(b.start));
+  const visitsUp=up.filter(e=>e.type==="visit");
+  const gatherUp=up.filter(isGathering);
+  // 방문 목록
+  h+=`<div class="grp grp-visit"><div class="grp-head">방문</div><div class="vlist">`;
+  if(!visitsUp.length)h+=`<div class="hc-empty" style="padding:6px 2px">예정된 방문이 없습니다.</div>`;
+  else visitsUp.forEach(e=>h+=eventRow(e));
+  h+=`</div></div>`;
+  // 모임(회의·활동) 목록
+  h+=`<div class="grp grp-gather"><div class="grp-head">집사 모임 · 활동</div><div class="vlist">`;
+  if(!gatherUp.length)h+=`<div class="hc-empty" style="padding:6px 2px">예정된 모임·활동이 없습니다.</div>`;
+  else gatherUp.forEach(e=>h+=eventRow(e));
+  h+=`</div></div>`;
+  v.innerHTML=h;
+}
+function nights(s,e){const d=Math.round((new Date(e)-new Date(s))/86400000);return d;}
+function visitMeta(e){
+  // "1박 · +손님 · 메모" 형태로 핵심 정보를 한 줄에
+  const parts=[];
+  const n=nights(e.start,e.end);
+  parts.push(n>=1?`${n}박 ${n+1}일`:"당일");
+  if(e.guest)parts.push(`손님 ${esc(e.guest)}`);
+  if(e.note)parts.push(esc(e.note));
+  return parts.join(" · ");
+}
+function eventRow(e){
+  const span=e.start===e.end?`${fmtDate(e.start)} (${dow(e.start)})`:`${fmtDate(e.start)} ~ ${fmtDate(e.end)}`;
+  if(e.type==="visit"){
+    return `<div class="vrow" onclick="openVisit('${e.id}')">
+      <span class="swatch" style="background:${e.color}"></span>
+      <div class="vmain"><div class="vwho">${esc(e.who)}${e.guest?` <span class="vguest">+${esc(e.guest)}</span>`:""}</div>
+      <div class="vwhen">${span} · ${visitMeta(e)}</div></div></div>`;
+  }
+  // 회의 이벤트
+  if(e.type==="meeting"||e.type==="meeting-next"){
+    const clickable=e.mid?`onclick="closeModal();readMinute('${e.mid}')"`:"";
+    return `<div class="vrow" ${clickable} style="${e.mid?'':'cursor:default'}">
+      <span class="swatch" style="background:${e.color};outline:2px solid #fff;outline-offset:-3px"></span>
+      <div class="vmain"><div class="vwho">${esc(e.who)}${e.mid?'<span class="vguest"> · 회의록 보기</span>':''}</div>
+      <div class="vwhen">${span}${e.note?` · ${esc(e.note)}`:""}</div></div></div>`;
+  }
+  // 활동 이벤트
+  return `<div class="vrow" onclick="openActivity('${e.aid}')">
+    <span class="swatch" style="background:${e.color}"></span>
+    <div class="vmain"><div class="vwho">${esc(e.who)}</div>
+    <div class="vwhen">${span}${e.note?` · ${esc(e.note)}`:""}</div></div></div>`;
+}
+function moveMonth(n){calRef=new Date(calRef.getFullYear(),calRef.getMonth()+n,1);renderVisits();}
+function dayPeek(iso){
+  const evs=eventsOnDay(iso);
+  let h=`<div class="grab"></div><h3>${fmtDate(iso)} (${dow(iso)})</h3>`;
+  if(!evs.length)h+=`<div class="empty" style="padding:22px">이 날은 비어 있습니다.</div>`;
+  else evs.forEach(e=>{
+    if(e.type==="visit"){
+      h+=`<div class="vrow" onclick="closeModal();openVisit('${e.id}')">
+        <span class="swatch" style="background:${e.color}"></span>
+        <div class="vmain"><div class="vwho">${esc(e.who)}${e.guest?` <span class="vguest">+${esc(e.guest)}</span>`:""}</div>
+        <div class="vwhen">${fmtDate(e.start)} ~ ${fmtDate(e.end)} · ${visitMeta(e)}</div></div></div>`;
+    }else if(e.type==="meeting"||e.type==="meeting-next"){
+      const clk=e.mid?`onclick="closeModal();readMinute('${e.mid}')"`:"";
+      h+=`<div class="vrow" ${clk} style="${e.mid?'':'cursor:default'}">
+        <span class="swatch" style="background:${e.color};outline:2px solid #fff;outline-offset:-3px"></span>
+        <div class="vmain"><div class="vwho">${esc(e.who)}${e.mid?'<span class="vguest"> · 회의록 보기</span>':''}</div>
+        <div class="vwhen">${esc(e.note||"")}</div></div></div>`;
+    }else{
+      h+=`<div class="vrow" onclick="closeModal();openActivity('${e.aid}')">
+        <span class="swatch" style="background:${e.color}"></span>
+        <div class="vmain"><div class="vwho">${esc(e.who)}</div>
+        <div class="vwhen">${fmtDate(e.start)}${e.start!==e.end?` ~ ${fmtDate(e.end)}`:""}${e.note?` · ${esc(e.note)}`:""}</div></div></div>`;
+    }
+  });
+  h+=`<div class="modal-actions"><button class="btn ghost" onclick="closeModal();openVisit('',{start:'${iso}',end:'${iso}'})">방문</button><button class="btn" style="background:var(--sky)" onclick="closeModal();openActivity('',{start:'${iso}',end:'${iso}'})">모임·활동</button></div>`;
+  showModal(h);
+}
+function openVisit(id,preset){
+  const v=id?visits.find(x=>x.id===id):{id:"",who:"",color:SWATCHES[visits.length%SWATCHES.length],start:preset?.start||todayISO(),end:preset?.end||todayISO(),guest:"",note:""};
+  let h=`<div class="grab"></div><h3>${id?"방문 수정":"방문 등록"}</h3>
+    <div class="field"><label>누가 (집사)</label><input id="v-who" value="${esc(v.who)}" placeholder="집사 이름"></div>
+    <div class="field"><label>함께 오는 손님 <span style="font-weight:400">(없으면 비워두세요)</span></label><input id="v-guest" value="${esc(v.guest)}" placeholder="지인·가족 등"></div>
+    <div class="row2">
+      <div class="field"><label>들어오는 날</label><input type="date" id="v-start" value="${v.start}"></div>
+      <div class="field"><label>나가는 날</label><input type="date" id="v-end" value="${v.end}"></div></div>
+    <div class="field"><label>색</label><div class="swatch-pick" id="v-swatch">
+      ${SWATCHES.map(c=>`<button style="background:${c}" class="${c===v.color?"sel":""}" data-c="${c}" onclick="pickSwatch(this)"></button>`).join("")}</div></div>
+    <div class="field"><label>무슨 일로 <span style="font-weight:400">(선택)</span></label><input id="v-note" value="${esc(v.note)}" placeholder="예: 명상수련, 텃밭 정리, 그냥 쉬러"></div>
+    <div id="v-warn"></div>
+    <div class="modal-actions">
+      ${id?`<button class="btn ghost" onclick="delVisit('${id}')">삭제</button>`:""}
+      <button class="btn" onclick="saveVisit('${v.id}')">저장</button></div>`;
+  showModal(h);window._pc=v.color;checkOverlap(id);
+  ["v-start","v-end"].forEach(i=>document.getElementById(i).addEventListener("change",()=>{syncEnd();checkOverlap(id);}));
+}
+function syncEnd(){const s=val("v-start"),e=document.getElementById("v-end");if(e.value<s)e.value=s;}
+function pickSwatch(b){document.querySelectorAll("#v-swatch button").forEach(x=>x.classList.remove("sel"));b.classList.add("sel");window._pc=b.dataset.c;}
+function checkOverlap(self){
+  const s=val("v-start"),e=val("v-end");
+  const clash=visits.filter(v=>v.id!==self&&rangeOverlaps(s,e,v.start,v.end));
+  document.getElementById("v-warn").innerHTML=clash.length?
+    `<div class="overlap-warn"><span>⚠️</span><span>겹치는 방문이 있어요 — ${clash.map(c=>`<b>${esc(c.who)}</b>(${fmtDate(c.start)}~${fmtDate(c.end)})`).join(", ")}. 그래도 괜찮다면 저장하세요.</span></div>`:"";
+}
+function saveVisit(id){
+  const o={who:val("v-who").trim(),guest:val("v-guest").trim(),start:val("v-start"),end:val("v-end"),note:val("v-note").trim(),color:window._pc||SWATCHES[0]};
+  if(!o.who){alert("집사 이름을 적어주세요.");return;}
+  if(o.end<o.start)o.end=o.start;
+  let item;
+  if(id){ item=visits.find(x=>x.id===id); Object.assign(item,o); }
+  else{ o.id=uid(); visits.push(o); item=o; }
+  markPending(item);syncUpsert("visits",item);closeModal();renderVisits();renderHome();
+}
+function delVisit(id){if(!confirm("이 방문을 삭제할까요?"))return;visits=visits.filter(x=>x.id!==id);syncDelete("visits",id);closeModal();renderVisits();renderHome();}
+
+/* ── 활동·모임 일정 ── */
+function openActivity(id,preset){
+  const a=id?activities.find(x=>x.id===id):{id:"",title:"",start:preset?.start||todayISO(),end:preset?.end||todayISO(),note:""};
+  const presets=["매실 따기","찻잎 따기","대청소","감 따기","비누·치약 만들기","침구 세탁","명상수련","텃밭 울력"];
+  let h=`<div class="grab"></div><h3>${id?"모임·활동 수정":"모임·활동 등록"}</h3>
+    <div class="field"><label>무슨 모임·활동</label><input id="a-title" value="${esc(a.title)}" placeholder="예: 매실 따기, 대청소, 명상수련">
+      <div class="preset-chips">${presets.map(p=>`<button onclick="document.getElementById('a-title').value='${p}'">${p}</button>`).join("")}</div></div>
+    <div class="row2">
+      <div class="field"><label>시작</label><input type="date" id="a-start" value="${a.start}"></div>
+      <div class="field"><label>끝</label><input type="date" id="a-end" value="${a.end}"></div></div>
+    <div class="field"><label>메모 <span style="font-weight:400">(선택)</span></label><input id="a-note" value="${esc(a.note)}" placeholder="예: 오전 10시 모이기, 장갑 챙기기"></div>
+    <div class="modal-actions">
+      ${id?`<button class="btn ghost" onclick="delActivity('${id}')">삭제</button>`:""}
+      <button class="btn" style="background:var(--sky)" onclick="saveActivity('${a.id}')">저장</button></div>`;
+  showModal(h);
+}
+function saveActivity(id){
+  const o={title:val("a-title").trim(),start:val("a-start"),end:val("a-end"),note:val("a-note").trim()};
+  if(!o.title){alert("무슨 모임·활동인지 적어주세요.");return;}
+  if(o.end<o.start)o.end=o.start;
+  let item;
+  if(id){ item=activities.find(x=>x.id===id); Object.assign(item,o); }
+  else{ o.id=uid(); activities.push(o); item=o; }
+  markPending(item);syncUpsert("activities",item);closeModal();renderVisits();renderHome();
+}
+function delActivity(id){if(!confirm("이 모임·활동을 삭제할까요?"))return;activities=activities.filter(x=>x.id!==id);syncDelete("activities",id);closeModal();renderVisits();renderHome();}
+/* ============================================================
+   화면 4 — 살림 (퇴실 체크리스트 + 4가지 단속 사진)
+   ============================================================ */
+function renderCare(){
+  const v=document.getElementById("view-care");
+  let h=`<div class="view-head"><div><div class="t">살림</div>
+    <div class="d">가볍집을 청정하게 — 떠나기 전 정리</div></div></div>
+    <div class="seg">
+      <button class="${careTab==='checklist'?'on':''}" onclick="setCareTab('checklist')">정리 기록</button>
+      <button class="${careTab==='history'?'on':''}" onclick="setCareTab('history')">지난 기록</button>
+    </div>`;
+  if(careTab==="checklist") h+=careActive();
+  else h+=careHistory();
+  v.innerHTML=h;
+}
+function setCareTab(t){careTab=t;renderCare();}
+
+function activeLog(){
+  // 진행 중(미마감) 기록 — 오늘 것 우선, 없으면 가장 최근 미마감
+  const open=visitLogs.filter(l=>!l.closed).sort((a,b)=>b.date.localeCompare(a.date));
+  return open.find(l=>l.date===todayISO())||open[0];
+}
+function careActive(){
+  const log=activeLog();
+  if(!log){
+    return `<div class="empty"><div class="big">🧹</div>오늘 정리를 시작하면<br>체크리스트가 펼쳐집니다.</div>
+      <button class="btn" style="width:100%;justify-content:center;padding:14px" onclick="startCare()">오늘 정리 시작하기</button>`;
+  }
+  let total=0,done=0;
+  let h=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <b style="font-size:15px">${fmtDate(log.date)}</b>
+    <span style="font-size:12px;color:var(--ink-soft)">${esc(log.who||"정리 중")}</span>
+    <button class="btn ghost sm" style="margin-left:auto" onclick="editCareWho('${log.id}')">이름</button></div>`;
+  CARE_TEMPLATE.forEach((g,gi)=>{
+    h+=`<div class="chk-group"><h4>${esc(g.group)}</h4>`;
+    g.items.forEach((it,ii)=>{
+      const k=`${gi}-${ii}`,d=!!log.checks[k];total++;if(d)done++;
+      h+=`<div class="chk-item${d?" done":""}" onclick="toggleChk('${log.id}','${k}')">
+        <div class="chk-box">${d?"✓":""}</div><div class="chk-label">${esc(it.t)}</div></div>`;
+    });
+    h+=`</div>`;
+  });
+  // 4가지 단속 사진 (각 칸에 무엇을 찍는지 안내, 누르면 바로 카메라)
+  h+=`<div class="chk-group"><h4>4가지 단속 — 사진으로 남기기</h4>
+    <div class="chk-sub" style="margin:0 2px 8px">떠나기 전, 사용 여부와 관계없이 아래 4가지를 찍어 남깁니다. 칸을 누르면 카메라가 켜져요.</div>
+    <div class="photo4">`;
+  PHOTO4.forEach(p=>{
+    const img=log.photos[p.key];total++;if(img)done++;
+    h+=`<div class="photo-slot${img?" filled":""}" onclick="${img?`removePhoto('${log.id}','${p.key}')`:`document.getElementById('cam-${p.key}').click()`}">
+      ${img?`<img src="${driveThumb(img)}"><div class="pcheck">✓</div>`:`<span class="pemoji">📷</span><span>${esc(p.label)}</span>${p.sub?`<span style="font-size:10px;opacity:.7;line-height:1.2">${esc(p.sub)}</span>`:""}`}
+      <input type="file" id="cam-${p.key}" accept="image/*" capture="environment" style="display:none" onchange="addPhoto('${log.id}','${p.key}',this)"></div>`;
+  });
+  h+=`</div></div>`;
+  const pct=total?Math.round(done/total*100):0;
+  h+=`<div class="vlog-prog"><i style="width:${pct}%"></i></div>
+    <div style="text-align:center;font-size:12px;color:var(--ink-soft);margin-top:6px">${done} / ${total} 완료</div>
+    <div class="modal-actions"><button class="btn lilac" style="width:100%" onclick="closeCare('${log.id}')">정리 마치기 — 다른 집사도 볼 수 있게</button></div></div>`;
+  return h;
+}
+function startCare(){
+  const log={id:uid(),date:todayISO(),who:me||"",checks:{},photos:{},closed:false};
+  visitLogs.push(log);markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
+}
+function editCareWho(id){
+  const log=visitLogs.find(l=>l.id===id);
+  const n=prompt("정리한 집사 이름",log.who||"");
+  if(n!==null){log.who=n.trim();markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();}
+}
+function toggleChk(id,k){
+  const log=visitLogs.find(l=>l.id===id);log.checks[k]=!log.checks[k];markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
+}
+function addPhoto(id,key,input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    // 용량 축소: 캔버스로 리사이즈
+    const img=new Image();
+    img.onload=async ()=>{
+      const max=900,sc=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");c.width=img.width*sc;c.height=img.height*sc;
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      const dataUrl=c.toDataURL("image/jpeg",0.7);
+      const log=visitLogs.find(l=>l.id===id);
+      log.photos[key]=dataUrl;markPending(log);renderCare();renderHome(); // 우선 이 기기에 바로 보이게, 업로드 끝날 때까지 보호
+      const url=await syncUploadPhoto(dataUrl,`care_${id}_${key}.jpg`);
+      if(url)log.photos[key]=url; // 업로드되면 드라이브 주소로 교체 — 다른 집사도 보임
+      markPending(log);syncUpsert("visitLogs",log);renderCare();
+    };img.src=e.target.result;
+  };r.readAsDataURL(f);
+}
+function removePhoto(id,key){
+  if(!confirm("이 사진을 지울까요?"))return;
+  const log=visitLogs.find(l=>l.id===id);delete log.photos[key];markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
+}
+function closeCare(id){
+  const log=visitLogs.find(l=>l.id===id);
+  if(!log.who){if(!confirm("정리한 집사 이름이 비어 있어요. 그래도 마칠까요?"))return;}
+  log.closed=true;markPending(log);syncUpsert("visitLogs",log);careTab="history";renderCare();
+}
+function careHistory(){
+  const closed=visitLogs.filter(l=>l.closed).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!closed.length)return `<div class="empty"><div class="big">📋</div>아직 마친 정리 기록이 없습니다.</div>`;
+  let h="";
+  closed.forEach(log=>{
+    let total=0,done=0;
+    CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{total++;if(log.checks[`${gi}-${ii}`])done++;}));
+    PHOTO4.forEach(p=>{total++;if(log.photos[p.key])done++;});
+    const pct=total?Math.round(done/total*100):0;
+    const photoCount=PHOTO4.filter(p=>log.photos[p.key]).length;
+    h+=`<div class="card visit-log-card" onclick="viewCareLog('${log.id}')">
+      <div style="display:flex;align-items:center;gap:8px">
+        <b style="font-size:15px">${fmtDate(log.date)}</b>
+        <span style="font-size:12.5px;color:var(--ink-soft)">${esc(log.who||"이름 없음")}</span>
+        <span style="margin-left:auto;font-size:12px;color:var(--moss-deep)">단속사진 ${photoCount}/4</span></div>
+      <div class="vlog-prog"><i style="width:${pct}%"></i></div></div>`;
+  });
+  return h;
+}
+function viewCareLog(id){
+  const log=visitLogs.find(l=>l.id===id);
+  let total=0,done=0;
+  CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{total++;if(log.checks[`${gi}-${ii}`])done++;}));
+  PHOTO4.forEach(p=>{total++;if(log.photos[p.key])done++;});
+  const undone=total-done;
+  let h=`<div class="grab"></div><h3>${fmtDate(log.date)} · ${esc(log.who||"이름 없음")}</h3>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <span style="font-size:12px;background:rgba(142,176,78,.14);color:var(--moss-deep);padding:4px 11px;border-radius:9px;font-weight:700">완료 ${done}</span>
+      ${undone?`<span style="font-size:12px;background:rgba(208,139,99,.14);color:#A85E38;padding:4px 11px;border-radius:9px;font-weight:700">못함 ${undone}</span>`:`<span style="font-size:12px;color:var(--moss-deep)">✓ 모두 마침</span>`}
+    </div>`;
+  CARE_TEMPLATE.forEach((g,gi)=>{
+    h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:14px 2px 7px">${esc(g.group)}</div>`;
+    g.items.forEach((it,ii)=>{
+      const d=!!log.checks[`${gi}-${ii}`];
+      h+=`<div class="log-line ${d?"ok":"no"}">
+        <span class="log-mark">${d?"✓":"✗"}</span><span class="log-txt">${esc(it.t)}</span></div>`;
+    });
+  });
+  // 사진
+  const pc=PHOTO4.filter(p=>log.photos[p.key]).length;
+  h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">4가지 단속 사진 — ${pc}/4</div>
+    <div class="photo4">`;
+  PHOTO4.forEach(p=>{const img=log.photos[p.key];
+    h+=`<div class="photo-slot${img?" filled":""}" ${img?`onclick="openPhoto('${driveThumb(img).replace(/'/g,"")}')"`:""}>${img?`<img src="${driveThumb(img)}"><div class="pcheck">✓</div>`:`<span class="pemoji" style="color:var(--clay)">✗</span><span style="color:#A85E38">${esc(p.label)}</span>`}</div>`;});
+  h+=`</div><div class="modal-actions"><button class="btn ghost" onclick="delCareLog('${id}')">삭제</button><button class="btn ghost" onclick="reopenCare('${id}')">수정</button><button class="btn" onclick="closeModal()">닫기</button></div>`;
+  showModal(h);
+}
+function reopenCare(id){
+  const log=visitLogs.find(l=>l.id===id);
+  log.closed=false;markPending(log);syncUpsert("visitLogs",log);closeModal();careTab="checklist";renderCare();goTab("care");
+}
+function openPhoto(src){
+  showModal(`<div class="grab"></div><img src="${driveThumb(src)}" style="width:100%;border-radius:14px"><div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>`);
+}
+function delCareLog(id){if(!confirm("이 정리 기록을 삭제할까요?"))return;visitLogs=visitLogs.filter(l=>l.id!==id);syncDelete("visitLogs",id);closeModal();renderCare();}
+
+/* ============================================================
+   화면 5 — 할 일 게시판
+   ============================================================ */
+function renderTodo(){
+  const v=document.getElementById("view-todo");
+  let h=`<div class="view-head"><div><div class="t">할 일</div>
+    <div class="d">가볍집에 필요한 일을 올리고, 누구든 해두고 갑니다</div></div>
+    <button class="btn clay" onclick="openTodo()">＋ 올리기</button></div>`;
+  const open=todos.filter(t=>!t.done).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const done=todos.filter(t=>t.done).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if(!todos.length){h+=`<div class="empty"><div class="big">📌</div>필요한 일이 있으면 올려보세요.<br>다른 집사가 보고 해둘 수 있어요.</div>`;}
+  else{
+    open.forEach(t=>h+=todoRow(t));
+    if(done.length){h+=`<div style="font-size:12px;color:var(--ink-soft);margin:18px 2px 8px">해결됨 ${done.length}</div>`;done.forEach(t=>h+=todoRow(t));}
+  }
+  v.innerHTML=h;
+}
+function todoRow(t){
+  return `<div class="todo-item${t.done?" done":""}">
+    <div class="todo-check" onclick="toggleTodo('${t.id}')">${t.done?"✓":""}</div>
+    <div class="todo-main"><div class="todo-text">${esc(t.text)}</div>
+      <div class="todo-meta">${t.who?`<span class="who">${esc(t.who)}</span> · `:""}${fmtDate(t.createdAt.slice(0,10))}${t.done&&t.doneBy?` · ${esc(t.doneBy)} 처리`:""}</div></div>
+    <button class="todo-del" onclick="delTodo('${t.id}')">×</button></div>`;
+}
+function openTodo(){
+  let h=`<div class="grab"></div><h3>할 일 올리기</h3>
+    <div class="field"><label>필요한 일</label><textarea id="t-text" placeholder="예: 화장실 휴지 떨어져감 / 텃밭 상추 솎아주기"></textarea></div>
+    <div class="field"><label>올린 사람 <span style="font-weight:400">(선택)</span></label><input id="t-who" value="${esc(me)}" placeholder="집사 이름"></div>
+    <div class="modal-actions"><button class="btn clay" onclick="saveTodo()">올리기</button></div>`;
+  showModal(h);
+}
+function saveTodo(){
+  const text=val("t-text").trim();if(!text){alert("필요한 일을 적어주세요.");return;}
+  const o={id:uid(),text,who:val("t-who").trim(),done:false,doneBy:"",createdAt:new Date().toISOString()};
+  todos.push(o);
+  markPending(o);syncUpsert("todos",o);closeModal();renderTodo();renderHome();
+}
+function toggleTodo(id){
+  const t=todos.find(x=>x.id===id);
+  if(!t.done){const n=prompt("해결한 집사 이름 (선택)","");t.doneBy=n?n.trim():"";t.done=true;}
+  else{t.done=false;t.doneBy="";}
+  markPending(t);syncUpsert("todos",t);renderTodo();renderHome();
+}
+function delTodo(id){if(!confirm("이 항목을 지울까요?"))return;todos=todos.filter(t=>t.id!==id);syncDelete("todos",id);renderTodo();renderHome();}
+
+/* ============================================================
+   화면 6 — 사랑방 (머물다 느낀 것·추천·사진)
+   ============================================================ */
+function renderNotes(){
+  const v=document.getElementById("view-notes");
+  let h=`<div class="view-head"><div><div class="t">사랑방</div>
+    <div class="d">머물다 느낀 것, 좋았던 것, 추천하고 싶은 것</div></div>
+    <button class="btn lilac" onclick="openNote()">＋ 올리기</button></div>`;
+  if(!notes.length){h+=`<div class="empty"><div class="big">🌸</div>가볍집에서 느낀 한 조각을<br>여기 남겨보세요.</div>`;}
+  else{
+    [...notes].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).forEach(n=>{
+      h+=`<div class="card note-card">
+        ${n.photo?`<img src="${driveThumb(n.photo)}" class="note-img" onclick="openPhoto('${driveThumb(n.photo).replace(/'/g,"")}')">`:""}
+        <div class="note-text">${esc(n.text)}</div>
+        <div class="note-meta"><span>${n.who?esc(n.who):"이름 없는 마음"}</span>
+          <span>${fmtShort(n.createdAt.slice(0,10))}</span>
+          <button class="note-del" onclick="delNote('${n.id}')">×</button></div></div>`;
+    });
+  }
+  v.innerHTML=h;
+}
+function openNote(){
+  let h=`<div class="grab"></div><h3>사랑방에 올리기</h3>
+    <div class="field"><label>나누고 싶은 마음</label><textarea id="n-text" placeholder="예: 새벽 안개 낀 차밭이 정말 좋았어요 / 쌍계사 가는 길 추천합니다" style="min-height:90px"></textarea></div>
+    <div class="field"><label>사진 <span style="font-weight:400">(선택)</span></label>
+      <div class="photo-slot" id="n-photo-slot" onclick="document.getElementById('n-cam').click()" style="aspect-ratio:16/10;max-width:100%">
+        <span class="pemoji">📷</span><span>사진 더하기</span></div>
+      <input type="file" id="n-cam" accept="image/*" style="display:none" onchange="notephoto(this)"></div>
+    <div class="field"><label>올린 사람</label><input id="n-who" value="${esc(me)}" placeholder="집사 이름"></div>
+    <div class="modal-actions"><button class="btn lilac" onclick="saveNote()">올리기</button></div>`;
+  showModal(h);window._notePhoto="";
+}
+function notephotoApply(data){window._notePhoto=data;
+  const s=document.getElementById("n-photo-slot");s.innerHTML=`<img src="${data}">`;s.classList.add("filled");}
+function notephoto(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{const img=new Image();img.onload=()=>{
+    const max=1200,sc=Math.min(1,max/Math.max(img.width,img.height));
+    const c=document.createElement("canvas");c.width=img.width*sc;c.height=img.height*sc;
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    notephotoApply(c.toDataURL("image/jpeg",0.72));
+  };img.src=e.target.result;};r.readAsDataURL(f);
+}
+async function saveNote(){
+  const text=val("n-text").trim();if(!text&&!window._notePhoto){alert("마음이나 사진을 남겨주세요.");return;}
+  const o={id:uid(),who:val("n-who").trim(),text,photo:window._notePhoto||"",createdAt:new Date().toISOString()};
+  notes.push(o);markPending(o);
+  closeModal();renderNotes();renderHome(); // 우선 이 기기에 바로 보이게
+  if(o.photo){
+    const url=await syncUploadPhoto(o.photo,`note_${o.id}.jpg`);
+    if(url){o.photo=url;renderNotes();}
+  }
+  markPending(o);syncUpsert("notes",o);
+}
+function delNote(id){if(!confirm("이 글을 지울까요?"))return;notes=notes.filter(n=>n.id!==id);syncDelete("notes",id);renderNotes();renderHome();}
+
+/* ============================================================
+   공통 — 모달 · 탭 · 시작
+   ============================================================ */
+function val(id){return document.getElementById(id).value;}
+function showModal(html){document.getElementById("modalBox").innerHTML=html;document.getElementById("modalBg").classList.add("on");document.getElementById("modalBox").scrollTop=0;}
+function closeModal(){document.getElementById("modalBg").classList.remove("on");}
+document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")closeModal();});
+
+function renderAll(){renderHome();renderTimeline();renderMinutes();renderVisits();renderCare();renderTodo();renderNotes();}
+
+/* ── 집사 이름 (이 기기에 기억) ── */
+const NAME_KEY="garyeobjip_me";
+function loadMe(){
+  try{me=localStorage.getItem(NAME_KEY)||"";}catch(e){me="";}
+}
+function setMe(name){
+  me=name;
+  try{localStorage.setItem(NAME_KEY,name);}catch(e){}
+  document.getElementById("nameGate").classList.remove("on");
+  renderAll();updateHeaderMe();
+}
+function updateHeaderMe(){
+  const el=document.getElementById("meLabel");
+  if(el)el.textContent=me?`${me} 집사`:"";
+  if(!SYNC_URL)setSync(false,"이 기기에 저장");
+}
+function openNameGate(force){
+  const g=document.getElementById("nameGate");
+  let h=`<div class="gate-box">
+    <div class="gate-leaf">🌿</div>
+    <div class="gate-title">어느 집사님이신가요?</div>
+    <div class="gate-sub">한 번 고르면 이 기기에서 기억해요.<br>정리·할 일·사랑방에 이름이 자동으로 들어갑니다.</div>
+    <div class="gate-names">${CARETAKERS.map(n=>`<button onclick="setMe('${n}')">${n}</button>`).join("")}</div>
+    <button class="gate-skip" onclick="setMe('')">${force?"나중에 고를게요":"이름 없이 둘러보기"}</button>
+  </div>`;
+  g.innerHTML=h;g.classList.add("on");
+}
+function changeMe(){openNameGate(true);}
+
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click",()=>{goTab(b.dataset.tab);});
+});
+
+loadMe();
+loadCache(); // 폰에 저장해둔 마지막 상태를 먼저 보여줌 — "초기화됐다 다시 뜨는" 느낌 없애기
+renderAll();
+updateHeaderMe();
+if(!me)openNameGate(false);
+if(SYNC_URL){ syncPullAll(); startPolling(); } // 초기 1회는 실패시 알려줌, 이후 주기적 폴링만 조용히
+</script>
+</body>
+</html>
