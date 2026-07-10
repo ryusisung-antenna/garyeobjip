@@ -1046,35 +1046,20 @@ function renderCare(){
   else h+=careHistory();
   v.innerHTML=h;
 }
-function setCareTab(t){ if(t==="checklist")window._activeOverride=null; careTab=t;renderCare();}
+function setCareTab(t){careTab=t;renderCare();}
 
 function activeLog(){
-  // '이어서 하기'로 특정 기록을 선택했으면 그걸 우선
-  if(window._activeOverride){
-    const ov=visitLogs.find(l=>l.id===window._activeOverride && !l.closed);
-    if(ov) return ov;
-    window._activeOverride=null; // 마감됐거나 사라졌으면 해제
-  }
-  // 내가 시작한 진행 중(미마감) 기록만 — 남이 정리 중인 건 여기 안 잡힘
-  const mine=visitLogs.filter(l=>!l.closed && (l.owner===me || (!l.owner && l.__pending)));
-  mine.sort((a,b)=>b.date.localeCompare(a.date));
-  return mine.find(l=>l.__pending)||mine.find(l=>l.date===todayISO())||mine[0];
-}
-// 다른 집사가 지금 정리 중인 기록들 (내 것 제외)
-function othersActiveLogs(){
-  return visitLogs.filter(l=>!l.closed && l.owner && l.owner!==me);
+  // 이 기기에서 진행 중인 내 정리 — 마치기 전까진 서버에 전혀 안 보내므로
+  // 다른 집사가 정리 중인 게 여기 섞여 보일 일 자체가 없음
+  const mine=visitLogs.filter(l=>!l.closed && (!l.owner || l.owner===me));
+  mine.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  return mine[0];
 }
 function careActive(){
   const log=activeLog();
   if(!log){
-    const others=othersActiveLogs();
-    let notice="";
-    if(others.length){
-      notice=`<div class="tip" style="border-color:rgba(208,139,99,.3);background:rgba(208,139,99,.07);margin-bottom:14px">
-        🧹 지금 ${others.map(o=>`<b>${esc(o.owner)}</b>`).join(", ")} 집사가 정리 중이에요.
-        같이 하시려면 아래에서 새로 시작하셔도 되고, 진행 중인 걸 이어서 하려면 '지난 기록'에서 열어보세요.</div>`;
-    }
-    return notice+`<div class="empty"><div class="big">🧹</div>오늘 정리를 시작하면<br>체크리스트가 펼쳐집니다.</div>
+    return `<div class="empty"><div class="big">🧹</div>오늘 정리를 시작하면<br>체크리스트가 펼쳐집니다.<br>
+      <span style="font-size:11.5px">체크와 사진은 이 폰 안에만 저장되다가,<br>'정리 마치기'를 누를 때 한 번에 공유돼요.</span></div>
       <button class="btn" style="width:100%;justify-content:center;padding:14px" onclick="startCare()">오늘 정리 시작하기</button>`;
   }
   let total=0,done=0;
@@ -1096,82 +1081,92 @@ function careActive(){
     <div class="chk-sub" style="margin:0 2px 8px">떠나기 전, 사용 여부와 관계없이 아래 4가지를 찍어 남깁니다. 칸을 누르면 카메라가 켜져요.</div>
     <div class="photo4">`;
   PHOTO4.forEach(p=>{
-    const img=log.photos[p.key];total++;if(img)done++;
-    h+=`<div class="photo-slot${img?" filled":""}" onclick="${img?`removePhoto('${log.id}','${p.key}')`:`document.getElementById('cam-${p.key}').click()`}">
-      ${img?`<img src="${driveThumb(img)}"><div class="pcheck">✓</div>`:`<span class="pemoji">📷</span><span>${esc(p.label)}</span>${p.sub?`<span style="font-size:10px;opacity:.7;line-height:1.2">${esc(p.sub)}</span>`:""}`}
-      <input type="file" id="cam-${p.key}" accept="image/*" capture="environment" style="display:none" onchange="addPhoto('${log.id}','${p.key}',this)"></div>`;
+    const img=log.photos[p.key];total++;
+    const loading=img==="__loading__";
+    if(img&&!loading)done++;
+    if(loading){
+      h+=`<div class="photo-slot"><span class="pemoji">⏳</span><span>불러오는 중…</span></div>`;
+    }else{
+      h+=`<div class="photo-slot${img?" filled":""}" onclick="${img?`removePhoto('${log.id}','${p.key}')`:`document.getElementById('cam-${p.key}').click()`}">
+        ${img?`<img src="${img}"><div class="pcheck">✓</div>`:`<span class="pemoji">📷</span><span>${esc(p.label)}</span>${p.sub?`<span style="font-size:10px;opacity:.7;line-height:1.2">${esc(p.sub)}</span>`:""}`}
+        <input type="file" id="cam-${p.key}" accept="image/*" capture="environment" style="display:none" onchange="addPhoto('${log.id}','${p.key}',this)"></div>`;
+    }
   });
   h+=`</div></div>`;
   const pct=total?Math.round(done/total*100):0;
   h+=`<div class="vlog-prog"><i style="width:${pct}%"></i></div>
     <div style="text-align:center;font-size:12px;color:var(--ink-soft);margin-top:6px">${done} / ${total} 완료</div>
-    <div class="modal-actions"><button class="btn lilac" style="width:100%" onclick="closeCare('${log.id}')">정리 마치기 — 다른 집사도 볼 수 있게</button></div></div>`;
+    <div class="modal-actions"><button class="btn lilac" id="closeCareBtn" style="width:100%" onclick="closeCare('${log.id}')">정리 마치기 — 다른 집사도 볼 수 있게</button></div></div>`;
   return h;
 }
 function startCare(){
-  window._activeOverride=null;
-  const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},closed:false};
-  visitLogs.push(log);markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
+  const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},closed:false,updatedAt:Date.now()};
+  visitLogs.push(log);saveCache();renderCare();renderHome();
 }
 function editCareWho(id){
   const log=visitLogs.find(l=>l.id===id);
   const n=prompt("정리한 집사 이름",log.who||"");
-  if(n!==null){log.who=n.trim();markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();}
+  if(n!==null){log.who=n.trim();log.updatedAt=Date.now();saveCache();renderCare();renderHome();}
 }
 function toggleChk(id,k){
-  const log=visitLogs.find(l=>l.id===id);log.checks[k]=!log.checks[k];markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
+  const log=visitLogs.find(l=>l.id===id);log.checks[k]=!log.checks[k];log.updatedAt=Date.now();saveCache();renderCare();renderHome();
 }
 function addPhoto(id,key,input){
   const f=input.files[0];if(!f)return;
+  const log=visitLogs.find(l=>l.id===id);
+  if(!log)return;
+  log.photos[key]="__loading__";renderCare();
   const r=new FileReader();
+  r.onerror=()=>{ delete log.photos[key]; renderCare(); alert("사진을 읽지 못했어요. 다시 시도해주세요."); };
   r.onload=e=>{
-    // 용량 축소: 캔버스로 리사이즈
     const img=new Image();
-    img.onload=async ()=>{
-      const max=900,sc=Math.min(1,max/Math.max(img.width,img.height));
-      const c=document.createElement("canvas");c.width=img.width*sc;c.height=img.height*sc;
-      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-      const dataUrl=c.toDataURL("image/jpeg",0.7);
-      const log=visitLogs.find(l=>l.id===id);
-      log.photos[key]=dataUrl;markPending(log);renderCare();renderHome(); // 우선 이 기기에 바로 보이게, 업로드 끝날 때까지 보호
-      const url=await syncUploadPhoto(dataUrl,`care_${id}_${key}.jpg`);
-      if(url)log.photos[key]=url; // 업로드되면 드라이브 주소로 교체 — 다른 집사도 보임
-      markPending(log);syncUpsert("visitLogs",log);renderCare();
+    img.onerror=()=>{ delete log.photos[key]; renderCare(); alert("사진 형식을 처리하지 못했어요. 다른 사진으로 시도해주세요."); };
+    img.onload=()=>{
+      try{
+        const max=800,sc=Math.min(1,max/Math.max(img.width,img.height));
+        const c=document.createElement("canvas");
+        c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+        // 이 폰 안에만 저장 — 드라이브 업로드는 '정리 마치기' 때 한 번에
+        log.photos[key]=c.toDataURL("image/jpeg",0.62);
+        log.updatedAt=Date.now();saveCache();renderCare();renderHome();
+      }catch(err){
+        delete log.photos[key];renderCare();
+        alert("사진 처리 중 문제가 생겼어요. 다시 시도해주세요.");
+      }
     };img.src=e.target.result;
   };r.readAsDataURL(f);
 }
 function removePhoto(id,key){
   if(!confirm("이 사진을 지울까요?"))return;
-  const log=visitLogs.find(l=>l.id===id);delete log.photos[key];markPending(log);syncUpsert("visitLogs",log);renderCare();renderHome();
+  const log=visitLogs.find(l=>l.id===id);delete log.photos[key];log.updatedAt=Date.now();saveCache();renderCare();renderHome();
 }
-function closeCare(id){
+async function closeCare(id){
   const log=visitLogs.find(l=>l.id===id);
   if(!log.who){if(!confirm("정리한 집사 이름이 비어 있어요. 그래도 마칠까요?"))return;}
-  log.closed=true;markPending(log);syncUpsert("visitLogs",log);window._activeOverride=null;careTab="history";renderCare();
+  const btn=document.getElementById("closeCareBtn");
+  if(btn){btn.textContent="마치는 중…";btn.style.opacity=".7";}
+  // 이 순간에 한 번에: 남아있는 사진들을 드라이브로 올리고
+  if(SYNC_URL){
+    const jobs=PHOTO4.filter(p=>{
+      const v=log.photos[p.key];
+      return v && v!=="__loading__" && v.startsWith("data:");
+    }).map(async p=>{
+      const url=await syncUploadPhoto(log.photos[p.key],`care_${id}_${p.key}_${Date.now()}.jpg`);
+      if(url) log.photos[p.key]=url;
+    });
+    if(jobs.length) await Promise.all(jobs);
+  }
+  // 최종 상태를 서버에 딱 한 번 저장
+  log.closed=true;log.updatedAt=Date.now();
+  markPending(log);
+  await syncUpsert("visitLogs",log);
+  careTab="history";renderCare();
 }
 function careHistory(){
-  const inProgress=visitLogs.filter(l=>!l.closed).sort((a,b)=>b.date.localeCompare(a.date));
   const closed=visitLogs.filter(l=>l.closed).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!closed.length)return `<div class="empty"><div class="big">📋</div>아직 마친 정리 기록이 없습니다.</div>`;
   let h="";
-  // 진행 중인 정리 (내 것이든 남 것이든) — 눌러서 이어서 할 수 있게
-  if(inProgress.length){
-    h+=`<div class="sect-label" style="margin:2px 2px 8px"><span class="sl-dot" style="background:var(--clay)"></span>진행 중</div>`;
-    inProgress.forEach(log=>{
-      let total=0,done=0;
-      CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{total++;if(log.checks[`${gi}-${ii}`])done++;}));
-      PHOTO4.forEach(p=>{total++;if(log.photos[p.key])done++;});
-      const pct=total?Math.round(done/total*100):0;
-      const isMine=log.owner===me||(!log.owner&&log.__pending);
-      h+=`<div class="card visit-log-card" onclick="continueCare('${log.id}')">
-        <div style="display:flex;align-items:center;gap:8px">
-          <b style="font-size:15px">${fmtDate(log.date)}</b>
-          <span style="font-size:12.5px;color:var(--ink-soft)">${esc(log.owner||log.who||"정리 중")}</span>
-          <span style="margin-left:auto;font-size:12px;color:var(--clay);font-weight:700">${isMine?"이어서 하기":"이어서 돕기"} ›</span></div>
-        <div class="vlog-prog"><i style="width:${pct}%"></i></div></div>`;
-    });
-    if(closed.length)h+=`<div class="sect-label" style="margin:18px 2px 8px"><span class="sl-dot" style="background:var(--moss)"></span>마친 정리</div>`;
-  }
-  if(!inProgress.length&&!closed.length)return `<div class="empty"><div class="big">📋</div>아직 정리 기록이 없습니다.</div>`;
   closed.forEach(log=>{
     let total=0,done=0;
     CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{total++;if(log.checks[`${gi}-${ii}`])done++;}));
@@ -1186,14 +1181,6 @@ function careHistory(){
       <div class="vlog-prog"><i style="width:${pct}%"></i></div></div>`;
   });
   return h;
-}
-// 진행 중인 정리를 이어서 하기 (내 것이면 그대로, 남의 것이면 그 정리에 합류)
-function continueCare(id){
-  const log=visitLogs.find(l=>l.id===id);
-  if(!log.owner) log.owner=me||""; // 예전 기록 호환
-  careTab="checklist";
-  window._activeOverride=id; // 이 기록을 활성으로 강제
-  renderCare();goTab("care");
 }
 function viewCareLog(id){
   const log=visitLogs.find(l=>l.id===id);
@@ -1225,7 +1212,8 @@ function viewCareLog(id){
 }
 function reopenCare(id){
   const log=visitLogs.find(l=>l.id===id);
-  log.closed=false;markPending(log);syncUpsert("visitLogs",log);closeModal();careTab="checklist";renderCare();goTab("care");
+  log.closed=false;log.updatedAt=Date.now();saveCache();
+  closeModal();careTab="checklist";renderCare();goTab("care");
 }
 function openPhoto(src){
   // 정리기록 모달 위에 겹쳐서 크게 보기 — 닫아도 뒤의 기록은 그대로 유지
