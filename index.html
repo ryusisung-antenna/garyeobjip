@@ -1100,16 +1100,17 @@ function careActive(){
   return h;
 }
 function startCare(){
-  const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},closed:false,updatedAt:Date.now()};
+  const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},closed:false};
+  markPending(log); // 서버엔 안 보내지만, 자동 새로고침이 이 로컬 진행분을 지우지 못하게 보호
   visitLogs.push(log);saveCache();renderCare();renderHome();
 }
 function editCareWho(id){
   const log=visitLogs.find(l=>l.id===id);
   const n=prompt("정리한 집사 이름",log.who||"");
-  if(n!==null){log.who=n.trim();log.updatedAt=Date.now();saveCache();renderCare();renderHome();}
+  if(n!==null){log.who=n.trim();markPending(log);saveCache();renderCare();renderHome();}
 }
 function toggleChk(id,k){
-  const log=visitLogs.find(l=>l.id===id);log.checks[k]=!log.checks[k];log.updatedAt=Date.now();saveCache();renderCare();renderHome();
+  const log=visitLogs.find(l=>l.id===id);log.checks[k]=!log.checks[k];markPending(log);saveCache();renderCare();renderHome();
 }
 function addPhoto(id,key,input){
   const f=input.files[0];if(!f)return;
@@ -1129,7 +1130,7 @@ function addPhoto(id,key,input){
         c.getContext("2d").drawImage(img,0,0,c.width,c.height);
         // 이 폰 안에만 저장 — 드라이브 업로드는 '정리 마치기' 때 한 번에
         log.photos[key]=c.toDataURL("image/jpeg",0.62);
-        log.updatedAt=Date.now();saveCache();renderCare();renderHome();
+        markPending(log);saveCache();renderCare();renderHome();
       }catch(err){
         delete log.photos[key];renderCare();
         alert("사진 처리 중 문제가 생겼어요. 다시 시도해주세요.");
@@ -1139,7 +1140,7 @@ function addPhoto(id,key,input){
 }
 function removePhoto(id,key){
   if(!confirm("이 사진을 지울까요?"))return;
-  const log=visitLogs.find(l=>l.id===id);delete log.photos[key];log.updatedAt=Date.now();saveCache();renderCare();renderHome();
+  const log=visitLogs.find(l=>l.id===id);delete log.photos[key];markPending(log);saveCache();renderCare();renderHome();
 }
 async function closeCare(id){
   const log=visitLogs.find(l=>l.id===id);
@@ -1212,7 +1213,7 @@ function viewCareLog(id){
 }
 function reopenCare(id){
   const log=visitLogs.find(l=>l.id===id);
-  log.closed=false;log.updatedAt=Date.now();saveCache();
+  log.closed=false;markPending(log);saveCache();
   closeModal();careTab="checklist";renderCare();goTab("care");
 }
 function openPhoto(src){
