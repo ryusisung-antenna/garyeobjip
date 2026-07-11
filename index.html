@@ -278,6 +278,7 @@ nav button .ic.blob i{font-size:16px}
 .arch-btn span:not(.blob){font-size:18px}
 .arch-btn:active{background:var(--paper-2)}
 .home-card.pending{opacity:.72;border-style:dashed}
+.home-card.guest{background:linear-gradient(135deg,rgba(95,169,214,.08),rgba(201,182,220,.10));border-color:rgba(95,169,214,.22)}
 .hc-soon{margin-left:auto;font-size:10.5px;color:var(--lilac-deep);background:rgba(201,182,220,.18);padding:2px 8px;border-radius:7px;font-weight:700}
 
 /* 사랑방 */
@@ -469,7 +470,7 @@ let todos = []; // {id, text, who, done, createdAt}
 let notes = []; // {id, who, text, photo, createdAt}
 
 /* ── 방문자 앱 연동: 신청 대기열 · 후기 ── */
-let visitRequests = []; // {id,name,phone,people,start,end,question,wantsSurvey,status,decidedBy,updatedAt}
+let visitRequests = []; // {id,name,phone,people,companions,start,end,question,wantsSurvey,status,decidedBy,updatedAt}
 let reviews = []; // {id,comfort,period,good,bad,suggest,bestmoment,worstmoment,guidehelp,guidemore,hadong,revisit,contact,updatedAt}
 
 /* ── 집사 (이 기기에 기억) ── */
@@ -656,19 +657,24 @@ function renderHome(){
       <div class="hc-row"><span class="hc-label">${esc(recentNote.text.slice(0,40))}${recentNote.text.length>40?"…":""}</span></div></div>`;
   }
 
-  // 방문자 앱 연동 — 방문 신청 · 방문자 후기
+  // 방문자 앱 연동 — 방문 신청 · 방문자 후기 (은은한 톤으로 구분)
   const waitingReq=visitRequests.filter(r=>r.status==="대기"||!r.status);
-  h+=`<div class="home-card" onclick="goTab('visitreq')">
+  h+=`<div class="home-card guest" onclick="goTab('visitreq')">
     <div class="hc-head"><span class="hc-emoji blob blob-f"><i class="ti ti-mail"></i></span><span class="hc-title">방문 신청</span>${waitingReq.length?`<span class="hc-badge">${waitingReq.length}</span>`:""}<span class="hc-go">›</span></div>`;
   if(!visitRequests.length) h+=`<div class="hc-empty">방문자 앱에서 들어온 신청을 여기서 승인합니다.</div>`;
   else if(!waitingReq.length) h+=`<div class="hc-empty">기다리는 신청이 없어요. 지난 처리 ${visitRequests.length}건.</div>`;
   else waitingReq.slice(0,3).forEach(r=>h+=`<div class="hc-row"><span class="hc-label">· ${esc(r.name||"이름없음")} — ${fmtDate(r.start)} ~ ${fmtDate(r.end)}</span></div>`);
   h+=`</div>`;
   const recentReview=[...reviews].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
-  h+=`<div class="home-card" onclick="goTab('reviews')">
-    <div class="hc-head"><span class="hc-emoji blob blob-g"><i class="ti ti-message-circle"></i></span><span class="hc-title">방문자 후기</span><span class="hc-go">›</span></div>`;
+  h+=`<div class="home-card guest" onclick="goTab('reviews')">
+    <div class="hc-head"><span class="hc-emoji blob blob-g"><i class="ti ti-message-circle"></i></span><span class="hc-title">방문자 후기</span>${reviews.length?`<span class="hc-badge" style="background:var(--lilac-deep)">${reviews.length}</span>`:""}<span class="hc-go">›</span></div>`;
   if(!recentReview) h+=`<div class="hc-empty">머물다 간 분들의 후기가 여기 모입니다.</div>`;
-  else h+=`<div class="hc-row"><span class="hc-label">· ${esc((recentReview.good||recentReview.period||"새 후기가 도착했어요").slice(0,36))}${(recentReview.good||"").length>36?"…":""}</span></div>`;
+  else{
+    const stSm=n=>{let s="";for(let i=1;i<=5;i++)s+=i<=(n||0)?"★":"☆";return s;};
+    const snippet=recentReview.good||recentReview.bestmoment||recentReview.suggest||"";
+    h+=`<div class="hc-row"><span style="color:var(--sun);letter-spacing:1px;font-size:12.5px">${stSm(recentReview.comfort)}</span>
+      <span class="hc-label">${recentReview.period?esc(recentReview.period)+" · ":""}${esc(snippet.slice(0,26))}${snippet.length>26?"…":!recentReview.period&&!snippet?"새 후기가 도착했어요":""}</span></div>`;
+  }
   h+=`</div>`;
 
   // 아카이브 입구
@@ -679,14 +685,27 @@ function renderHome(){
   v.innerHTML=h;
 }
 function fmtShort(iso){const p=iso.split("-");return p.length<3?iso:`${+p[1]}.${+p[2]} (${dow(iso)})`;}
-function goTab(tab){
+function goTab(tab,fromHistory){
   document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));
   const navBtn=document.querySelector(`nav button[data-tab="${tab}"]`);
   if(navBtn)navBtn.classList.add("on");
   document.getElementById("view-"+tab).classList.add("on");
   window.scrollTo(0,0);
+  if(!fromHistory){
+    try{
+      const cur=history.state&&history.state.tab;
+      if(cur!==tab) history.pushState({tab},"","#"+tab);
+    }catch(e){ /* file://로 로컬 열람 등 히스토리 API가 막힌 환경 — 탭 전환은 그대로 되니 조용히 넘어감 */ }
+  }
 }
+// 뒤로가기(폰 시스템 back·브라우저 back)를 앱 안 탭 이동으로 받기 — 안 그러면 링크 밖으로 나가버림
+window.addEventListener("popstate",e=>{
+  if(document.getElementById("modalBg").classList.contains("on")){ closeModal(); return; }
+  const tab=(e.state&&e.state.tab)||"home";
+  goTab(tab,true);
+});
+try{ if(!history.state) history.replaceState({tab:"home"},"","#home"); }catch(e){}
 
 /* ============================================================
    화면 1 — 걸어온 길 (고정 + 회의록 자동 + 손추가)
@@ -1375,11 +1394,11 @@ function renderVisitReq(){
   }else{
     if(waiting.length){
       h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:6px 2px 8px">승인 기다리는 중 · ${waiting.length}</div>`;
-      waiting.forEach(r=>h+=vreqCard(r,true));
+      waiting.forEach(r=>{ try{ h+=vreqCard(r,true); }catch(e){ console.error("신청 표시 실패 · id=",r&&r.id,e); } });
     }
     if(decided.length){
       h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:18px 2px 8px">지난 처리 · ${decided.length}</div>`;
-      decided.forEach(r=>h+=vreqCard(r,false));
+      decided.forEach(r=>{ try{ h+=vreqCard(r,false); }catch(e){ console.error("신청 표시 실패 · id=",r&&r.id,e); } });
     }
   }
   v.innerHTML=h;
@@ -1399,6 +1418,7 @@ function vreqCard(r,pending){
     <div style="font-size:15.5px;font-weight:700;color:var(--sky);margin-top:9px">${fmtDate(r.start)} — ${fmtDate(r.end)}</div>
     <div style="font-size:12px;color:var(--ink-soft)">${nights}박 · ${r.start} ~ ${r.end}</div>
     <div style="margin-top:10px;font-size:13.5px;line-height:1.7">
+      ${r.companions?`<div><span style="color:var(--ink-soft)">함께 오는 분</span> · ${esc(r.companions)}</div>`:""}
       ${r.phone?`<div><span style="color:var(--ink-soft)">연락처</span> · <a href="tel:${esc(r.phone.replace(/[^0-9]/g,""))}" style="color:var(--sky)">${esc(r.phone)}</a></div>`:""}
       ${r.question?`<div><span style="color:var(--ink-soft)">문의</span> · ${esc(r.question)}</div>`:""}
       <div><span style="color:var(--ink-soft)">후기설문</span> · ${r.wantsSurvey?"참여할게요 ✓":"괜찮대요"}</div>
@@ -1431,7 +1451,7 @@ async function decideVisitReq(id,status){
   req.status=status; req.decidedBy=me||""; req.updatedAt=Date.now();
   markPending(req);
   if(status==="승인"){
-    visits.push({id:"v_from_"+req.id, who:"손님", guest:req.name||"", start:req.start, end:req.end,
+    visits.push({id:"v_from_"+req.id, who:req.name||"손님", guest:req.companions||"", start:req.start, end:req.end,
       note:((req.people||1)+"명")+(req.question?" · 문의있음":""), color:"#8FB04E", updatedAt:Date.now()});
   }
   renderVisitReq();renderHome();renderVisits();
@@ -1451,28 +1471,63 @@ function renderReviews(){
   if(!list.length){
     h+=`<div class="empty"><div class="big">💬</div>아직 남겨진 후기가 없어요.<br>머문 분들이 후기를 남기면 여기 모입니다.</div>`;
   }else{
-    list.forEach(r=>h+=reviewCard(r));
+    let failed=0;
+    list.forEach(r=>{
+      try{ h+=reviewCard(r); }
+      catch(e){ failed++; console.error("후기 표시 실패 · id=",r&&r.id,e); }
+    });
+    if(failed) h+=`<div style="text-align:center;font-size:12px;color:var(--ink-soft);padding:10px">표시하지 못한 후기 ${failed}건이 있어요 (개발자도구 콘솔 참고)</div>`;
   }
   v.innerHTML=h;
 }
+function fmtWhen(ms){
+  if(!ms) return "";
+  const dt=new Date(ms);
+  const hh=dt.getHours(), mi=dt.getMinutes();
+  const ap=hh<12?"오전":"오후", h12=hh%12===0?12:hh%12;
+  const hm=`${ap} ${h12}:${String(mi).padStart(2,"0")}`;
+  const md=`${dt.getMonth()+1}.${dt.getDate()}`;
+  const days=Math.floor((Date.now()-ms)/86400000);
+  const rel = days<=0 ? "오늘" : days===1 ? "어제" : `${days}일 전`;
+  return `${md} ${hm} · ${rel}`;
+}
 function reviewCard(r){
   const stars=n=>{let s="";for(let i=1;i<=5;i++)s+=`<span style="color:${i<=(n||0)?"var(--sun)":"var(--line)"}">★</span>`;return s;};
-  const scaleTxt=(v,opts)=>(v===""||v===undefined||v===null)?null:(opts[+v]!==undefined?opts[+v]:v);
-  const row=(label,val)=>val?`<div style="margin-top:10px"><div style="font-size:11.5px;color:var(--ink-soft);font-weight:700">${label}</div><div style="font-size:14px;line-height:1.65;margin-top:2px">${esc(val)}</div></div>`:"";
-  let h=`<div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:15px;letter-spacing:2px">${stars(r.comfort)}</span>
+  const row=(label,val)=>val?`<div style="margin-top:10px"><div style="font-size:11.5px;color:var(--ink-soft);font-weight:700">${label}</div><div style="font-size:14px;line-height:1.65;margin-top:2px;white-space:pre-line">${esc(val)}</div></div>`:"";
+  const snippet=r.good||r.bestmoment||r.suggest||r.bad||r.guidehelp||"";
+  const fullFields=[
+    ["머문 기간",r.period],["좋았던 점",r.good],["아쉬웠던 점",r.bad],["바라는 점",r.suggest],
+    ["가장 편안했던 순간",r.bestmoment],["가장 불편했던 순간",r.worstmoment],
+    ["안내서 도움",r.guidehelp],["안내서 보완점",r.guidemore],
+    ["하동 추천",r.hadong],["재방문 의향",r.revisit],
+  ].filter(([,v])=>v);
+  let h=`<div class="card" id="rev-${r.id}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <span style="font-size:15px;letter-spacing:2px">${r.comfort?stars(r.comfort):`<span style="font-size:12px;color:var(--ink-soft)">편안함 응답 없음</span>`}</span>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:4px">${r.period?esc(r.period)+" · ":""}${fmtWhen(r.updatedAt)}</div>
+      </div>
       <button class="btn ghost sm" onclick="delReview('${r.id}')">삭제</button>
     </div>
-    ${r.period?`<div style="font-size:14.5px;font-weight:700;color:var(--sky);margin-top:8px">${esc(r.period)}</div>`:""}
-    ${row("좋았던 점",r.good)}${row("아쉬웠던 점",r.bad)}${row("바라는 점",r.suggest)}
-    ${row("가장 편안했던 순간",r.bestmoment)}${row("가장 불편했던 순간",r.worstmoment)}
-    ${scaleTxt(r.guidehelp,["별로","보통","많이"])?`<div style="margin-top:10px"><span style="font-size:11.5px;color:var(--ink-soft);font-weight:700">안내서 도움</span> <span style="font-size:12.5px;background:rgba(142,176,78,.14);color:var(--moss-deep);padding:2px 9px;border-radius:8px;font-weight:700">${scaleTxt(r.guidehelp,["별로","보통","많이"])}</span></div>`:""}
-    ${row("안내서 보완점",r.guidemore)}${row("하동 추천",r.hadong)}
-    ${scaleTxt(r.revisit,["글쎄요","아마도","꼭이요"])?`<div style="margin-top:10px"><span style="font-size:11.5px;color:var(--ink-soft);font-weight:700">재방문 의향</span> <span style="font-size:12.5px;background:rgba(142,176,78,.14);color:var(--moss-deep);padding:2px 9px;border-radius:8px;font-weight:700">${scaleTxt(r.revisit,["글쎄요","아마도","꼭이요"])}</span></div>`:""}
-    ${r.contact?`<div style="margin-top:10px;font-size:12.5px;color:var(--ink-soft)">연락처 · ${esc(r.contact)}</div>`:""}
+    <div style="margin-top:10px;font-size:13.5px;line-height:1.6;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(snippet)||"새 후기가 도착했어요"}</div>
+    ${fullFields.length?`<button class="rev-toggle" data-count="${fullFields.length}" onclick="toggleReview('${r.id}')" style="margin-top:9px;background:none;border:none;padding:0;font-size:12px;color:var(--sky);font-weight:700;display:flex;align-items:center;gap:3px">전체 답변 ${fullFields.length}개 더보기 <i class="ti ti-chevron-down" style="font-size:14px"></i></button>`:""}
+    <div class="rev-full" style="display:none;margin-top:2px">
+      ${fullFields.map(([l,v])=>row(l,v)).join("")}
+      ${r.contact?`<div style="margin-top:10px;font-size:12.5px;color:var(--ink-soft)">연락처 · ${esc(r.contact)}</div>`:""}
+    </div>
   </div>`;
   return h;
+}
+function toggleReview(id){
+  const card=document.getElementById("rev-"+id); if(!card) return;
+  const full=card.querySelector(".rev-full"), btn=card.querySelector(".rev-toggle");
+  const opening=full.style.display==="none";
+  full.style.display=opening?"block":"none";
+  if(btn){
+    btn.innerHTML = opening
+      ? `접기 <i class="ti ti-chevron-up" style="font-size:14px"></i>`
+      : `전체 답변 ${btn.dataset.count}개 더보기 <i class="ti ti-chevron-down" style="font-size:14px"></i>`;
+  }
 }
 function delReview(id){
   if(!confirm("이 후기를 지울까요?"))return;
