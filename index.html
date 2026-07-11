@@ -326,6 +326,8 @@ nav button .ic.blob i{font-size:16px}
   <section class="view" id="view-notes"></section>
   <section class="view" id="view-timeline"></section>
   <section class="view" id="view-minutes"></section>
+  <section class="view" id="view-visitreq"></section>
+  <section class="view" id="view-reviews"></section>
 </main>
 
 <nav>
@@ -466,6 +468,10 @@ let todos = []; // {id, text, who, done, createdAt}
 /* ── 사랑방 (머물다 느낀 것·추천·사진) ── */
 let notes = []; // {id, who, text, photo, createdAt}
 
+/* ── 방문자 앱 연동: 신청 대기열 · 후기 ── */
+let visitRequests = []; // {id,name,phone,people,start,end,question,wantsSurvey,status,decidedBy,updatedAt}
+let reviews = []; // {id,comfort,period,good,bad,suggest,bestmoment,worstmoment,guidehelp,guidemore,hadong,revisit,contact,updatedAt}
+
 /* ── 집사 (이 기기에 기억) ── */
 const CARETAKERS = ["류시성","유성희","송혜경","이흥선","김해숙"];
 let me = ""; // 현재 접속한 집사 이름
@@ -515,6 +521,7 @@ function normBool(v){ return v===true||v==="TRUE"||v==="true"||v===1; }
 function normalizeFromServer(d){
   if(d.visitLogs) d.visitLogs.forEach(l=>{ l.closed=normBool(l.closed); });
   if(d.todos) d.todos.forEach(t=>{ t.done=normBool(t.done); });
+  if(d.visitRequests) d.visitRequests.forEach(r=>{ r.agree=normBool(r.agree); r.wantsSurvey=normBool(r.wantsSurvey); });
   return d;
 }
 async function syncPullAll(silent){
@@ -529,6 +536,8 @@ async function syncPullAll(silent){
     if(d.visitLogs)visitLogs=mergeKeepPending(visitLogs,d.visitLogs);
     if(d.todos)todos=mergeKeepPending(todos,d.todos);
     if(d.notes)notes=mergeKeepPending(notes,d.notes);
+    if(d.visitRequests)visitRequests=mergeKeepPending(visitRequests,d.visitRequests);
+    if(d.reviews)reviews=mergeKeepPending(reviews,d.reviews);
     setSync(true,"동기화됨");renderAll();saveCache();
   }catch(e){if(!silent)setSync(false,"동기화 실패");}
 }
@@ -647,13 +656,20 @@ function renderHome(){
       <div class="hc-row"><span class="hc-label">${esc(recentNote.text.slice(0,40))}${recentNote.text.length>40?"…":""}</span></div></div>`;
   }
 
-  // 방문자 앱 연동 자리 (동기화 켜면 채워짐)
-  h+=`<div class="home-card pending" onclick="showSyncInfo('신청')">
-    <div class="hc-head"><span class="hc-emoji blob blob-f"><i class="ti ti-mail"></i></span><span class="hc-title">방문 신청</span><span class="hc-soon">동기화 후</span></div>
-    <div class="hc-empty">방문자 앱에서 들어온 신청을 여기서 승인합니다.</div></div>`;
-  h+=`<div class="home-card pending" onclick="showSyncInfo('후기')">
-    <div class="hc-head"><span class="hc-emoji blob blob-g"><i class="ti ti-message-circle"></i></span><span class="hc-title">방문자 후기</span><span class="hc-soon">동기화 후</span></div>
-    <div class="hc-empty">머물다 간 분들의 후기가 여기 모입니다.</div></div>`;
+  // 방문자 앱 연동 — 방문 신청 · 방문자 후기
+  const waitingReq=visitRequests.filter(r=>r.status==="대기"||!r.status);
+  h+=`<div class="home-card" onclick="goTab('visitreq')">
+    <div class="hc-head"><span class="hc-emoji blob blob-f"><i class="ti ti-mail"></i></span><span class="hc-title">방문 신청</span>${waitingReq.length?`<span class="hc-badge">${waitingReq.length}</span>`:""}<span class="hc-go">›</span></div>`;
+  if(!visitRequests.length) h+=`<div class="hc-empty">방문자 앱에서 들어온 신청을 여기서 승인합니다.</div>`;
+  else if(!waitingReq.length) h+=`<div class="hc-empty">기다리는 신청이 없어요. 지난 처리 ${visitRequests.length}건.</div>`;
+  else waitingReq.slice(0,3).forEach(r=>h+=`<div class="hc-row"><span class="hc-label">· ${esc(r.name||"이름없음")} — ${fmtDate(r.start)} ~ ${fmtDate(r.end)}</span></div>`);
+  h+=`</div>`;
+  const recentReview=[...reviews].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
+  h+=`<div class="home-card" onclick="goTab('reviews')">
+    <div class="hc-head"><span class="hc-emoji blob blob-g"><i class="ti ti-message-circle"></i></span><span class="hc-title">방문자 후기</span><span class="hc-go">›</span></div>`;
+  if(!recentReview) h+=`<div class="hc-empty">머물다 간 분들의 후기가 여기 모입니다.</div>`;
+  else h+=`<div class="hc-row"><span class="hc-label">· ${esc((recentReview.good||recentReview.period||"새 후기가 도착했어요").slice(0,36))}${(recentReview.good||"").length>36?"…":""}</span></div>`;
+  h+=`</div>`;
 
   // 아카이브 입구
   h+=`<div class="home-arch">
@@ -663,13 +679,6 @@ function renderHome(){
   v.innerHTML=h;
 }
 function fmtShort(iso){const p=iso.split("-");return p.length<3?iso:`${+p[1]}.${+p[2]} (${dow(iso)})`;}
-function showSyncInfo(what){
-  showModal(`<div class="grab"></div><h3>${what}은 동기화 후에 켜져요</h3>
-    <div style="font-size:14px;line-height:1.7;color:var(--ink)">
-    방문자 앱과 집사 앱이 <b>같은 구글 시트</b>를 함께 보게 되면, 방문자가 남긴 ${what}이 이 자리에 자동으로 모입니다.<br><br>
-    지금은 집사 앱을 충분히 써보시는 단계예요. 화면이 손에 익고 나면, 구글 시트를 한 번 연결해 ${what} 취합까지 한꺼번에 켜겠습니다.</div>
-    <div class="modal-actions"><button class="btn" onclick="closeModal()">알겠어요</button></div>`);
-}
 function goTab(tab){
   document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));
@@ -1169,15 +1178,21 @@ function careHistory(){
   if(!closed.length)return `<div class="empty"><div class="big">📋</div>아직 마친 정리 기록이 없습니다.</div>`;
   let h="";
   closed.forEach(log=>{
+    const isGuest=log.owner==="guest";
     let total=0,done=0;
-    CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{total++;if(log.checks[`${gi}-${ii}`])done++;}));
+    if(isGuest){
+      const cks=Object.values(log.checks||{}); total+=cks.length; done+=cks.filter(Boolean).length;
+    }else{
+      CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{total++;if(log.checks[`${gi}-${ii}`])done++;}));
+    }
     PHOTO4.forEach(p=>{total++;if(log.photos[p.key])done++;});
     const pct=total?Math.round(done/total*100):0;
     const photoCount=PHOTO4.filter(p=>log.photos[p.key]).length;
     h+=`<div class="card visit-log-card" onclick="viewCareLog('${log.id}')">
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <b style="font-size:15px">${fmtDate(log.date)}</b>
         <span style="font-size:12.5px;color:var(--ink-soft)">${esc(log.who||"이름 없음")}</span>
+        ${isGuest?`<span style="font-size:10.5px;font-weight:700;color:var(--lilac-deep);background:rgba(201,182,220,.18);padding:2px 8px;border-radius:7px">손님 제출</span>`:""}
         <span style="margin-left:auto;font-size:12px;color:var(--moss-deep)">단속사진 ${photoCount}/4</span></div>
       <div class="vlog-prog"><i style="width:${pct}%"></i></div></div>`;
   });
@@ -1185,23 +1200,36 @@ function careHistory(){
 }
 function viewCareLog(id){
   const log=visitLogs.find(l=>l.id===id);
+  const isGuest=log.owner==="guest";
   let total=0,done=0;
-  CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{total++;if(log.checks[`${gi}-${ii}`])done++;}));
+  if(isGuest){
+    const cks=Object.values(log.checks||{}); total+=cks.length; done+=cks.filter(Boolean).length;
+  }else{
+    CARE_TEMPLATE.forEach((g,gi)=>g.items.forEach((it,ii)=>{total++;if(log.checks[`${gi}-${ii}`])done++;}));
+  }
   PHOTO4.forEach(p=>{total++;if(log.photos[p.key])done++;});
   const undone=total-done;
-  let h=`<div class="grab"></div><h3>${fmtDate(log.date)} · ${esc(log.who||"이름 없음")}</h3>
+  let h=`<div class="grab"></div><h3>${fmtDate(log.date)} · ${esc(log.who||"이름 없음")}${isGuest?` <span style="font-size:11px;font-weight:700;color:var(--lilac-deep);background:rgba(201,182,220,.18);padding:2px 8px;border-radius:7px;vertical-align:2px">손님 제출</span>`:""}</h3>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <span style="font-size:12px;background:rgba(142,176,78,.14);color:var(--moss-deep);padding:4px 11px;border-radius:9px;font-weight:700">완료 ${done}</span>
       ${undone?`<span style="font-size:12px;background:rgba(208,139,99,.14);color:#A85E38;padding:4px 11px;border-radius:9px;font-weight:700">못함 ${undone}</span>`:`<span style="font-size:12px;color:var(--moss-deep)">✓ 모두 마침</span>`}
     </div>`;
-  CARE_TEMPLATE.forEach((g,gi)=>{
-    h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:14px 2px 7px">${esc(g.group)}</div>`;
-    g.items.forEach((it,ii)=>{
-      const d=!!log.checks[`${gi}-${ii}`];
+  if(isGuest){
+    h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:14px 2px 7px">방문자가 확인한 정리 항목</div>`;
+    Object.entries(log.checks||{}).forEach(([label,d])=>{
       h+=`<div class="log-line ${d?"ok":"no"}">
-        <span class="log-mark">${d?"✓":"✗"}</span><span class="log-txt">${esc(it.t)}</span></div>`;
+        <span class="log-mark">${d?"✓":"✗"}</span><span class="log-txt">${esc(label)}</span></div>`;
     });
-  });
+  }else{
+    CARE_TEMPLATE.forEach((g,gi)=>{
+      h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:14px 2px 7px">${esc(g.group)}</div>`;
+      g.items.forEach((it,ii)=>{
+        const d=!!log.checks[`${gi}-${ii}`];
+        h+=`<div class="log-line ${d?"ok":"no"}">
+          <span class="log-mark">${d?"✓":"✗"}</span><span class="log-txt">${esc(it.t)}</span></div>`;
+      });
+    });
+  }
   // 사진
   const pc=PHOTO4.filter(p=>log.photos[p.key]).length;
   h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">4가지 단속 사진 — ${pc}/4</div>
@@ -1333,6 +1361,125 @@ async function saveNote(){
 function delNote(id){if(!confirm("이 글을 지울까요?"))return;notes=notes.filter(n=>n.id!==id);syncDelete("notes",id);renderNotes();renderHome();}
 
 /* ============================================================
+   화면 — 방문 신청 (방문자 앱에서 들어온 신청을 승인·거절)
+   ============================================================ */
+function renderVisitReq(){
+  const v=document.getElementById("view-visitreq");
+  const waiting=visitRequests.filter(r=>r.status==="대기"||!r.status).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  const decided=visitRequests.filter(r=>r.status==="승인"||r.status==="거절").sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  let h=`<div class="view-head"><div><div class="t">방문 신청</div>
+    <div class="d">방문자 앱에서 들어온 신청을 살펴보고 처리합니다</div></div>
+    <button class="btn ghost sm" onclick="syncPullAll()">↻ 새로고침</button></div>`;
+  if(!visitRequests.length){
+    h+=`<div class="empty"><div class="big">✉️</div>아직 들어온 방문 신청이 없어요.<br>방문자 앱에서 신청이 오면 여기 쌓입니다.</div>`;
+  }else{
+    if(waiting.length){
+      h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:6px 2px 8px">승인 기다리는 중 · ${waiting.length}</div>`;
+      waiting.forEach(r=>h+=vreqCard(r,true));
+    }
+    if(decided.length){
+      h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:18px 2px 8px">지난 처리 · ${decided.length}</div>`;
+      decided.forEach(r=>h+=vreqCard(r,false));
+    }
+  }
+  v.innerHTML=h;
+}
+function vreqCard(r,pending){
+  const nights=Math.max(0,Math.round((new Date(r.end)-new Date(r.start))/864e5));
+  const badge = pending
+    ? `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(208,139,99,.16);color:#A85E38">승인 대기</span>`
+    : r.status==="승인"
+      ? `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(142,176,78,.14);color:var(--moss-deep)">승인됨</span>`
+      : `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:var(--line);color:var(--ink-soft)">거절됨</span>`;
+  let h=`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div><b style="font-size:16px">${esc(r.name||"이름없음")}</b> <span style="font-size:12.5px;color:var(--ink-soft)">${r.people||1}명</span></div>
+      ${badge}
+    </div>
+    <div style="font-size:15.5px;font-weight:700;color:var(--sky);margin-top:9px">${fmtDate(r.start)} — ${fmtDate(r.end)}</div>
+    <div style="font-size:12px;color:var(--ink-soft)">${nights}박 · ${r.start} ~ ${r.end}</div>
+    <div style="margin-top:10px;font-size:13.5px;line-height:1.7">
+      ${r.phone?`<div><span style="color:var(--ink-soft)">연락처</span> · <a href="tel:${esc(r.phone.replace(/[^0-9]/g,""))}" style="color:var(--sky)">${esc(r.phone)}</a></div>`:""}
+      ${r.question?`<div><span style="color:var(--ink-soft)">문의</span> · ${esc(r.question)}</div>`:""}
+      <div><span style="color:var(--ink-soft)">후기설문</span> · ${r.wantsSurvey?"참여할게요 ✓":"괜찮대요"}</div>
+    </div>`;
+  if(pending && reqOverlaps(r)){
+    h+=`<div style="margin-top:10px;background:rgba(208,139,99,.14);color:#A85E38;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.6">⚠ 이 기간이 이미 확정된 일정과 겹쳐요. 승인 전에 일정 탭을 확인해주세요.</div>`;
+  }
+  if(pending){
+    h+=`<div class="modal-actions" style="margin-top:12px">
+      <button class="btn ghost" onclick="decideVisitReq('${r.id}','거절')">거절</button>
+      <button class="btn" onclick="decideVisitReq('${r.id}','승인')">승인하고 일정에 넣기</button>
+    </div>`;
+  }
+  h+=`</div>`;
+  return h;
+}
+function reqOverlaps(req){
+  return (visits||[]).some(v=>{
+    if(v.id==="v_from_"+req.id) return false;
+    return req.start<v.end && v.start<req.end;
+  });
+}
+async function decideVisitReq(id,status){
+  const req=visitRequests.find(r=>r.id===id); if(!req) return;
+  if(status==="승인" && reqOverlaps(req)){
+    if(!confirm("이 기간이 다른 일정과 겹쳐요. 그래도 승인할까요?")) return;
+  }else{
+    if(!confirm(`${req.name||""}님 방문을 ${status} 처리할까요?`)) return;
+  }
+  req.status=status; req.decidedBy=me||""; req.updatedAt=Date.now();
+  markPending(req);
+  if(status==="승인"){
+    visits.push({id:"v_from_"+req.id, who:"손님", guest:req.name||"", start:req.start, end:req.end,
+      note:((req.people||1)+"명")+(req.question?" · 문의있음":""), color:"#8FB04E", updatedAt:Date.now()});
+  }
+  renderVisitReq();renderHome();renderVisits();
+  await syncUpsert("visitRequests",req);
+  setTimeout(()=>syncPullAll(true),1500);
+}
+
+/* ============================================================
+   화면 — 방문자 후기
+   ============================================================ */
+function renderReviews(){
+  const v=document.getElementById("view-reviews");
+  const list=[...reviews].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  let h=`<div class="view-head"><div><div class="t">방문자 후기</div>
+    <div class="d">머물다 간 분들이 남긴 이야기입니다</div></div>
+    <button class="btn ghost sm" onclick="syncPullAll()">↻ 새로고침</button></div>`;
+  if(!list.length){
+    h+=`<div class="empty"><div class="big">💬</div>아직 남겨진 후기가 없어요.<br>머문 분들이 후기를 남기면 여기 모입니다.</div>`;
+  }else{
+    list.forEach(r=>h+=reviewCard(r));
+  }
+  v.innerHTML=h;
+}
+function reviewCard(r){
+  const stars=n=>{let s="";for(let i=1;i<=5;i++)s+=`<span style="color:${i<=(n||0)?"var(--sun)":"var(--line)"}">★</span>`;return s;};
+  const scaleTxt=(v,opts)=>(v===""||v===undefined||v===null)?null:(opts[+v]!==undefined?opts[+v]:v);
+  const row=(label,val)=>val?`<div style="margin-top:10px"><div style="font-size:11.5px;color:var(--ink-soft);font-weight:700">${label}</div><div style="font-size:14px;line-height:1.65;margin-top:2px">${esc(val)}</div></div>`:"";
+  let h=`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:15px;letter-spacing:2px">${stars(r.comfort)}</span>
+      <button class="btn ghost sm" onclick="delReview('${r.id}')">삭제</button>
+    </div>
+    ${r.period?`<div style="font-size:14.5px;font-weight:700;color:var(--sky);margin-top:8px">${esc(r.period)}</div>`:""}
+    ${row("좋았던 점",r.good)}${row("아쉬웠던 점",r.bad)}${row("바라는 점",r.suggest)}
+    ${row("가장 편안했던 순간",r.bestmoment)}${row("가장 불편했던 순간",r.worstmoment)}
+    ${scaleTxt(r.guidehelp,["별로","보통","많이"])?`<div style="margin-top:10px"><span style="font-size:11.5px;color:var(--ink-soft);font-weight:700">안내서 도움</span> <span style="font-size:12.5px;background:rgba(142,176,78,.14);color:var(--moss-deep);padding:2px 9px;border-radius:8px;font-weight:700">${scaleTxt(r.guidehelp,["별로","보통","많이"])}</span></div>`:""}
+    ${row("안내서 보완점",r.guidemore)}${row("하동 추천",r.hadong)}
+    ${scaleTxt(r.revisit,["글쎄요","아마도","꼭이요"])?`<div style="margin-top:10px"><span style="font-size:11.5px;color:var(--ink-soft);font-weight:700">재방문 의향</span> <span style="font-size:12.5px;background:rgba(142,176,78,.14);color:var(--moss-deep);padding:2px 9px;border-radius:8px;font-weight:700">${scaleTxt(r.revisit,["글쎄요","아마도","꼭이요"])}</span></div>`:""}
+    ${r.contact?`<div style="margin-top:10px;font-size:12.5px;color:var(--ink-soft)">연락처 · ${esc(r.contact)}</div>`:""}
+  </div>`;
+  return h;
+}
+function delReview(id){
+  if(!confirm("이 후기를 지울까요?"))return;
+  reviews=reviews.filter(r=>r.id!==id);syncDelete("reviews",id);renderReviews();renderHome();
+}
+
+/* ============================================================
    공통 — 모달 · 탭 · 시작
    ============================================================ */
 function val(id){return document.getElementById(id).value;}
@@ -1340,7 +1487,7 @@ function showModal(html){document.getElementById("modalBox").innerHTML=html;docu
 function closeModal(){document.getElementById("modalBg").classList.remove("on");}
 document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")closeModal();});
 
-function renderAll(){renderHome();renderTimeline();renderMinutes();renderVisits();renderCare();renderTodo();renderNotes();}
+function renderAll(){renderHome();renderTimeline();renderMinutes();renderVisits();renderCare();renderTodo();renderNotes();renderVisitReq();renderReviews();}
 
 /* ── 집사 이름 (이 기기에 기억) ── */
 const NAME_KEY="garyeobjip_me";
