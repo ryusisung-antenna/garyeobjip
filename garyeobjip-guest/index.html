@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>가볍집</title>
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
+<style>
+  /* ============================================================
+     가볍집 방문자 앱 — 디자인 토큰
+     세이지 near-monochrome · 고운바탕(문구)+Pretendard(본문)
+     시그니처: 얇은 붓터치 한 획 (여백 속의 유일한 강조)
+     ============================================================ */
+  :root{
+    --paper:#F1F2EC;        /* 종이 바탕 (크림이 아닌 서늘한 초록빛 회백) */
+    --paper-2:#FBFBF7;      /* 카드 바탕 */
+    --ink:#2B2E28;          /* 먹 (따뜻한 녹회색 근검정) */
+    --ink-soft:#5A5F54;     /* 본문 보조 */
+    --sage:#5B7355;         /* 유일한 강조색 */
+    --sage-soft:#8A9B82;    /* 옅은 세이지 */
+    --sage-wash:#E6EAE0;    /* 세이지 워시(선택/블록) */
+    --line:#DBDBCF;         /* 헤어라인 */
+    --clay:#C0876A;         /* 아주 드물게 쓰는 온기(기존 일정색과 호응) */
+    --shadow:0 1px 0 rgba(43,46,40,.04), 0 10px 30px -18px rgba(43,46,40,.28);
+    --r:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Pretendard",-apple-system,system-ui,sans-serif;
+    font-size:16px;line-height:1.75;
+    letter-spacing:-.01em;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  .serif{font-family:"Gowun Batang",serif}
+  .app{max-width:440px;margin:0 auto;min-height:100vh;position:relative;overflow:hidden}
+
+  /* 종이 질감 — 극도로 옅은 노이즈 한 겹 */
+  .app::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.35;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
+  }
+
+  /* 시그니처 붓 한 획 */
+  .stroke{display:block;height:14px;overflow:visible}
+  .stroke path{fill:none;stroke:var(--sage);stroke-width:2.4;stroke-linecap:round;
+    stroke-dasharray:220;stroke-dashoffset:220;animation:draw 1.4s .2s cubic-bezier(.6,.1,.2,1) forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  @media (prefers-reduced-motion:reduce){
+    .stroke path{animation:none;stroke-dashoffset:0}
+    *{animation-duration:.001s!important}
+  }
+
+  /* 화면 전환 */
+  .screen{display:none;position:relative;z-index:1;padding:0 24px 120px;animation:rise .5s cubic-bezier(.2,.7,.2,1)}
+  .screen.on{display:block}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--sage);font-weight:600}
+
+  /* ===== 홈 ===== */
+  .screen.home.on{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:64px 30px 48px}
+  .mark{font-family:"Gowun Batang",serif;font-size:46px;font-weight:700;letter-spacing:.04em;line-height:1;margin:0}
+  .mark small{display:block;font-family:"Pretendard";font-size:13px;font-weight:500;
+    letter-spacing:.34em;color:var(--sage-soft);margin-top:16px;text-transform:uppercase}
+  .lede{font-family:"Gowun Batang",serif;font-size:19px;line-height:1.9;color:var(--ink-soft);margin:34px 0 0;max-width:22em}
+  .lede em{font-style:normal;color:var(--ink)}
+  .paths{margin-top:52px;display:flex;flex-direction:column;gap:12px}
+  .path{background:var(--paper-2);border:1px solid var(--line);border-radius:var(--r);
+    padding:22px 24px;text-align:left;cursor:pointer;transition:.25s;display:flex;
+    align-items:center;justify-content:space-between;gap:16px;box-shadow:var(--shadow)}
+  .path:hover,.path:focus-visible{border-color:var(--sage-soft);transform:translateY(-2px);outline:none}
+  .path:focus-visible{box-shadow:0 0 0 3px var(--sage-wash),var(--shadow)}
+  .path .ptxt{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .path .t{display:block;font-size:17px;font-weight:600;line-height:1.3}
+  .path .d{display:block;font-size:13px;color:var(--ink-soft);font-weight:400;line-height:1.4}
+  .path .arw{color:var(--sage);flex:none;transition:transform .25s}
+  .path:hover .arw{transform:translateX(4px)}
+
+  /* ===== 공통 상단바 ===== */
+  .bar{position:sticky;top:0;z-index:5;background:rgba(241,242,236,.86);
+    backdrop-filter:saturate(1.4) blur(10px);display:flex;align-items:center;gap:14px;
+    padding:16px 0 14px;margin:0 -24px 0;padding-left:24px;padding-right:24px;border-bottom:1px solid var(--line)}
+  .back{width:38px;height:38px;flex:none;border:1px solid var(--line);background:var(--paper-2);
+    border-radius:11px;display:grid;place-items:center;cursor:pointer;color:var(--ink);transition:.2s}
+  .back:hover{border-color:var(--sage-soft)}
+  .bar h2{font-family:"Gowun Batang",serif;font-size:19px;margin:0;font-weight:700;letter-spacing:.01em}
+  .bar .sub{font-size:12px;color:var(--sage-soft);margin-top:1px}
+
+  /* ===== 안내서(챕터) ===== */
+  .guide-wrap{padding-top:8px}
+  .swipe-hint{display:none;text-align:center;font-size:12px;color:var(--sage-soft);
+    letter-spacing:.02em;margin:30px 0 4px}
+  .progress{height:3px;width:100%;background:var(--line);border-radius:3px;margin:20px 0 26px;overflow:hidden}
+  .progress .fill{display:block;height:100%;background:var(--sage);border-radius:3px;
+    width:0;transition:width .45s cubic-bezier(.4,0,.2,1)}
+  .chapter{animation:rise .45s}
+  .ch-no{font-family:"Gowun Batang",serif;font-size:13px;color:var(--sage);letter-spacing:.1em}
+  .ch-cat{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--sage-soft);
+    font-weight:600;margin-left:10px}
+  .ch-title{font-family:"Gowun Batang",serif;font-size:28px;line-height:1.35;font-weight:700;
+    margin:14px 0 6px;letter-spacing:.01em}
+  .ch-lead{font-family:"Gowun Batang",serif;font-size:17px;color:var(--ink-soft);line-height:1.9;margin:0 0 22px}
+  .ch-body{font-size:15.5px;color:var(--ink-soft);line-height:1.85}
+  .ch-body strong{color:var(--ink);font-weight:600}
+  .ch-list{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:2px}
+  .ch-list li{position:relative;padding:12px 0 12px 26px;border-top:1px solid var(--line);font-size:15px}
+  .ch-list li:first-child{border-top:0}
+  .ch-list li::before{content:"";position:absolute;left:2px;top:20px;width:8px;height:8px;
+    border-radius:50%;background:var(--sage-wash);border:1.5px solid var(--sage-soft)}
+  .callout{background:var(--sage-wash);border-radius:14px;padding:18px 20px;margin:22px 0 0;
+    font-family:"Gowun Batang",serif;font-size:16px;color:var(--ink);line-height:1.8}
+  .callout .lab{display:block;font-family:"Pretendard";font-size:11px;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--sage);font-weight:600;margin-bottom:6px}
+  .fee{display:flex;align-items:baseline;gap:8px;margin:8px 0 2px}
+  .fee b{font-family:"Gowun Batang",serif;font-size:34px;color:var(--sage);font-weight:700}
+  .fee span{font-size:14px;color:var(--ink-soft)}
+  .porting{font-size:12px;color:var(--sage-soft);border:1px dashed var(--line);border-radius:12px;
+    padding:12px 14px;margin:24px 0 0;line-height:1.6}
+
+  /* 원문 반영용 블록들 */
+  .ch-body{margin:0 0 4px}
+  .ch-body + .ch-body{margin-top:16px}
+  .ch-h{font-size:16px;font-weight:700;color:var(--sage);margin:26px 0 10px;letter-spacing:.005em}
+  .ch-h:first-child{margin-top:6px}
+  .ch-sub{font-size:13px;color:var(--sage-soft);margin:-4px 0 12px}
+  .ch-note{font-size:12.5px;color:var(--sage-soft);line-height:1.7;margin:14px 0 0;
+    padding-left:14px;border-left:2px solid var(--sage-wash)}
+  .ch-check{list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:0}
+  .ch-check li{position:relative;padding:11px 0 11px 30px;border-top:1px solid var(--line);font-size:15px;line-height:1.6}
+  .ch-check li:first-child{border-top:0}
+  .ch-check li::before{content:"";position:absolute;left:0;top:15px;width:16px;height:16px;
+    border:1.6px solid var(--sage-soft);border-radius:5px;background:var(--paper-2)}
+  .ch-check li b{display:block;font-weight:400}
+  .ch-check li .em{color:var(--clay);font-size:13px}
+  .spaces{display:flex;flex-wrap:wrap;gap:7px;margin:16px 0 0}
+  .spaces span{background:var(--paper-2);border:1px solid var(--line);border-radius:9px;
+    padding:7px 12px;font-size:13.5px;color:var(--ink-soft)}
+  .spaces span b{color:var(--sage);font-weight:600;font-family:"Gowun Batang",serif}
+  .ch-contact{margin:20px 0 0;background:var(--sage-wash);border-radius:12px;padding:14px 18px;
+    font-family:"Gowun Batang",serif;font-size:16px;color:var(--ink)}
+  .ch-contact .k{font-family:"Pretendard";font-size:12px;color:var(--sage);font-weight:600;
+    letter-spacing:.04em;display:block;margin-bottom:3px}
+  .rlist{list-style:none;padding:0;margin:8px 0 0}
+  .rlist li{padding:16px 0;border-top:1px solid var(--line)}
+  .rlist li:first-child{border-top:0}
+  .rlist .rt{font-weight:700;font-size:15.5px;color:var(--ink)}
+  .rlist .ra{font-size:12.5px;color:var(--sage-soft);margin:1px 0 6px}
+  .rlist .rd{font-size:14px;color:var(--ink-soft);line-height:1.7}
+  .r5{counter-reset:r5;list-style:none;padding:0;margin:14px 0 0}
+  .r5 li{position:relative;padding:14px 0 14px 46px;border-top:1px solid var(--line)}
+  .r5 li:first-child{border-top:0}
+  .r5 li::before{counter-increment:r5;content:counter(r5);position:absolute;left:0;top:14px;
+    width:30px;height:30px;border-radius:50%;background:var(--sage-wash);color:var(--sage);
+    font-family:"Gowun Batang",serif;font-weight:700;display:grid;place-items:center;font-size:14px}
+  .r5 .rt{font-weight:700;color:var(--ink)}
+  .r5 .rt em{font-style:normal;color:var(--sage);font-family:"Gowun Batang",serif;margin-right:6px}
+  .r5 .rd{font-size:13.5px;color:var(--ink-soft);line-height:1.7;margin-top:4px}
+
+  .ch-nav{display:flex;gap:10px;margin:34px 0 0}
+  .ch-nav button{flex:1;border-radius:13px;padding:15px;font-size:15px;font-weight:600;cursor:pointer;
+    font-family:inherit;transition:.22s;border:1px solid var(--line)}
+  .ch-prev{background:var(--paper-2);color:var(--ink-soft)}
+  .ch-prev:hover{border-color:var(--sage-soft)}
+  .ch-next{background:var(--sage);color:#fff;border-color:var(--sage);flex:1.6}
+  .ch-next:hover{background:#4e6349}
+  .ch-prev:disabled{opacity:.35;cursor:default}
+
+  /* ===== 달력 ===== */
+  .cal-intro{font-family:"Gowun Batang",serif;font-size:16px;color:var(--ink-soft);margin:22px 0 20px;line-height:1.85}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px}
+  .cal-head .mon{font-family:"Gowun Batang",serif;font-size:20px;font-weight:700}
+  .cal-head button{width:36px;height:36px;border:1px solid var(--line);background:var(--paper-2);
+    border-radius:10px;cursor:pointer;color:var(--ink);display:grid;place-items:center;transition:.2s}
+  .cal-head button:hover:not(:disabled){border-color:var(--sage-soft)}
+  .cal-head button:disabled{opacity:.3;cursor:default}
+  .dow{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:11px;
+    letter-spacing:.05em;color:var(--sage-soft);font-weight:600;margin-bottom:6px}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cell{aspect-ratio:1;border-radius:11px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;font-size:14px;cursor:pointer;position:relative;border:1px solid transparent;transition:.15s}
+  .cell.pad{visibility:hidden}
+  .cell.free:hover{background:var(--paper-2);border-color:var(--line)}
+  .cell.past{color:var(--line);cursor:default;pointer-events:none}
+  .cell.booked{background:repeating-linear-gradient(-45deg,#EDE6DF,#EDE6DF 5px,#F3EEE9 5px,#F3EEE9 10px);
+    color:var(--clay);cursor:not-allowed;font-weight:500}
+  .cell.booked::after{content:"";position:absolute;bottom:6px;width:5px;height:5px;border-radius:50%;background:var(--clay)}
+  .cell.sel{background:var(--sage);color:#fff;font-weight:700;border-color:var(--sage)}
+  .cell.range{background:var(--sage-wash);color:var(--sage);border-radius:0}
+  .cell.sel.start{border-radius:11px 0 0 11px}
+  .cell.sel.end{border-radius:0 11px 11px 0}
+  .legend{display:flex;gap:16px;margin:16px 2px 0;font-size:12px;color:var(--ink-soft)}
+  .legend b{display:inline-block;width:11px;height:11px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+  .sel-note{margin:20px 0 0;background:var(--paper-2);border:1px solid var(--line);border-radius:14px;
+    padding:16px 18px;font-size:14.5px;min-height:56px;display:flex;align-items:center;color:var(--ink-soft)}
+  .sel-note b{color:var(--sage);font-family:"Gowun Batang",serif}
+
+  /* ===== 폼 ===== */
+  .field{margin:22px 0 0}
+  .field label{display:block;font-size:13.5px;font-weight:600;margin:0 0 8px;color:var(--ink)}
+  .field .hint{font-weight:400;color:var(--sage-soft);font-size:12.5px;margin-left:6px}
+  .field input,.field textarea,.field select{width:100%;border:1px solid var(--line);background:var(--paper-2);
+    border-radius:12px;padding:14px 15px;font-family:inherit;font-size:15.5px;color:var(--ink);transition:.2s}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--sage);
+    box-shadow:0 0 0 3px var(--sage-wash)}
+  .field textarea{resize:vertical;min-height:92px;line-height:1.7}
+  .stepper{display:flex;align-items:center;gap:0;width:150px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper-2)}
+  .stepper button{width:46px;height:48px;border:0;background:transparent;font-size:20px;cursor:pointer;color:var(--sage)}
+  .stepper button:hover{background:var(--sage-wash)}
+  .stepper input{border:0;text-align:center;box-shadow:none!important;background:transparent;padding:14px 0}
+  .agree{margin:26px 0 0;background:var(--sage-wash);border-radius:16px;padding:20px}
+  .agree .q{font-family:"Gowun Batang",serif;font-size:16px;line-height:1.8;margin-bottom:14px}
+  .check{display:flex;gap:12px;align-items:flex-start;padding:11px 0;cursor:pointer;font-size:14.5px;color:var(--ink-soft)}
+  .check input{appearance:none;width:22px;height:22px;flex:none;border:1.6px solid var(--sage-soft);
+    border-radius:7px;background:var(--paper-2);margin:2px 0 0;cursor:pointer;transition:.15s;position:relative}
+  .check input:checked{background:var(--sage);border-color:var(--sage)}
+  .check input:checked::after{content:"✓";position:absolute;inset:0;color:#fff;font-size:14px;
+    display:grid;place-items:center}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;margin:24px 0 0;
+    padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:var(--paper-2)}
+  .toggle-row .tt{font-size:14px;font-weight:600}
+  .toggle-row .td{font-size:12.5px;color:var(--sage-soft);margin-top:2px}
+  .sw{width:50px;height:29px;border-radius:20px;background:var(--line);position:relative;cursor:pointer;flex:none;transition:.25s}
+  .sw::after{content:"";position:absolute;top:3px;left:3px;width:23px;height:23px;border-radius:50%;background:#fff;transition:.25s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .sw.on{background:var(--sage)}.sw.on::after{transform:translateX(21px)}
+
+  .submit{width:100%;margin:28px 0 0;background:var(--sage);color:#fff;border:0;border-radius:15px;
+    padding:18px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;transition:.22s;letter-spacing:.02em}
+  .submit:hover{background:#4e6349}
+  .submit:disabled{opacity:.4;cursor:default}
+  .safe-note{font-size:12px;color:var(--sage-soft);text-align:center;margin:12px 0 0}
+
+  /* 후기 별점 */
+  .stars{display:flex;gap:8px;margin-top:4px}
+  .stars span{font-size:30px;cursor:pointer;color:var(--line);transition:.15s;line-height:1}
+  .stars span.lit{color:var(--sage)}
+  .scale{display:flex;gap:6px;margin-top:4px}
+  .scale button{flex:1;padding:12px 0;border:1px solid var(--line);background:var(--paper-2);
+    border-radius:10px;font-family:inherit;font-size:15px;cursor:pointer;color:var(--ink-soft);transition:.18s}
+  .scale button.on{background:var(--sage);color:#fff;border-color:var(--sage);font-weight:700}
+
+  /* 후기 답변 입력 — 분위기에 맞는 큰 입력창 */
+  .rev-input,.rev-area{width:100%;border:1.5px solid var(--line);background:var(--paper-2);
+    border-radius:16px;padding:18px 20px;font-family:"Pretendard",sans-serif;font-size:16.5px;
+    color:var(--ink);line-height:1.75;transition:.2s;box-shadow:var(--shadow)}
+  .rev-input::placeholder,.rev-area::placeholder{color:var(--sage-soft);opacity:.85}
+  .rev-input:focus,.rev-area:focus{outline:none;border-color:var(--sage);
+    box-shadow:0 0 0 3px var(--sage-wash)}
+  .rev-area{min-height:150px;resize:vertical}
+  .rev-input{height:58px}
+
+  /* 완료 화면 */
+  .done{min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px}
+  .done .ring{width:78px;height:78px;border-radius:50%;border:2px solid var(--sage);display:grid;place-items:center;margin-bottom:26px}
+  .done .ring svg path{fill:none;stroke:var(--sage);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:40;stroke-dashoffset:40;animation:draw .6s .3s forwards}
+  .done h3{font-family:"Gowun Batang",serif;font-size:26px;margin:0 0 12px;font-weight:700}
+  .done p{color:var(--ink-soft);font-size:15px;line-height:1.85;max-width:26em;margin:0}
+  .done .again{margin-top:34px;background:transparent;border:1px solid var(--line);color:var(--ink-soft);
+    border-radius:12px;padding:13px 26px;font-family:inherit;font-size:14px;cursor:pointer}
+  .done .again:hover{border-color:var(--sage-soft)}
+
+  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--paper);padding:13px 22px;border-radius:12px;font-size:14px;
+    opacity:0;pointer-events:none;transition:.3s;z-index:50;max-width:88%;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ===== 홈: 저장된 방문 바로가기 ===== */
+  .my-visit-link{margin:22px auto 0;display:block;background:transparent;border:0;
+    color:var(--sage);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+    padding:10px 16px;border:1px solid var(--line);border-radius:11px;transition:.2s}
+  .my-visit-link:hover{border-color:var(--sage-soft);background:var(--paper-2)}
+
+  /* ===== 방문자 대시보드 ===== */
+  .dash{padding:0!important}
+  .dash-body{padding:24px 24px 108px;min-height:100vh}
+  .dash-h{font-family:"Gowun Batang",serif;font-size:23px;font-weight:700;margin:8px 0 4px}
+  .dash-sub{font-size:13px;color:var(--sage-soft);margin-bottom:20px}
+  .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;
+    background:rgba(251,251,247,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);
+    display:flex;padding:8px 6px calc(8px + env(safe-area-inset-bottom,0px));z-index:20}
+  .tabbar .tab{flex:1;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:4px;padding:6px 2px;color:var(--sage-soft);font-family:inherit;
+    font-size:11px;font-weight:600;transition:.2s;border-radius:12px}
+  .tabbar .tab svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;
+    stroke-linecap:round;stroke-linejoin:round}
+  .tabbar .tab.on{color:var(--sage)}
+  .tabbar .tab.on svg{stroke-width:2}
+
+  /* 상태 카드 */
+  .status-card{background:var(--paper-2);border:1px solid var(--line);border-radius:18px;
+    padding:24px;box-shadow:var(--shadow);text-align:center;margin-bottom:16px}
+  .status-badge{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:20px;
+    font-size:13px;font-weight:700;margin-bottom:16px}
+  .st-wait{background:var(--clay-wash,#F6ECE4);color:var(--clay)}
+  .st-ok{background:var(--sage-wash);color:var(--sage)}
+  .st-no{background:var(--line);color:var(--ink-soft)}
+  .status-dates{font-family:"Gowun Batang",serif;font-size:22px;font-weight:700;margin:4px 0}
+  .status-meta{font-size:13.5px;color:var(--ink-soft)}
+  .status-msg{font-size:13.5px;color:var(--ink-soft);line-height:1.75;margin-top:16px;
+    padding-top:16px;border-top:1px solid var(--line)}
+  .status-refresh{margin-top:14px;background:transparent;border:1px solid var(--line);border-radius:11px;
+    padding:10px 18px;font-family:inherit;font-size:13px;color:var(--sage);cursor:pointer;transition:.2s}
+  .status-refresh:hover{border-color:var(--sage-soft)}
+  .status-refresh.spin{opacity:.5;pointer-events:none}
+
+  /* 퇴실 체크 */
+  .co-list{list-style:none;padding:0;margin:0 0 22px}
+  .co-list li{display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-top:1px solid var(--line);
+    font-size:14.5px;line-height:1.5;cursor:pointer;color:var(--ink-soft)}
+  .co-list li:first-child{border-top:0}
+  .co-list li .box{width:22px;height:22px;flex:none;border:1.6px solid var(--sage-soft);border-radius:7px;
+    margin-top:1px;display:grid;place-items:center;transition:.15s}
+  .co-list li.on .box{background:var(--sage);border-color:var(--sage)}
+  .co-list li.on .box::after{content:"✓";color:#fff;font-size:14px}
+  .co-list li.on{color:var(--ink)}
+  .photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 20px}
+  .photo-slot{border:1.5px dashed var(--line);border-radius:14px;aspect-ratio:1;overflow:hidden;
+    position:relative;cursor:pointer;background:var(--paper-2);transition:.2s}
+  .photo-slot:hover{border-color:var(--sage-soft)}
+  .photo-slot.filled{border-style:solid;border-color:var(--sage)}
+  .photo-slot img{width:100%;height:100%;object-fit:cover;display:block}
+  .photo-slot .ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:7px;padding:12px;text-align:center}
+  .photo-slot .ph svg{width:26px;height:26px;fill:none;stroke:var(--sage-soft);stroke-width:1.6}
+  .photo-slot .ph .pl{font-size:12px;font-weight:600;color:var(--ink)}
+  .photo-slot .ph .ps{font-size:10.5px;color:var(--sage-soft)}
+  .photo-slot input{display:none}
+  .photo-slot .mark{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;
+    background:var(--sage);color:#fff;display:grid;place-items:center;font-size:12px}
+
+  .co-empty{text-align:center;color:var(--sage-soft);font-family:"Gowun Batang",serif;
+    padding:36px 16px;font-size:15px;line-height:1.9;background:var(--paper-2);
+    border:1px solid var(--line);border-radius:16px;margin-bottom:20px}
+
+  /* ===== 안내서 목차 ===== */
+  .bar{position:relative}
+  .toc-btn{margin-left:auto;flex:none;border:1px solid var(--line);background:var(--paper-2);
+    border-radius:10px;padding:8px 14px;font-family:inherit;font-size:13px;font-weight:600;
+    color:var(--sage);cursor:pointer;transition:.2s}
+  .toc-btn:hover{border-color:var(--sage-soft)}
+  .toc-panel{max-height:0;overflow:hidden;transition:max-height .35s ease;background:var(--paper-2);
+    margin:0 -24px;border-bottom:1px solid transparent}
+  .toc-panel.open{max-height:75vh;overflow-y:auto;border-bottom:1px solid var(--line);
+    box-shadow:0 12px 20px -14px rgba(43,46,40,.3)}
+  .toc-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:none;
+    border:0;border-top:1px solid var(--line);padding:14px 24px;cursor:pointer;font-family:inherit;
+    color:var(--ink-soft);transition:.15s}
+  .toc-item:first-child{border-top:0}
+  .toc-item:hover{background:var(--sage-wash)}
+  .toc-item.on{color:var(--sage);background:var(--sage-wash)}
+  .toc-item .toc-no{font-family:"Gowun Batang",serif;font-size:13px;color:var(--sage-soft);flex:none;width:22px}
+  .toc-item.on .toc-no{color:var(--sage)}
+  .toc-item .toc-t{font-size:15px;font-weight:500}
+
+  /* ===== 수정 배너 ===== */
+  .edit-banner{background:var(--clay-wash,#F6ECE4);color:var(--clay);border-radius:12px;
+    padding:12px 16px;margin:16px 0 0;font-size:13.5px;line-height:1.6}
+
+  /* ===== 내 방문: 상태 버튼 줄 / 공지 ===== */
+  .status-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  .notice-wrap{background:var(--paper-2);border:1px solid var(--line);border-radius:16px;
+    padding:18px 20px;margin-top:16px;box-shadow:var(--shadow)}
+  .notice-head{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage);
+    font-weight:700;margin-bottom:12px}
+  .notice-item{font-size:14.5px;line-height:1.7;color:var(--ink);padding:11px 0;border-top:1px solid var(--line)}
+  .notice-item:first-of-type{border-top:0}
+  .notice-item.edit{display:flex;gap:8px;align-items:flex-start;border-top:0;padding:6px 0}
+  .notice-item.action{display:flex;align-items:center;gap:12px;width:100%;background:none;
+    border:0;border-top:1px solid var(--line);text-align:left;cursor:pointer;font-family:inherit;
+    padding:12px 2px;transition:.15s;border-radius:8px}
+  .notice-item.action:first-of-type{border-top:0}
+  .notice-item.action:hover{background:var(--sage-wash)}
+  .notice-item.action .ni-ico{font-size:17px;flex:none;width:30px;height:30px;border-radius:50%;
+    background:var(--sage-wash);color:var(--sage);display:grid;place-items:center}
+  .notice-item.action .ni-txt{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0}
+  .notice-item.action .ni-txt b{font-size:14.5px;font-weight:600;color:var(--ink)}
+  .notice-item.action .ni-txt span{font-size:12.5px;color:var(--sage-soft)}
+  .notice-item.action .ni-arw{color:var(--sage);flex:none;transition:transform .2s}
+  .notice-item.action:hover .ni-arw{transform:translateX(3px)}
+  .notice-fixed-tag{font-size:10px;color:var(--sage-soft);border:1px solid var(--line);border-radius:8px;
+    padding:2px 8px;flex:none}
+
+  /* ===== 관리자 편집 공통 ===== */
+  .admin-tag{font-family:"Pretendard";font-size:10.5px;font-weight:700;letter-spacing:.04em;
+    color:#fff;background:var(--clay);padding:3px 8px;border-radius:20px;vertical-align:3px;margin-left:8px}
+  .ed-input,.ed-area{width:100%;border:1.5px solid var(--line);background:#fff;border-radius:11px;
+    padding:12px 14px;font-family:"Pretendard",sans-serif;font-size:15px;color:var(--ink);transition:.15s}
+  .ed-input:focus,.ed-area:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 3px var(--sage-wash)}
+  .ed-area{line-height:1.6;resize:vertical;min-height:80px}
+  .ed-area.sm{min-height:64px;font-size:14px}
+  .ed-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .ed-row{display:flex;gap:8px;align-items:center}
+  .ed-row .ed-input{flex:1}
+  .ed-card{background:var(--paper-2);border:1px solid var(--line);border-radius:14px;padding:14px;
+    margin-bottom:10px;display:flex;flex-direction:column;gap:8px}
+  .ed-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .del{flex:none;width:38px;height:42px;border:1px solid var(--line);background:#fff;border-radius:10px;
+    color:var(--clay);font-size:18px;cursor:pointer;transition:.15s;display:grid;place-items:center}
+  .del:hover{border-color:var(--clay);background:var(--clay-wash,#F6ECE4)}
+  .del.wide{width:auto;height:auto;padding:9px 14px;font-size:13px;font-weight:600}
+  .mini-add{border:1.5px dashed var(--sage-soft);background:transparent;color:var(--sage);
+    border-radius:11px;padding:11px 16px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+  .mini-add:hover{background:var(--sage-wash)}
+  .save-conf{background:var(--sage);color:#fff;border:0;border-radius:11px;padding:12px 18px;
+    font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:2px;transition:.2s}
+  .save-conf:hover{background:#4e6349}
+  .ghost-btn{background:transparent;border:1px solid var(--line);border-radius:11px;padding:11px 14px;
+    font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ══════════ 홈 ══════════ -->
+  <section class="screen home on" id="s-home">
+    <h1 class="mark">가볍집<small>Gabyeoljip · Hadong</small></h1>
+    <svg class="stroke" viewBox="0 0 240 14" style="margin-top:22px;width:170px"><path d="M2 9 C 40 2, 90 12, 140 6 S 220 3, 238 8"/></svg>
+    <p class="lede serif">덜어내며 머무는 집.<br><em>가볍게 오셔서, 가볍게 쉬다 가세요.</em></p>
+
+    <div class="paths">
+      <button class="path" onclick="startFirst()">
+        <span class="ptxt"><span class="t">처음 오시나요</span><span class="d">공간의 마음을 먼저 읽고 신청해요</span></span>
+        <span class="arw">→</span>
+      </button>
+      <button class="path" onclick="calOrigin='onboarding'; go('s-cal')">
+        <span class="ptxt"><span class="t">다시 오셨네요</span><span class="d">바로 방문일을 잡아요</span></span>
+        <span class="arw">→</span>
+      </button>
+    </div>
+    <button class="my-visit-link" id="home-myvisit" style="display:none" onclick="openDash('me')">신청하신 방문 현황 보기 →</button>
+  </section>
+
+  <!-- ══════════ 안내서 ══════════ -->
+  <section class="screen" id="s-guide">
+    <div class="bar">
+      <button class="back" onclick="guideBack()" aria-label="뒤로">←</button>
+      <div><h2>가볍집 안내서</h2><div class="sub" id="g-sub">1 / 15</div></div>
+      <button class="toc-btn" id="toc-btn" onclick="toggleToc()" aria-label="목차">목차</button>
+    </div>
+    <div class="toc-panel" id="g-toc"></div>
+    <div class="guide-wrap">
+      <div class="progress"><span class="fill" id="g-prog"></span></div>
+      <div id="g-body"></div>
+      <div class="swipe-hint" id="swipe-hint">← 옆으로 밀어서 다른 장으로 넘길 수 있어요 →</div>
+      <div class="ch-nav" id="ch-nav">
+        <button class="ch-prev" id="g-prev" onclick="chStep(-1)">이전</button>
+        <button class="ch-next" id="g-next" onclick="chStep(1)">다음</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 달력 ══════════ -->
+  <section class="screen" id="s-cal">
+    <div class="bar">
+      <button class="back" onclick="calBack()" aria-label="뒤로">←</button>
+      <div><h2>언제 오실까요</h2><div class="sub">이미 잡힌 날은 피해서 골라주세요</div></div>
+    </div>
+    <p class="cal-intro serif">가볍집은 한 번에 한 팀만 머뭅니다.<br>빗금 친 날짜는 이미 예약된 날이에요.</p>
+    <div class="cal-head">
+      <button id="cal-prev" onclick="calMove(-1)" aria-label="이전 달">‹</button>
+      <div class="mon serif" id="cal-mon">2026년 7월</div>
+      <button id="cal-next" onclick="calMove(1)" aria-label="다음 달">›</button>
+    </div>
+    <div class="dow"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+    <div class="grid" id="cal-grid"></div>
+    <div class="legend">
+      <span><b style="background:repeating-linear-gradient(-45deg,#EDE6DF,#EDE6DF 3px,#F3EEE9 3px,#F3EEE9 6px)"></b>예약된 날</span>
+      <span><b style="background:var(--sage)"></b>내가 고른 날</span>
+    </div>
+    <div class="sel-note" id="cal-note">묵고 싶은&nbsp;<b>시작일</b>과&nbsp;<b>퇴실일</b>을 차례로 눌러주세요.</div>
+    <button class="submit" id="cal-go" disabled onclick="go('s-form')">이 날짜로 신청하기</button>
+  </section>
+
+  <!-- ══════════ 신청서 ══════════ -->
+  <section class="screen" id="s-form">
+    <div class="bar">
+      <button class="back" onclick="go('s-cal')" aria-label="달력으로">←</button>
+      <div><h2>방문 신청</h2><div class="sub" id="form-dates">날짜를 먼저 골라주세요</div></div>
+    </div>
+    <div class="edit-banner" id="form-edit-banner" style="display:none">✏️ 신청 내용을 수정하고 있어요. 다시 보내면 집사들이 새로 확인해요.</div>
+
+    <div class="field"><label>성함</label><input id="f-name" placeholder="이름을 적어주세요" autocomplete="name"></div>
+    <div class="field"><label>연락처<span class="hint">승인 소식을 문자로 보내드려요</span></label><input id="f-phone" placeholder="010-0000-0000" inputmode="tel" autocomplete="tel"></div>
+    <div class="field"><label>몇 분이 오시나요</label>
+      <div class="stepper">
+        <button onclick="ppl(-1)" aria-label="줄이기">−</button>
+        <input id="f-ppl" value="1" readonly aria-label="인원수">
+        <button onclick="ppl(1)" aria-label="늘리기">＋</button>
+      </div>
+    </div>
+    <div class="field"><label>함께 오는 분들<span class="hint">선택 · 2인 이상이면 적어주세요</span></label>
+      <input id="f-companions" placeholder="예: 엄마와 딸 2명, 김하늘 외 2명"></div>
+
+    <div class="agree">
+      <div class="q serif">가볍집의 지침을 읽고 그 뜻에 함께하시나요?</div>
+      <label class="check"><input type="checkbox" id="c1"><span>안내서를 끝까지 읽었어요</span></label>
+      <label class="check"><input type="checkbox" id="c2"><span>술 대신 차, 비건 식사, 일회용품 없는 살림에 함께해요</span></label>
+      <label class="check"><input type="checkbox" id="c3"><span>머문 자리는 정리하고, 4가지 단속을 지킬게요</span></label>
+    </div>
+
+    <div class="field"><label>궁금한 점이 있다면<span class="hint">선택</span></label>
+      <textarea id="f-q" placeholder="집사들에게 묻고 싶은 것을 편하게 적어주세요"></textarea></div>
+
+    <div class="toggle-row">
+      <div><div class="tt">떠난 뒤 후기 설문에 응할게요</div><div class="td">더 나은 공간을 위한 작은 목소리</div></div>
+      <div class="sw on" id="f-survey" onclick="this.classList.toggle('on')"></div>
+    </div>
+
+    <button class="submit" id="f-submit" onclick="submitVisit()">신청서 보내기</button>
+    <p class="safe-note">집사들이 함께 살펴본 뒤 문자로 결과를 알려드려요.</p>
+  </section>
+
+  <!-- ══════════ 후기 ══════════ -->
+  <section class="screen" id="s-review">
+    <div class="bar">
+      <button class="back" onclick="openDash('me')" aria-label="뒤로">←</button>
+      <div><h2>가볍집은 어떠셨나요</h2><div class="sub" id="rev-sub">머문 이야기를 들려주세요</div></div>
+    </div>
+    <div id="rev-body"></div>
+    <div class="ch-nav">
+      <button class="ch-prev" id="rev-prev" onclick="revStep(-1)">이전</button>
+      <button class="ch-next" id="rev-next" onclick="revStep(1)">다음</button>
+    </div>
+  </section>
+
+  <!-- ══════════ 방문자 대시보드 (하단 탭) ══════════ -->
+  <section class="screen dash" id="s-dash">
+    <div class="dash-body" id="dash-body"></div>
+    <nav class="tabbar" id="tabbar">
+      <button class="tab" data-tab="me" onclick="dashTab('me')">
+        <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM5 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/></svg><span>내 방문</span>
+      </button>
+      <button class="tab" data-tab="prep" onclick="dashTab('prep')">
+        <svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg><span>준비물</span>
+      </button>
+      <button class="tab" data-tab="places" onclick="dashTab('places')">
+        <svg viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 10-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span>가볼 곳</span>
+      </button>
+      <button class="tab" data-tab="guide" onclick="dashTab('guide')">
+        <svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M19 19v2H6a2 2 0 010-4h13"/></svg><span>안내서</span>
+      </button>
+      <button class="tab" data-tab="checkout" onclick="dashTab('checkout')">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>퇴실 체크</span>
+      </button>
+    </nav>
+  </section>
+
+  <!-- ══════════ 후기 완료 ══════════ -->
+  <section class="screen" id="s-done">
+    <div class="done">
+      <div class="ring"><svg viewBox="0 0 24 24" width="34" height="34"><path d="M5 12.5 10 17.5 19.5 7"/></svg></div>
+      <h3 id="done-title">들려주셔서 고맙습니다</h3>
+      <p id="done-msg">남겨주신 이야기는 집사들이 하나하나 읽고, 다음 손님을 위한 살림에 담을게요.</p>
+      <button class="again" onclick="openDash('me')">돌아가기</button>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ============================================================
+   설정 — 배포 시 그대로 라이브 동기화됨
+   ============================================================ */
+const SYNC_URL = "https://script.google.com/macros/s/AKfycbzsoEA0W9w7B62qQ2V8K4UyRRHus8bqzUJlEns62IzZEOUh6mow0dLmpZtxGuRRV3f7/exec";
+
+/* 실제 확정 일정(집사 앱에서 확인된 값) — 배포 후엔 SYNC_URL에서 자동 갱신 */
+let BOOKINGS = [
+  {who:"유성희",   start:"2026-07-10", end:"2026-07-13"},
+  {who:"로푸드팜", start:"2026-07-21", end:"2026-07-26"},
+  {who:"박은영",   start:"2026-07-30", end:"2026-08-02"},
+];
+
+/* ============================================================
+   공유 데이터 — 안내서와 방문자 대시보드가 함께 씁니다
+   ============================================================ */
+const PLACES = {
+  hadong:[
+    {t:"정금차밭 정자 (단금정)", a:"정금리 산168-1", d:"가볍집 동네 산책길. 정금차밭으로 걸어가면 2층 높이의 정자가 있고 화개골짜기가 한 눈에 보임. 경치도 좋고 바람도 시원. 과일이나 차를 싸서 가져가면 좋음. 정금정 가는 길, 다리 밑에서 물놀이 가능."},
+    {t:"쌍계사", a:"쌍계사길 59", d:"도보 40분, 차로 5분. 2가지 산책 코스(맨발 걷기에 좋음) — ①쌍계사-국사암-목압마을-쌍계초등학교-쌍계사 초입 ②쌍계사-불일폭포-중간에서 다시 쌍계사로. 샌드위치와 차를 싸서 아침으로 먹고 걷다오면 좋습니다. 아래 '좋은세상' 식당, '쌍계반점'(짜장면에 고기 빼달라 하면 채식으로, 매운버섯탕수 좋아요) 추천."},
+    {t:"평사리 공원", a:"평사리 77", d:"하동읍 방향 차로 20분. 계단으로 내려가 신발을 벗고 섬진강 모래밭을 한바퀴 돌면 40분 정도. 비 오는 날 우중 맨발 걷기 좋습니다."},
+    {t:"악양 들판 걷기 (동정호 근처)", a:"악양서로 38-2 맞은편", d:"논 사이 길을 산책하기 좋습니다. 추천 식당&카페 — 무량원의 청국장, 지리산대박터고매감의 비빔밥, 솔향 맷돌콩국수의 콩국수, 카페 정서리, 소소하당(비건 음료와 디저트)."},
+    {t:"모두의 가게", a:"악양동로 388 · 월~금 11~15시", d:"아주 저렴한 가격, 고귀한 마음이 모여 만들어진 제로웨이스트 가게 & 동네 새활용 센터 및 특산물 상점. 용기를 가져가야 살 수 있는 세제·무포장 비누·헌옷·레트로 그릇 등. 건고사리 같은 것은 상시 판매 중."},
+    {t:"카페 적량다온", a:"적량면 대티길 44-22 · 화요일 휴무 10~18시", d:"저렴한 가격 & 지역 농산물 음료·디저트·제로웨이스트 제품. 세제·베이킹소다 등도 용기를 가져가면 구입 가능. 그린스무디·팥빙수·백향과 에이드 추천."},
+    {t:"하동 영화관", a:"하동읍 시장1길 17, 4층 · 매일 10~22시", d:"온라인 예매 가능. 최신 영화를 저렴한 가격에 볼 수 있는 소중한 영화관. 근처 명성콩국수의 콩국수 추천."},
+    {t:"송림 공원", a:"섬진강대로 2107-3", d:"하동읍 근처. 빽빽한 소나무와 섬진강 정경. 맨발 걷기·조깅·벤치 독서 등 여유. 숲해설 프로그램 있음 (4~10월 매주 토·일·공휴일 11/14/15시, 010-3110-6579 하동군 환경보호과 예약)."},
+  ],
+  gurye:[
+    {t:"피아골 산책로", a:"구례군 토지면 직전길", d:"차가 있어야 가기 쉽고 길이 좁아 주차는 눈치껏. 가을 단풍 골짜기, 산책하기 좋음. 다리 건너는 코스부터는 등산화가 있어야 하니 등산 원하면 미리 준비."},
+    {t:"구례 화엄사", a:"구례군 마산면 화엄사로 539 · 매일 18시까지", d:"휴가철엔 주차난. 지리산권에서 가장 큰 절. 주차장 옆 대숲 그늘에서 텀블러에 차 담아 마시며 쉬고 오면 좋습니다."},
+    {t:"구례 실내수영장", a:"구례읍 서시천로 106", d:"월~금 6~20시 / 토 6~18시(중간 휴식). 입장료 2,000원, 샤워만 하고 나와도 좋음 :) 2층 실내헬스장(실내용 운동화 필요). 사람 적고 물 관리를 잘 하는 편."},
+    {t:"매천도서관 & 구례도서관", a:"구례읍 봉성로 38", d:"쾌적하고 여유로운 도서관. 휴관 — 매천 매주 금, 구례 매주 월. 근처 맛집 : 삼촌네 분식(떡볶이·김말이, 비건 아님), 느린가게 김밥(비건 아님), 구례아빠김밥(비건 아님·사람 많음), 굿베리베이커리 카페(빵·커피, 주말 휴무), 물한댁 손두부(문척면, 청국장 비건), 지리산소풍 새참먹는시간(비건 친화·예약 필수, 목금토, @adishforabird)."},
+    {t:"구례 5일장", a:"구례읍 봉동리", d:"끝자리 3·8일 크게 열리는 재래시장. 늘 붐벼 주차난, 현금·온누리상품권 미리 준비. 장터팥죽 팥칼국수·수제비, 장터맛집 백반 추천. 제로웨이스트 — 장바구니·다회용기·재사용비닐 넉넉히, 양 적게 미리 요청, 안 먹을 반찬은 바로 반납."},
+    {t:"섬진강 대나무숲길", a:"구례읍 원방리 1", d:"구례5일장에서 차로 7분, 섬진강변을 따라 대나무숲 산책길. 입구 카페 주차장 이용. '따릉이' 같은 자전거 대여소 있음. 텀블러에 차 담아 벤치에서 쉬면 좋음. 반대편에도 제법 긴 대숲길."},
+    {t:"봉성피자", a:"구례군 지리산온천로 280 · 11~19시(휴식 14~16:30)", d:"비건은 아니지만 치즈까지 허용하면 임실치즈 야채피자 추천. 옆 구례특산물 가게에서 로컬 산나물·간식 쇼핑. 전화로 미리 주문, 식당 내 취식 불가. 제로웨이스트 — 예약 시 고정핀 빼달라 요청, 영수증·비닐·일회용품 No, 손 닦을 손수건 준비."},
+    {t:"천은사", a:"구례읍 광의면 노고단로 209", d:"둘레 숲길과 저수지를 한바퀴. 숲길은 짧고 저수지길은 제법 긺. 아침 일찍 구례오일장 갔다가 산책하기 좋음. 일부 저수지길은 햇빛 강하니 모자·양산 준비."},
+    {t:"구례자연드림파크", a:"구례군 용방면 용산로 107-73 · 매일 8:30~21/22시", d:"아이쿱 생협 유기농산물마트 / 펍·식당 / 숙소 / 체험 견학(예약제) / 영화관. 가볍집사들은 아직 소문만 듣고 방문은 못 해봄."},
+    {t:"빵집 몇 군데", a:"", d:"메종 드 하동(하동 유일 천연발효빵, 비건 있다지만 실은 치즈 든 빵), 굿베리베리커리(천연발효빵·식빵, 저렴, 주말 휴무), 목월빵집(구례·하동 통틀어 가장 큰 빵집, 다양·대기줄), 월인정원 오후3시 빵집(가장 맛있고 비쌈, 구례 우리밀, 3시 오픈·품절 잦음, 문자 예약 010-8695-2444)."},
+  ],
+};
+
+const PREP = [
+  {t:"개인 칫솔"},
+  {t:"텀블러 — 음료 테이크아웃용"},
+  {t:"다회용기 — '용기내'와 남은 음식 되가져갈 용도. 다양한 크기로 넉넉히"},
+  {t:"장바구니 or 에코백 — 비닐봉지 No No!"},
+  {t:"쓰레기 되가져갈 용도의 재사용 비닐 등"},
+  {t:"개인 위생 용품 (생리대 등)", em:"면생리대·생리컵이라면 더 좋아요 ♥"},
+  {t:"손수건 or 와입스 — 티슈·물티슈 No No!"},
+  {t:"그 외 — 휴대용 수저세트, 다회용 빨대"},
+];
+
+/* 퇴실 정리 체크리스트 + 4가지 단속 사진 */
+const CHECKOUT_LIST = [
+  "바닥 청소 — 청소기, 걸레질",
+  "화장실 청소 — 머리카락 등 제거",
+  "사용한 이불·베개 커버·수건 개어 화장실 앞에 두기",
+  "물건 원래 자리에 — 부엌 식기, '여유방' 이불·청소용구",
+  "음식물쓰레기는 퇴비함으로, 나머지 쓰레기는 되가져가기",
+];
+const GUARD_PHOTOS = [
+  {k:"gas",   label:"주방 가스밸브 잠근 사진"},
+  {k:"wifi",  label:"와이파이 코드 꽂은 사진", sub:"제습기 원격 조정을 위해"},
+  {k:"boiler",label:"보일러 전원 끈 사진"},
+  {k:"elec",  label:"복도 전기판넬 코드 뺀 사진"},
+];
+
+/* ============================================================
+   안내서 챕터 — 캔바 원본(공간 사용 안내서) 문구를 그대로 옮김.
+   임의 축약·삭제 없이 원문 내용을 세이지 톤 레이아웃에 담았습니다.
+   ============================================================ */
+const CHAPTERS = [
+  { cat:"공간 사용 안내서", title:"가볍게 왔다 가볍게 가는 집",
+    lead:"우리는 걱정, 불안, 초조, 스트레스… 이런 마음의 그늘 없이,",
+    blocks:[
+      {callout:{lab:"이 공간이 만들어진 연유", x:"탁 트이고 편안하며 여유로운 마음으로, 가볍게 사는 연습을 하려고 이 공간을 마련했습니다."}},
+      {p:"그래서 입고 먹고 살아가는 문화를, 가볍게 사는 쪽으로 옮겨보려고 합니다."},
+      {p:"이 공간에 오시는 분들도 이곳 생활이 처음엔 익숙하지 않더라도, 차츰차츰 좋은 습관에 물들어 편안함에 이르는 계기가 되길 진심으로 바라며 이 공간을 공유합니다."},
+      {p:"<strong>삶이 가벼워지는 집, 가볍집.</strong>"},
+    ]},
+
+  { cat:"공간 안내", title:"가볍집 공간 안내",
+    lead:"다섯 집사가 함께 돌보는 시골집이에요. 어디에 무엇이 있는지 미리 그려두면 편해요.",
+    blocks:[
+      {h:"방"},
+      {spaces:["차꽃방","고사리방","상추방",{b:"무방",x:"이부자리·청소용구·물품보관"}]},
+      {h:"살림 공간"},
+      {spaces:["부엌","화장실 (세탁기·세탁세제)","창고 1","창고 2","수도 1","수도 2"]},
+      {h:"마당과 자연"},
+      {spaces:["텃밭","머위","쑥","매화","엄나무","차나무",{b:"퇴비함",x:"항아리 옆 파란통"},"주차장"]},
+    ]},
+
+  { cat:"입는 문화 연습", title:"그래서, 이렇게 입어요",
+    blocks:[
+      {p:"이곳, 가볍집은 어르신들과 함께 사는 마을이자 공동의 공간입니다. 상대에게 불편함을 줄 수 있는 복장은 삼가주세요."},
+      {sub:"가령, 노출이 너무 심한 옷^^;;"},
+      {p:"화장실에 있는 세탁기와 세탁세제를 이용할 수 있습니다."},
+      {p:"빨래감은 모아서 한번에 돌립니다. 손빨래도 환영입니다. 세탁기 헹굼물, 제습기 물을 받아 걸레를 빠는 것도 가능합니다만ㅎ"},
+    ]},
+
+  { cat:"먹는 문화 연습 · 1", title:"술 대신, 차를 마셔봅니다",
+    blocks:[
+      {p:"이 공간에서 술은 마시지 않습니다. 다른 곳에서 음주하고 오신 분의 숙박은 가능하지만, 큰 소리를 내는 등 다른 사람들에게 불편을 줄 수 있는 술 주정은 허용되지 않습니다."},
+      {p:"대신 하동의 차를 맛 볼 수 있는 다구와 찻잎이 준비돼 있습니다. 여유롭게 앉아 하동의 차를 맛 보시면 어떨까요?"},
+    ]},
+
+  { cat:"먹는 문화 연습 · 2", title:"고기 대신, 텃밭의 작물을 먹어봅니다",
+    blocks:[
+      {p:"불가피한 경우가 아니라면, 이 공간에서는 다른 생명에게 빚지지 않는 식사를 합니다. 동물성 식단(고기, 생선, 달걀, 유제품 등)을 먹고 마시지 않습니다."},
+      {h:"어린이를 위한 경우"},
+      {p:"부모님께서 판단하시되, 육식은 외부에서 해주시길 부탁드립니다. (이 경우 유제품 같은 것은 가능)"},
+      {p:"텃밭과 냉장고, 식량찬장에 있는 식재료를 이용하실 수 있습니다. 추천레시피는 공유 드리겠습니다."},
+      {note:"*길가에 있는 달래, 냉이, 머위, 밤, 감 등을 함부로 채취하지 않습니다. 모두 주인이 있습니다. 주인 허락 없이 채취할 경우 고발될 수 있습니다. 우리한테는 '어쩌다 하나'일지 모르지만 그분들 입장에서는 '매번'이라 이 부분에 민감하실 수 있습니다."},
+    ]},
+
+  { cat:"먹는 문화 연습 · 3", title:"남기지 않고 먹습니다",
+    blocks:[
+      {list:["먹을 만큼만 덜기","약간 부족한 듯 먹고, 과식하려고 할 때 멈추기"]},
+      {p:"채소는 깨끗하게 세척해(식초 사용) 약간만 다듬어 껍질째 요리해보길 권합니다. 사과, 배, 감, 복숭아 등 과일도 껍질채 먹으면 몸에도 더 좋답니다."},
+      {h:"음식물쓰레기는 퇴비로"},
+      {p:"발생한 음식물쓰레기는 *퇴비함에 넣고 밭의 흙을 한줌 뿌려준 후 뚜껑을 잘 닫아주시면 밭의 소중한 퇴비로 돌아갑니다. 하지만 다량의 음식물쓰레기는 퇴비화가 잘 안 되니, 되도록 적게 버려주세요."},
+      {note:"*퇴비함은 항아리 옆 파란통입니다."},
+    ]},
+
+  { cat:"먹는 문화 연습 · 4", title:"음식은 남기지 않고, 일회용품은 쓰지 않아요",
+    blocks:[
+      {h:"음식은 남겨놓지 않습니다"},
+      {list:["필요한 만큼 음식을 가져옵니다","다회용기에 담아옵니다","남은 음식은 모두 되가져갑니다"]},
+      {p:"미리 여분의 다회용기를 넉넉히 준비해오시길 부탁드려요."},
+      {h:"일회용품을 사용하지 않습니다"},
+      {list:["페트병에 든 물을 사서 먹지 않습니다. 물을 받아 마시거나 끓여 마십니다","일회용컵, 물티슈, 키친타올, 랩, 지퍼백, 일회용 비닐장갑 등을 사용하지 않습니다"]},
+      {p:"장바구니, 텀블러를 꼭 챙겨오시고, 주방에 비치된 컵, 행주(과탄산소다로 살균해놓은 상태임), 용기와 그릇들, 맨손 등을 활용해 보아요."},
+      {note:"✳ 페트병의 물은 미세플라스틱이 다량 함유돼 있습니다. 가볍집의 물은 정기적으로 수질검사를 하는 산에서 내려오는 물입니다."},
+      {note:"✳ 가볍집에는 텀블러, 다회용기, 수저세트, 세척한 재사용비닐 등을 담아놓은 에코백을 비치해두었습니다. 자유롭게 사용 후 세척하여 제자리에 놓습니다."},
+    ]},
+
+  { cat:"살림 문화 연습 · 1", title:"공간을 청정하게 사용합니다",
+    blocks:[
+      {h:"쓰레기는 되가져 갑니다"},
+      {p:"음식물쓰레기는 퇴비함으로, 나머지 쓰레기는 각자의 집으로."},
+      {h:"퇴실할 때는 꼭 청소를 합니다"},
+      {list:["바닥 청소 : 청소기, 걸레질","화장실 청소 : 머리카락 등 제거","사용한 이불과 베개의 커버, 수건은 화장실 앞에 잘 개서 놓아둡니다"]},
+      {h:"물건은 원래 자리에 놓습니다"},
+      {p:"부엌 공간의 식기들, '여유방'의 이불, 청소용구 등은 사용 후 제자리에 놓고 갑니다."},
+      {callout:{lab:"떠나기 전, 4가지 단속은 꼭!", x:"문 · 가스 · 보일러 · 전기 단속. 사용 여부와 관계 없이, 단속한 사진을 찍어 가볍집사 대표에게 공유합니다."}},
+      {list:["주방 가스밸브 잠근 사진","와이파이 코드 꽂은 사진 (제습기 원격 조정을 위해)","보일러 전원 끈 사진","복도 전기판넬 코드 뺀 사진 — 이렇게 4장"]},
+    ]},
+
+  { cat:"사는 문화 연습 · 2", title:"관계 : 마을 공동체와 함께 살기",
+    blocks:[
+      {h:"이웃에게 피해를 주지 않도록 배려합니다"},
+      {p:"주변에는 일찍 주무시는 마을 어르신들이 계시니 고요한 밤 부탁합니다. ☽"},
+      {h:"반려동물 동반은 불가합니다"},
+      {p:"저희도 동물은 사랑하지만, 이 동네는 차농사를 짓는 곳으로 반려동물을 키우지 않는 무언의 약속이 돼있는 곳이라 부득이 부탁합니다."},
+      {h:"주차 문제 또는 주변과 마찰 발생 시"},
+      {p:"주차는 지정된 주차공간(집 앞)에만 합니다. 가볍집 앞공간은 윗집들이 공용 주차공간으로 함께 사용하고 있습니다. 2대 이상 주차공간이 필요한 경우에는 미리 연락주시기 바랍니다."},
+      {p:"혹시 문의가 있거나 주변과 마찰이 생길 시에는 가볍집사에게 연락바랍니다."},
+      {contact:{k:"가볍집사 대표", x:"010-9533-3036"}},
+    ]},
+
+  { cat:"이용 안내", title:"공간 이용료",
+    lead:"이 연습의 공간을 유지하기 위한 소정의 운영비를 받고 있어요.",
+    blocks:[
+      {p:"공간운영에 필요한 월세와 기본비용은 가볍집사들이 십시일반으로 부담하고 있습니다."},
+      {p:"가스비, 기름보일러비, 전기요금, 수도요금 등은 이 공간의 지속적 운영을 위해 이용하시는 분들과 함께 부담하려고 합니다."},
+      {fee:true},
+      {note:"*20세 이하 백수는 무료"},
+      {contact:{k:"가볍집 계좌", x:"카카오뱅크 3333-1699-11022 (예금주 : ㅇㅅㅅ)"}},
+    ]},
+
+  { cat:"이용 안내", title:"사용 가능한 가볍집 비품들",
+    blocks:[
+      {h:"주방 살림"},
+      {list:["식기류 : 기본 식기류 모두 있음","식량 : 쌀, 누룽지 상비. 식량 찬장에 그때그때 다른 식품이 있음","양념류 : 소금, 설탕, 후추, 간장류, 연두, 된장, 고추장, 고춧가루, 매실액기스, 식초, 식용유 등 (그때그때 다를 수 있음)","도구류 : 냉장고, 가스레인지, 토스터, 전기포트, 전자레인지, 믹서 등","차 도구 : 그때그때 다른 여러가지 차, 주전자, 잔 등 다구 있음"]},
+      {h:"욕실 살림"},
+      {list:["기름보일러 : 뜨거운 물 사용 시 '목욕'으로 설정하고 사용 (※ 온수 화상 주의)","온몸비누 : 샴푸·린스·바디워시·클린징폼 대용으로 다 쓸 수 있음 (Made by 가볍집)","고체치약 : 죽염을 넣어 약간 짠맛이 나지만 개운함 (Made by 가볍집)","세탁세제 : 용기내 리필한 제품 (부족할 경우 제로웨이스트샵 적량다온·모두의 가게에서 구입 가능)","세탁기, 빨래건조대, 수건, 헤어 드라이어 비치"]},
+      {h:"기타 공용 살림"},
+      {list:["와이파이, 핸드폰 충전기, 이불, 베개, 선풍기, 에어컨, 제습기, 우산","요가 매트 (본인 위생을 위해 요가 타월 사용 권장)","생리방수패드 1개","기초화장품(토너, 로션, 선크림, 핸드크림, 립밤), 손톱깎이","약품류 : 물파스, 연고, 밴드, 빨간약 등"]},
+      {note:"✳ 가볍집 살림 중 작동법이 필요한 보일러, 에어컨, 제습기 등 몇가지는 물품 가까운 곳에 사용법을 인쇄해 부착해놓았습니다. 문의가 있을 경우 연락해주세요."},
+      {callout:{lab:"가볍집은 지구도 가볍게 하고 싶어요", x:"가능한 최소한의 물건을 구비하고, 거의 모든 비품은 중고 혹은 제로웨이스트샵에서 구입했어요. 생활하시다가 혹시 더 필요한 물건이 생겨도 '지금 이대로 충분하다'는 관점으로, 있는 물건을 창의적으로 활용하시길 당부드려요."}},
+    ]},
+
+  { cat:"가볍게 사는 연습", title:"가볍집에 머물며 5R 실천하기",
+    blocks:[
+      {r5:[
+        {e:"Refuse", t:"필요없는 물건은 No No!", d:"플라스틱 빨대, 비닐봉지, 나무젓가락, 영수증, 종이컵, 티슈, 화장실 종이핸드타올 등"},
+        {e:"Reduce", t:"쓰레기 양 줄이기", d:"되도록 사지 않고, 가볍집에 있는 것을 먹고 사용하기. 세제·화장품·비누 등 리필 또는 무포장 제품 구입. *하동 제로웨이스샵 : 적량다온, 모두의 가게"},
+        {e:"ReUse", t:"재사용 or 다회용 제품 이용", d:"손수건·텀블러·장바구니 휴대 + 다회용기·휴대용 수저세트·빨대 휴대하면 만점! 이미 써버린 일회용품이라면 다시 사용하기"},
+        {e:"Recycle", t:"재활용하기", d:"재사용이 어려워진 제품은 재활용 가능 여부를 확인하고 깨끗이 세척해 정확한 분리배출을 합니다. 비우고, 헹구고, 분리배출하고, 섞지 않고!"},
+        {e:"Rot", t:"썩히기 or 썩는 제품 사용", d:"천연수세미·순면·생분해 제품 사용. 음식물쓰레기는 퇴비화. 비닐과 플라스틱은 멀리합니다."},
+      ]},
+      {note:"5R 실천에 익숙치 않은 분들을 위해 가볍집에 텀블러, 다회용기, 수저, 세척한 재사용 비닐 등을 담은 에코백을 마련해 두었습니다. 외출 시 가볍게 사용해보시고, 세척해 제자리에 놓아주세요."},
+    ]},
+
+  { cat:"하동에서 여유부리기", title:"하동 · 악양에서",
+    blocks:[
+      {places:PLACES.hadong},
+    ]},
+
+  { cat:"하동에서 여유부리기", title:"구례 쪽으로 조금 더",
+    blocks:[
+      {places:PLACES.gurye},
+      {note:"하동 여행하시면서 발견한 좋은 곳이 있다면 공유해주세요."},
+    ]},
+
+  { cat:"떠나기 전", title:"가볍집에 오실 때, 준비물 체크",
+    blocks:[
+      {callout:{lab:"준비의 마음", x:"생활이 무해해야 무의식의 깊은 곳에서 편안한 마음으로 휴식할 수 있습니다. ✦"}},
+      {check:PREP},
+      {p:"그 외 필요한 물건은 공간안내서를 읽어보고 공간 윤리에 맞게 본인이 준비합니다."},
+    ],
+    last:true,
+    closingLab:"가볍집",
+    closing:"가볍게 왔다 가볍게 가는 집. 이제 편안한 마음으로 방문 신청을 해볼까요?" },
+];
+
+/* ============================================================
+   후기 설문 12문항 — 원본 폼 그대로
+   ============================================================ */
+const REVIEW = [
+  {t:"star",  q:"머무는 동안 마음이 편안하셨나요",             k:"comfort"},
+  {t:"text",  q:"묵으신 기간을 알려주세요",                    k:"period", ph:"예) 7월 15일 ~ 17일"},
+  {t:"text",  q:"어떤 점이 편하고 좋으셨나요",                 k:"good",   area:true},
+  {t:"text",  q:"불편하거나 아쉬웠던 점이 있었나요",           k:"bad",    area:true},
+  {t:"text",  q:"이렇게 바뀌면 좋겠다 싶은 게 있다면",         k:"suggest",area:true},
+  {t:"text",  q:"가장 편안했던 순간은 언제였나요",             k:"bestmoment", area:true},
+  {t:"text",  q:"가장 불편했던 순간이 있었다면",               k:"worstmoment", area:true},
+  {t:"scale", q:"안내서가 지내는 데 도움이 되었나요",          k:"guidehelp", opts:["별로","보통","많이"]},
+  {t:"text",  q:"안내서에 더 담겼으면 하는 내용이 있나요",     k:"guidemore", area:true},
+  {t:"text",  q:"하동에서 좋았던 곳을 추천해주신다면",         k:"hadong", area:true},
+  {t:"scale", q:"다시 오고 싶은 마음이 드시나요",              k:"revisit", opts:["글쎄요","아마도","꼭이요"]},
+  {t:"text",  q:"연락처를 남겨주시면 소식을 전해요",           k:"contact", ph:"선택 · 010-0000-0000"},
+];
+
+/* ============================================================
+   상태 & 라우팅
+   ============================================================ */
+let chIdx=0, revIdx=0, monOffset=0, sel={start:null,end:null}, review={}, guideOrigin='onboarding', calOrigin='onboarding';
+const $=id=>document.getElementById(id);
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $(id).classList.add('on');
+  window.scrollTo({top:0,behavior:'instant'});
+  if(id==='s-cal') renderCal();
+  if(id==='s-review'){revIdx=0;renderReview();}
+  if(id==='s-form'){ syncFormDates(); if(editing){ prefillForm(); } else { const b=$('form-edit-banner'); if(b) b.style.display='none'; } }
+}
+function prefillForm(){
+  if(!myVisit) return;
+  $('f-name').value = myVisit.name||'';
+  $('f-phone').value = myVisit.phone||'';
+  $('f-ppl').value = myVisit.people||1;
+  $('f-companions').value = myVisit.companions||'';
+  $('f-q').value = myVisit.question||'';
+  $('c1').checked=$('c2').checked=$('c3').checked=true;
+  $('f-survey').classList.toggle('on', myVisit.wantsSurvey!==false);
+  const banner=$('form-edit-banner'); if(banner) banner.style.display='block';
+}
+function startFirst(){ guideOrigin='onboarding'; chIdx=0; closeToc(); setTocBtn(); go('s-guide'); renderChapter(); }
+function openGuideFromDash(){ guideOrigin='dash'; chIdx=0; closeToc(); setTocBtn(); go('s-guide'); renderChapter(); }
+function setTocBtn(){ var b=document.getElementById('toc-btn'); if(b) b.style.display = guideOrigin==='dash' ? 'block' : 'none'; }
+function closeToc(){ tocOpen=false; var el=document.getElementById('g-toc'); if(el){ el.classList.remove('open'); el.innerHTML=''; } }
+function guideBack(){ guideOrigin==='dash' ? openDash('me') : go('s-home'); }
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+
+/* ===== 안내서 렌더 ===== */
+function renderChapter(){
+  const c=CHAPTERS[chIdx];
+  $('g-sub').textContent=`${chIdx+1} / ${CHAPTERS.length}`;
+  $('g-prog').style.width=Math.round((chIdx+1)/CHAPTERS.length*100)+'%';
+  let h=`<div class="chapter"><div><span class="ch-no serif">${String(chIdx+1).padStart(2,'0')}</span><span class="ch-cat">${c.cat}</span></div>`;
+  h+=`<h3 class="ch-title serif">${c.title}</h3>`;
+  if(c.lead) h+=`<p class="ch-lead serif">${c.lead}</p>`;
+  (c.blocks||[]).forEach(b=>{
+    if(b.p)            h+=`<div class="ch-body">${b.p}</div>`;
+    else if(b.h)       h+=`<div class="ch-h">${b.h}</div>`;
+    else if(b.sub)     h+=`<div class="ch-sub">${b.sub}</div>`;
+    else if(b.list)    h+=`<ul class="ch-list">${b.list.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+    else if(b.note)    h+=`<div class="ch-note">${b.note}</div>`;
+    else if(b.callout) h+=`<div class="callout">${b.callout.lab?`<span class="lab">${b.callout.lab}</span>`:''}${b.callout.x}</div>`;
+    else if(b.fee)     h+=`<div class="callout"><span class="lab">공간 이용료</span><div class="fee"><b>10,000원</b><span>1인 · 1박</span></div>가볍집 이용 전, 아래 계좌로 보내주시면 공간 운영에 잘 쓰도록 하겠습니다.</div>`;
+    else if(b.contact) h+=`<div class="ch-contact"><span class="k">${b.contact.k}</span>${b.contact.x}</div>`;
+    else if(b.spaces)  h+=`<div class="spaces">${b.spaces.map(s=>`<span>${typeof s==='string'?s:`<b>${s.b}</b> ${s.x||''}`}</span>`).join('')}</div>`;
+    else if(b.check)   h+=`<ul class="ch-check">${b.check.map(x=>`<li>${x.t}${x.em?` <span class="em">${x.em}</span>`:''}</li>`).join('')}</ul>`;
+    else if(b.places)  h+=`<ul class="rlist">${b.places.map(p=>`<li><div class="rt">${p.t}</div>${p.a?`<div class="ra">${p.a}</div>`:''}<div class="rd">${p.d}</div></li>`).join('')}</ul>`;
+    else if(b.r5)      h+=`<ul class="r5">${b.r5.map(r=>`<li><div class="rt"><em>${r.e}</em>${r.t}</div><div class="rd">${r.d}</div></li>`).join('')}</ul>`;
+  });
+  if(c.closing) h+=`<div class="callout" style="margin-top:24px"><span class="lab">${c.closingLab||'가볍집'}</span>${c.closing}</div>`;
+  h+=`</div>`;
+  $('g-body').innerHTML=h;
+  $('g-prev').disabled=chIdx===0;
+  const isLast=chIdx===CHAPTERS.length-1;
+  $('g-next').textContent = isLast
+    ? (guideOrigin==='dash' ? '다 봤어요 · 돌아가기' : '다 읽었어요 · 방문 신청하기')
+    : '다음';
+  // 목차로 진입했을 때(대시보드)는 이전/다음 버튼 대신 스와이프 힌트만 보여줌.
+  // 단, 마지막 장의 "돌아가기"만은 버튼으로 남겨 명확한 종료 동작을 유지.
+  const showButtons = guideOrigin!=='dash' || isLast;
+  $('ch-nav').style.display = showButtons ? 'flex' : 'none';
+  $('g-prev').style.display = (guideOrigin==='dash') ? 'none' : '';
+  const hint=$('swipe-hint');
+  hint.textContent = isTouchDevice
+    ? '← 옆으로 밀어서 다른 장으로 넘길 수 있어요 →'
+    : '← → 화살표 키를 누르거나, 마우스로 옆으로 밀어보세요';
+  hint.style.display = (guideOrigin==='dash' && !isLast) ? 'block' : 'none';
+}
+function chStep(d){
+  if(chIdx===CHAPTERS.length-1 && d>0){
+    guideOrigin==='dash' ? openDash('me') : (calOrigin='onboarding', go('s-cal'));
+    return;
+  }
+  chIdx=Math.max(0,Math.min(CHAPTERS.length-1,chIdx+d));
+  renderChapter();
+  window.scrollTo({top:0,behavior:'auto'}); // 넘길 때마다 제목부터 보이게
+}
+let tocOpen=false;
+function toggleToc(){
+  tocOpen=!tocOpen;
+  const el=$('g-toc');
+  if(tocOpen){
+    el.innerHTML=CHAPTERS.map((c,i)=>
+      `<button class="toc-item ${i===chIdx?'on':''}" onclick="jumpChapter(${i})">
+        <span class="toc-no">${String(i+1).padStart(2,'0')}</span>
+        <span class="toc-t">${c.title}</span></button>`).join('');
+    el.classList.add('open');
+  }else{ el.classList.remove('open'); }
+}
+function jumpChapter(i){
+  chIdx=i; renderChapter();
+  tocOpen=false; $('g-toc').classList.remove('open');
+  window.scrollTo({top:0,behavior:'auto'});
+}
+
+/* ===== 달력 ===== */
+function ymd(d){return d.toISOString().slice(0,10);}
+function isBooked(dateStr){
+  return BOOKINGS.some(b=>{
+    if(editing && myVisit && (b.id===myVisit.id || b.id==='v_from_'+myVisit.id)) return false; // 수정 중엔 내 기존 일정 제외
+    return dateStr>=b.start && dateStr<b.end; // 퇴실일은 새 손님 입실 가능
+  });
+}
+function renderCal(){
+  const base=new Date(2026,6,1); // 2026년 7월 기준
+  const view=new Date(base.getFullYear(),base.getMonth()+monOffset,1);
+  const y=view.getFullYear(), m=view.getMonth();
+  $('cal-mon').textContent=`${y}년 ${m+1}월`;
+  $('cal-prev').disabled=monOffset<=0;
+  const first=new Date(y,m,1).getDay();
+  const days=new Date(y,m+1,0).getDate();
+  const today=new Date(2026,6,10); // 오늘 = 2026-07-10
+  let cells='';
+  for(let i=0;i<first;i++) cells+=`<div class="cell pad"></div>`;
+  for(let d=1;d<=days;d++){
+    const dt=new Date(y,m,d), ds=ymd(dt);
+    let cls='cell', tap=`onclick="pickDay('${ds}')"`;
+    if(dt<today){cls+=' past';tap='';}
+    else if(isBooked(ds)){cls+=' booked';tap='';}
+    else cls+=' free';
+    if(sel.start&&ds===sel.start){cls+=' sel start';}
+    if(sel.end&&ds===sel.end){cls+=' sel end';}
+    if(sel.start&&sel.end&&ds>sel.start&&ds<sel.end){cls+=' range';}
+    cells+=`<div class="${cls}" ${tap}>${d}</div>`;
+  }
+  $('cal-grid').innerHTML=cells;
+}
+function calMove(d){monOffset=Math.max(0,monOffset+d);renderCal();}
+function rangeHasBooking(a,b){
+  let cur=new Date(a+'T00:00'); const end=new Date(b+'T00:00');
+  while(cur<end){ if(isBooked(ymd(cur))) return true; cur.setDate(cur.getDate()+1); }
+  return false;
+}
+function pickDay(ds){
+  if(!sel.start||(sel.start&&sel.end)){ sel={start:ds,end:null}; }
+  else if(ds<=sel.start){ sel={start:ds,end:null}; }
+  else {
+    if(rangeHasBooking(sel.start,ds)){ toast('그 사이에 이미 예약된 날이 있어요'); sel={start:ds,end:null}; }
+    else sel.end=ds;
+  }
+  renderCal(); updateSelNote();
+}
+function fmtK(ds){ const d=new Date(ds+'T00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; }
+function updateSelNote(){
+  const note=$('cal-note'), btn=$('cal-go');
+  if(sel.start&&sel.end){
+    const n=Math.round((new Date(sel.end)-new Date(sel.start))/864e5);
+    note.innerHTML=`<b>${fmtK(sel.start)}</b>&nbsp;부터&nbsp;&nbsp;<b>${fmtK(sel.end)}</b>&nbsp;까지 · ${n}박`;
+    btn.disabled=false;
+  }else if(sel.start){
+    note.innerHTML=`<b>${fmtK(sel.start)}</b>&nbsp;입실 — 이제 퇴실일을 골라주세요`;
+    btn.disabled=true;
+  }else{
+    note.innerHTML='묵고 싶은&nbsp;<b>시작일</b>과&nbsp;<b>퇴실일</b>을 차례로 눌러주세요.';
+    btn.disabled=true;
+  }
+}
+
+/* ===== 신청서 ===== */
+function syncFormDates(){
+  $('form-dates').textContent = (sel.start&&sel.end)?`${fmtK(sel.start)} ~ ${fmtK(sel.end)}`:'날짜를 먼저 골라주세요';
+}
+function ppl(d){ const el=$('f-ppl'); el.value=Math.max(1,Math.min(12,(+el.value)+d)); }
+
+async function submitVisit(){
+  const name=$('f-name').value.trim();
+  if(!sel.start||!sel.end){ toast('방문 날짜를 먼저 골라주세요'); go('s-cal'); return; }
+  if(!name){ toast('성함을 적어주세요'); $('f-name').focus(); return; }
+  if(!$('c1').checked||!$('c2').checked||!$('c3').checked){ toast('지침 세 가지에 함께해주세요'); return; }
+
+  const item={
+    id: (editing && myVisit) ? myVisit.id : ('req_'+Date.now()),
+    name, phone:$('f-phone').value.trim(),
+    people:+$('f-ppl').value,
+    companions:$('f-companions').value.trim(),
+    start:sel.start, end:sel.end,
+    agree:true, question:$('f-q').value.trim(),
+    wantsSurvey:$('f-survey').classList.contains('on'),
+    status:'대기', updatedAt:Date.now()
+  };
+
+  const btn=$('f-submit'); btn.disabled=true; btn.textContent='보내는 중…';
+  try{
+    await fetch(SYNC_URL,{ method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({resource:'visitRequests', op:'upsert', item, actor:name}) });
+    const wasEditing=editing;
+    myVisit=Object.assign({},item); editing=false;
+    saveVisit();
+    $('home-myvisit').style.display='block';
+    openDash('me');
+    toast(wasEditing ? '수정 내용을 집사에게 다시 보냈어요' : '신청서를 보냈어요');
+  }catch(e){
+    toast('전송에 실패했어요. 잠시 뒤 다시 시도해주세요');
+  }finally{ btn.disabled=false; btn.textContent='신청서 보내기'; }
+}
+
+/* ===== 후기 ===== */
+function renderReview(){
+  const q=REVIEW[revIdx];
+  $('rev-sub').textContent=`${revIdx+1} / ${REVIEW.length}`;
+  let h=`<div class="chapter" style="padding-top:24px"><div class="eyebrow">${revIdx+1} · ${REVIEW.length}</div>
+    <h3 class="ch-title serif" style="font-size:24px;margin-top:12px">${q.q}</h3><div style="margin-top:18px">`;
+  const v=review[q.k];
+  if(q.t==='star'){
+    h+=`<div class="stars">`+[1,2,3,4,5].map(n=>`<span class="${v>=n?'lit':''}" onclick="setStar('${q.k}',${n})">●</span>`).join('')+`</div>`;
+  }else if(q.t==='scale'){
+    h+=`<div class="scale">`+q.opts.map((o,i)=>`<button class="${v===i?'on':''}" onclick="setScale('${q.k}',${i})">${o}</button>`).join('')+`</div>`;
+  }else{
+    const val=v?v.replace(/"/g,'&quot;'):'';
+    h+= q.area
+      ? `<textarea class="rev-area" oninput="review['${q.k}']=this.value" placeholder="${q.ph||'편하게 적어주세요'}">${val}</textarea>`
+      : `<input class="rev-input" oninput="review['${q.k}']=this.value" placeholder="${q.ph||''}" value="${val}">`;
+  }
+  h+=`</div></div>`;
+  $('rev-body').innerHTML=h;
+  $('rev-prev').disabled=revIdx===0;
+  $('rev-next').textContent=revIdx===REVIEW.length-1?'후기 보내기':'다음';
+}
+function setStar(k,n){review[k]=n;renderReview();}
+function setScale(k,i){review[k]=i;renderReview();}
+function revStep(d){
+  if(revIdx===REVIEW.length-1&&d>0){ sendReview(); return; }
+  revIdx=Math.max(0,Math.min(REVIEW.length-1,revIdx+d));
+  renderReview();
+  window.scrollTo({top:0,behavior:'auto'});
+}
+async function sendReview(){
+  const item={id:'rev_'+Date.now(), ...review, updatedAt:Date.now()};
+  try{
+    await fetch(SYNC_URL,{method:'POST',mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({resource:'reviews',op:'upsert',item})});
+  }catch(e){}
+  $('done-title').textContent='들려주셔서 고맙습니다';
+  $('done-msg').textContent='남겨주신 이야기는 집사들이 하나하나 읽고, 다음 손님을 위한 살림에 담을게요.';
+  go('s-done');
+}
+
+/* ============================================================
+   방문자 대시보드 — 신청 후 도착하는 화면 (하단 탭)
+   ============================================================ */
+let myVisit=null, editing=false, checkoutState={checks:{}, photos:{}}, prepChecked={};
+let CONF={}, adminMode=false, adminClicks=0, adminTimer=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* 효과 데이터 — 관리자가 고친 게 있으면 그걸, 없으면 기본값 */
+function effPrep(){ return CONF.prep || PREP; }
+function effCheckout(){ return CONF.checkout || CHECKOUT_LIST; }
+function effPlaces(){ return CONF.places || PLACES; }
+function effNotices(){ return CONF.notices || []; }
+function ensureConf(key){
+  if(!CONF[key]){
+    const base = key==='prep'?PREP : key==='checkout'?CHECKOUT_LIST : key==='places'?PLACES : [];
+    CONF[key]=JSON.parse(JSON.stringify(base));
+  }
+  return CONF[key];
+}
+
+function saveVisit(){ try{ localStorage.setItem('gbj_visit', JSON.stringify(myVisit)); }catch(e){} }
+function loadVisit(){ try{ const s=localStorage.getItem('gbj_visit'); if(s) myVisit=JSON.parse(s); }catch(e){} }
+function savePrep(){ try{ localStorage.setItem('gbj_prep', JSON.stringify(prepChecked)); }catch(e){} }
+function loadPrep(){ try{ const s=localStorage.getItem('gbj_prep'); if(s) prepChecked=JSON.parse(s); }catch(e){} }
+
+async function saveConf(key){
+  const val = key==='prep'?effPrep() : key==='checkout'?effCheckout() : key==='places'?effPlaces() : effNotices();
+  try{
+    await fetch(SYNC_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({resource:'config',op:'upsert',item:{id:key,key:key,value:JSON.stringify(val),updatedAt:Date.now()}})});
+    toast('저장했어요 · 모두에게 반영돼요');
+  }catch(e){ toast('저장에 실패했어요'); }
+}
+
+/* ===== 라우팅 ===== */
+function openDash(tab){ go('s-dash'); dashTab(tab||'me'); }
+function dashTab(tab){
+  if(tab==='guide'){ openGuideFromDash(); return; } // 안내서는 별도 화면(챕터 넘김)
+  document.querySelectorAll('#tabbar .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  if(tab==='me') renderMe();
+  else if(tab==='places') renderPlaces();
+  else if(tab==='checkout') renderCheckout();
+  else if(tab==='prep') renderPrep();
+  window.scrollTo({top:0,behavior:'auto'});
+}
+function redrawTab(){ const cur=document.querySelector('#tabbar .tab.on'); dashTab(cur?cur.dataset.tab:'me'); }
+
+/* ===== 관리자 진입 (탭 제목 5번 톡톡, 비밀번호 없이 바로 전환) ===== */
+function adminTap(){
+  adminClicks++; clearTimeout(adminTimer);
+  adminTimer=setTimeout(()=>adminClicks=0,1600);
+  if(adminClicks>=5){
+    adminClicks=0;
+    adminMode=!adminMode;
+    toast(adminMode ? '관리자 모드 · 바로 고칠 수 있어요' : '관리자 모드를 껐어요');
+    redrawTab();
+  }
+}
+
+/* ===== 내 방문 ===== */
+function renderMe(){
+  const v=myVisit;
+  const notices=renderNotices();
+  if(!v){
+    $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">내 방문</div><div class="dash-sub">신청 현황과 소식</div>
+      <div class="co-empty">아직 신청한 방문이 없어요.<br>홈에서 방문 신청을 먼저 해주세요.</div>
+      <button class="submit" onclick="go('s-home')">홈으로</button>
+      ${notices}`;
+    return;
+  }
+  const st=v.preview?'preview':(v.status||'대기');
+  const badge= st==='승인'?'<span class="status-badge st-ok">● 승인되었어요</span>'
+            : st==='거절'?'<span class="status-badge st-no">● 이번엔 어렵게 되었어요</span>'
+            : st==='preview'?'<span class="status-badge st-wait">● 미리보기</span>'
+            : '<span class="status-badge st-wait">● 승인 기다리는 중</span>';
+  const msg = st==='승인'?'방문이 확정되었어요! 도착 전 안내서와 준비물을 한 번 더 살펴봐 주세요.'
+            : st==='거절'?'아쉽지만 이번 일정은 어렵게 되었어요. 다른 날짜로 다시 신청해 주시면 반갑게 맞이할게요.'
+            : st==='preview'?'실제로 저장된 신청은 아니에요. 아래 탭들을 자유롭게 둘러보실 수 있어요.'
+            : '집사들이 함께 살펴본 뒤 문자로도 결과를 알려드려요. 편안한 마음으로 기다려 주세요.';
+  const nights=Math.max(0,Math.round((new Date(v.end)-new Date(v.start))/864e5));
+  const canEdit = !v.preview && st!=='거절';
+  $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">내 방문</div><div class="dash-sub">신청 현황과 소식</div>
+    <div class="status-card">
+      ${badge}
+      <div class="status-dates serif">${fmtK(v.start)} — ${fmtK(v.end)}</div>
+      <div class="status-meta">${nights}박 · ${v.people||1}명 · ${esc(v.name||'')}</div>
+      <div class="status-msg">${msg}</div>
+      <div class="status-actions">
+        ${v.preview?'':`<button class="status-refresh" id="st-refresh" onclick="refreshStatus()">↻ 상태 새로고침</button>`}
+        ${canEdit?`<button class="status-refresh" onclick="editRequest()">✏️ 일정·인원 수정</button>`:''}
+      </div>
+    </div>
+    ${notices}`;
+}
+async function refreshStatus(){
+  if(!myVisit) return;
+  const b=$('st-refresh'); if(b) b.classList.add('spin');
+  try{
+    const r=await fetch(SYNC_URL,{method:'GET'}); const d=await r.json();
+    const found=(d.visitRequests||[]).find(x=>x.id===myVisit.id);
+    if(found){ myVisit.status=found.status||'대기'; saveVisit(); }
+    loadConfFrom(d);
+    renderMe();
+  }catch(e){ toast('상태를 불러오지 못했어요'); const bb=$('st-refresh'); if(bb) bb.classList.remove('spin'); }
+}
+
+/* ===== 집사의 알림(공지) — 항상 존재하며, 첫 항목은 방문 후기 안내 ===== */
+function renderNotices(){
+  const ns=effNotices();
+  let inner='';
+  // 시스템 고정 알림: 방문 후기 남기기 (미리보기가 아닐 때만)
+  if(myVisit && !myVisit.preview){
+    inner += `<button class="notice-item action" onclick="go('s-review')">
+        <span class="ni-ico">✎</span>
+        <span class="ni-txt"><b>방문 후기 남기기</b><span>머문 뒤라면 이야기를 들려주세요</span></span>
+        <span class="ni-arw">→</span>
+      </button>`;
+  }
+  if(adminMode){
+    inner += ns.map((n,i)=>`<div class="notice-item edit"><textarea class="ed-area sm" oninput="editNotice(${i},this.value)">${esc(n)}</textarea><button class="del" onclick="delNotice(${i})">×</button></div>`).join('')
+      + `<div class="ed-actions"><button class="mini-add" onclick="addNotice()">+ 공지 추가</button><button class="save-conf" onclick="saveConf('notices')">공지 저장</button></div>
+      <p style="font-size:11.5px;color:var(--sage-soft);margin-top:10px">※ '방문 후기 남기기'는 항상 고정으로 보이는 항목이라 여기서 지울 수 없어요.</p>`;
+  }else{
+    inner += ns.map(n=>`<div class="notice-item">${esc(n)}</div>`).join('');
+    if(!inner) return ''; // 보여줄 게 정말 없으면 빈 박스를 만들지 않음
+  }
+  return `<div class="notice-wrap"><div class="notice-head">집사의 알림${adminMode?' <span class="admin-tag">관리자</span>':''}</div>${inner}</div>`;
+}
+function addNotice(){ ensureConf('notices').push('전할 내용을 적어주세요'); renderMe(); }
+function editNotice(i,val){ ensureConf('notices')[i]=val; }
+function delNotice(i){ ensureConf('notices').splice(i,1); renderMe(); }
+
+/* ===== 일정 수정 ===== */
+function editRequest(){
+  if(!myVisit) return;
+  if(myVisit.preview){ toast('미리보기 상태예요'); return; }
+  editing=true; calOrigin='dash';
+  sel={start:myVisit.start, end:myVisit.end};
+  go('s-cal'); updateSelNote();
+}
+function calBack(){ calOrigin==='dash' ? openDash('me') : go('s-home'); }
+
+/* ===== 준비물 ===== */
+function renderPrep(){
+  const items=effPrep();
+  if(adminMode){
+    const rows=items.map((x,i)=>`<div class="ed-row"><input class="ed-input" value="${esc(x.t)}" oninput="editPrep(${i},this.value)"><button class="del" onclick="delPrep(${i})">×</button></div>`).join('');
+    $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">준비물 <span class="admin-tag">관리자</span></div><div class="dash-sub">항목을 바로 고치고 저장하세요</div>
+      <div class="ed-list">${rows}</div>
+      <div class="ed-actions"><button class="mini-add" onclick="addPrep()">+ 준비물 추가</button><button class="save-conf" onclick="saveConf('prep')">준비물 저장</button></div>`;
+    return;
+  }
+  const rows=items.map((x,i)=>`<li class="${prepChecked[i]?'on':''}" onclick="togglePrep(${i})"><span class="box"></span><span>${esc(x.t)}${x.em?` <span class="em">${esc(x.em)}</span>`:''}</span></li>`).join('');
+  $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">준비물</div><div class="dash-sub">오실 때 챙기면 좋아요 · 눌러서 체크</div>
+    <div class="callout"><span class="lab">준비의 마음</span>생활이 무해해야 무의식의 깊은 곳에서 편안한 마음으로 휴식할 수 있습니다. ✦</div>
+    <ul class="co-list">${rows}</ul>
+    <p style="font-size:13.5px;color:var(--ink-soft);margin-top:16px">그 외 필요한 물건은 공간안내서를 읽어보고 공간 윤리에 맞게 본인이 준비합니다.</p>`;
+}
+function togglePrep(i){ prepChecked[i]=!prepChecked[i]; savePrep(); renderPrep(); }
+function editPrep(i,val){ ensureConf('prep')[i].t=val; }
+function delPrep(i){ ensureConf('prep').splice(i,1); renderPrep(); }
+function addPrep(){ ensureConf('prep').push({t:'새 준비물'}); renderPrep(); }
+
+/* ===== 가볼 곳 ===== */
+function renderPlaces(){
+  const P=effPlaces();
+  if(adminMode){
+    const block=(region,title)=>`<div class="ch-h">${title}</div>`+
+      P[region].map((p,i)=>`<div class="ed-card">
+        <input class="ed-input" value="${esc(p.t)}" oninput="editPlace('${region}',${i},'t',this.value)" placeholder="이름">
+        <input class="ed-input" value="${esc(p.a||'')}" oninput="editPlace('${region}',${i},'a',this.value)" placeholder="주소·운영시간">
+        <textarea class="ed-area sm" oninput="editPlace('${region}',${i},'d',this.value)" placeholder="설명">${esc(p.d||'')}</textarea>
+        <button class="del wide" onclick="delPlace('${region}',${i})">이 장소 삭제</button>
+      </div>`).join('') +
+      `<button class="mini-add" onclick="addPlace('${region}')">+ 장소 추가</button>`;
+    $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">가볼 곳 <span class="admin-tag">관리자</span></div><div class="dash-sub">바로 고치고 저장하세요</div>
+      ${block('hadong','하동 · 악양')}${block('gurye','구례 쪽으로 조금 더')}
+      <button class="save-conf" onclick="saveConf('places')">가볼 곳 저장</button>`;
+    return;
+  }
+  const card=p=>`<li><div class="rt">${esc(p.t)}</div>${p.a?`<div class="ra">${esc(p.a)}</div>`:''}<div class="rd">${esc(p.d)}</div></li>`;
+  $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">가볼 곳</div><div class="dash-sub">가볍게 다녀오기 좋은 곳들</div>
+    <div class="ch-h">하동 · 악양</div><ul class="rlist">${P.hadong.map(card).join('')}</ul>
+    <div class="ch-h">구례 쪽으로 조금 더</div><ul class="rlist">${P.gurye.map(card).join('')}</ul>`;
+}
+function editPlace(region,i,field,val){ ensureConf('places')[region][i][field]=val; }
+function delPlace(region,i){ ensureConf('places')[region].splice(i,1); renderPlaces(); }
+function addPlace(region){ ensureConf('places')[region].push({t:'새 장소',a:'',d:''}); renderPlaces(); }
+
+/* ===== 퇴실 체크 ===== */
+function renderCheckout(){
+  const list=effCheckout();
+  if(adminMode){
+    const rows=list.map((t,i)=>`<div class="ed-row"><input class="ed-input" value="${esc(t)}" oninput="editCo(${i},this.value)"><button class="del" onclick="delCo(${i})">×</button></div>`).join('');
+    $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">퇴실 체크 <span class="admin-tag">관리자</span></div><div class="dash-sub">정리 체크리스트를 고치세요</div>
+      <div class="ed-list">${rows}</div>
+      <div class="ed-actions"><button class="mini-add" onclick="addCo()">+ 항목 추가</button><button class="save-conf" onclick="saveConf('checkout')">체크리스트 저장</button></div>
+      <p style="font-size:12.5px;color:var(--sage-soft);margin-top:14px">※ 4가지 단속 사진 항목은 고정입니다.</p>`;
+    return;
+  }
+  const checks=checkoutState.checks, photos=checkoutState.photos;
+  const listH=list.map((t,i)=>`<li class="${checks[i]?'on':''}" onclick="toggleCheck(${i})"><span class="box"></span><span>${esc(t)}</span></li>`).join('');
+  const slotH=GUARD_PHOTOS.map((g,i)=>{
+    const p=photos[g.k];
+    return `<label class="photo-slot ${p?'filled':''}">
+      ${p?`<img src="${p.dataUrl}"><span class="mark">✓</span>`:`<span class="ph">
+        <svg viewBox="0 0 24 24"><path d="M4 7h3l2-2h6l2 2h3v12H4z"/><circle cx="12" cy="13.5" r="3.2"/></svg>
+        <span class="pl">${i+1}. ${esc(g.label)}</span>${g.sub?`<span class="ps">${esc(g.sub)}</span>`:''}</span>`}
+      <input type="file" accept="image/*" onchange="pickPhoto('${g.k}',this)">
+    </label>`;
+  }).join('');
+  const done=list.every((_,i)=>checks[i]) && GUARD_PHOTOS.every(g=>photos[g.k]);
+  $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">퇴실 체크</div><div class="dash-sub">떠나기 전, 함께 살펴요</div>
+    <div class="ch-h">정리 체크리스트</div>
+    <ul class="co-list">${listH}</ul>
+    <div class="ch-h">4가지 단속 사진</div>
+    <p style="font-size:13px;color:var(--sage-soft);margin:-4px 0 12px">사용 여부와 관계 없이, 아래 4장을 찍어 집사에게 보내요.</p>
+    <div class="photo-grid">${slotH}</div>
+    <button class="submit" id="co-submit" ${done?'':'disabled'} onclick="submitCheckout()">
+      ${done?'집사에게 정리 완료 보내기':'체크리스트와 사진 4장을 모두 채워주세요'}</button>`;
+}
+function toggleCheck(i){ checkoutState.checks[i]=!checkoutState.checks[i]; renderCheckout(); }
+function editCo(i,val){ ensureConf('checkout')[i]=val; }
+function delCo(i){ ensureConf('checkout').splice(i,1); renderCheckout(); }
+function addCo(){ ensureConf('checkout').push('새 항목'); renderCheckout(); }
+function pickPhoto(k, input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{ checkoutState.photos[k]={dataUrl:reader.result, mime:file.type}; renderCheckout(); };
+  reader.readAsDataURL(file);
+}
+async function submitCheckout(){
+  const btn=$('co-submit'); btn.disabled=true; btn.textContent='보내는 중…';
+  try{
+    const photosObj={};
+    for(const g of GUARD_PHOTOS){
+      const p=checkoutState.photos[g.k]; let url='';
+      try{
+        const base64=p.dataUrl.split(',')[1];
+        const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body:JSON.stringify({resource:'photo',op:'upload',filename:g.k+'_'+Date.now()+'.jpg',mime:p.mime||'image/jpeg',dataBase64:base64})});
+        const j=await res.json(); url=j.url||'';
+      }catch(e){ url=''; }
+      photosObj[g.k]=url; // 집사 앱의 4가지 단속 사진 칸(gas/wifi/boiler/elec)과 같은 키로 저장
+    }
+    const list=effCheckout();
+    const checksObj={}; list.forEach((t,i)=>checksObj[t]=!!checkoutState.checks[i]);
+    const item={ id:'co_'+Date.now(), date:new Date().toISOString().slice(0,10),
+      who:(myVisit&&myVisit.name)||'방문자', owner:'guest',
+      checks:checksObj, photos:photosObj, closed:true, updatedAt:Date.now() };
+    await fetch(SYNC_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({resource:'visitLogs',op:'upsert',item})});
+    $('dash-body').innerHTML=`<div class="dash-h serif">퇴실 체크</div>
+      <div class="co-empty">정리 완료를 집사에게 보냈어요. ✓<br>고맙습니다. 편안히 돌아가세요.</div>
+      <button class="submit" style="margin-top:4px" onclick="go('s-review')">방문 후기 작성하러 가기 →</button>`;
+  }catch(e){ toast('전송에 실패했어요. 잠시 뒤 다시 시도해주세요'); btn.disabled=false; btn.textContent='집사에게 정리 완료 보내기'; }
+}
+
+/* ===== 배포 후 라이브 동기화 (GitHub Pages 등 실제 도메인에서 작동) ===== */
+function loadConfFrom(d){
+  if(!d || !d.config) return;
+  (d.config||[]).forEach(c=>{
+    if(!c || !c.key) return;
+    try{ CONF[c.key] = (typeof c.value==='string') ? JSON.parse(c.value) : c.value; }catch(e){}
+  });
+}
+async function loadBookings(){
+  try{
+    const r=await fetch(SYNC_URL,{method:'GET'});
+    const d=await r.json();
+    if(d.visits&&d.visits.length){
+      BOOKINGS=d.visits.filter(v=>v.start&&v.end).map(v=>({id:v.id,who:v.who||v.guest||'',start:v.start,end:v.end}));
+    }
+    if(d.visitRequests){ // 대기중 신청도 겹침 방지에 포함
+      d.visitRequests.filter(v=>v.status!=='거절'&&v.start&&v.end)
+        .forEach(v=>BOOKINGS.push({id:v.id,who:v.name,start:v.start,end:v.end}));
+    }
+    loadConfFrom(d);
+    if($('s-cal').classList.contains('on')) renderCal();
+    if($('s-dash').classList.contains('on')) redrawTab();
+  }catch(e){ /* 미리보기 환경에선 시드 데이터 사용 */ }
+}
+/* ===== 안내서 넘기기 — 터치 스와이프 · 마우스 드래그 · 키보드 화살표 =====
+   Pointer Events로 터치와 마우스를 하나로 통일: 폰에서는 손가락으로,
+   노트북에서는 마우스로 눌러 밀거나 ← → 키로 장을 넘길 수 있음. */
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints>0);
+(function(){
+  const el = document.querySelector('.guide-wrap');
+  if(!el) return;
+  let sx=0, sy=0, tracking=false, isMouse=false;
+  el.addEventListener('pointerdown', e=>{
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    sx=e.clientX; sy=e.clientY; tracking=true; isMouse=(e.pointerType==='mouse');
+    if(isMouse) e.preventDefault(); // 마우스 드래그 중 텍스트가 선택되지 않도록
+  });
+  el.addEventListener('pointerup', e=>{
+    if(!tracking) return; tracking=false;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    // 가로 이동이 세로보다 뚜렷하고 충분히 클 때만 페이지 넘김으로 인식
+    if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.4){
+      if(dx<0) chStep(1); else chStep(-1);
+    }
+  });
+  el.addEventListener('pointercancel', ()=>{ tracking=false; });
+})();
+/* 키보드 ← → : 노트북·데스크톱에서 안내서를 보고 있을 때만 동작 */
+window.addEventListener('keydown', e=>{
+  if(!document.getElementById('s-guide').classList.contains('on')) return;
+  if(e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+  if(e.key==='ArrowLeft'){ chStep(-1); }
+  else if(e.key==='ArrowRight'){ chStep(1); }
+});
+
+loadVisit();
+loadPrep();
+if(myVisit) $('home-myvisit').style.display='block';
+loadBookings();
+</script>
+</body>
+</html>
