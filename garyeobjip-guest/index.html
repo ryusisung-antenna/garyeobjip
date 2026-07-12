@@ -1318,12 +1318,16 @@ function renderNotices(){
   }
   inner += ns.map((n,i)=>{
     const isOpen = openNoticeIdx===i;
+    let bodyView=n.body||"";
+    if(n.title && bodyView.indexOf(n.title)===0){
+      bodyView=bodyView.slice(n.title.length).replace(/^[\s\n]+/,"");
+    }
     return `<div class="notice-item" style="padding:0;border-top:1px solid var(--line)">
       <button onclick="toggleNoticeOpen(${i})" style="width:100%;text-align:left;background:none;border:0;padding:11px 0;font-family:inherit;font-size:14.5px;color:var(--ink);display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer">
         <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.title)||"공지"}</span>
         <span style="flex-shrink:0;color:var(--sage-soft);font-size:12px">${isOpen?"▲":"▼"}</span>
       </button>
-      ${isOpen?`<div style="padding:0 0 12px;font-size:13.5px;line-height:1.7;color:var(--ink-soft);min-width:0;overflow-wrap:anywhere;white-space:pre-line">${esc(n.body)}</div>`:""}
+      ${isOpen && bodyView?`<div style="padding:0 0 12px;font-size:13.5px;line-height:1.7;color:var(--ink-soft);min-width:0;overflow-wrap:anywhere;white-space:pre-line">${esc(bodyView)}</div>`:""}
     </div>`;
   }).join('');
   if(adminMode && ns.length){
