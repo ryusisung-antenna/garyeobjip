@@ -1013,7 +1013,7 @@ function jumpChapter(i){
 }
 
 /* ===== 달력 ===== */
-function ymd(d){return d.toISOString().slice(0,10);}
+function ymd(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
 function isBooked(dateStr){
   return BOOKINGS.some(b=>{
     if(editing && myVisit && (b.id===myVisit.id || b.id==='v_from_'+myVisit.id)) return false; // 수정 중엔 내 기존 일정 제외
@@ -1021,14 +1021,14 @@ function isBooked(dateStr){
   });
 }
 function renderCal(){
-  const base=new Date(2026,6,1); // 2026년 7월 기준
+  const today=new Date(); today.setHours(0,0,0,0); // 로컬 자정 기준 오늘
+  const base=new Date(today.getFullYear(),today.getMonth(),1); // 이번 달 기준
   const view=new Date(base.getFullYear(),base.getMonth()+monOffset,1);
   const y=view.getFullYear(), m=view.getMonth();
   $('cal-mon').textContent=`${y}년 ${m+1}월`;
   $('cal-prev').disabled=monOffset<=0;
   const first=new Date(y,m,1).getDay();
   const days=new Date(y,m+1,0).getDate();
-  const today=new Date(2026,6,10); // 오늘 = 2026-07-10
   let cells='';
   for(let i=0;i<first;i++) cells+=`<div class="cell pad"></div>`;
   for(let d=1;d<=days;d++){
@@ -1299,8 +1299,14 @@ async function refreshStatus(){
 }
 
 /* ===== 집사의 알림(공지) — 항상 존재하며, 첫 항목은 방문 후기 안내 ===== */
+function normalizeNoticeV(n){
+  if(n && typeof n==="object") return {title:n.title||"", body:n.body||""};
+  const s=String(n||""); return {title:s.split("\n")[0].slice(0,30), body:s};
+}
+let openNoticeIdx=-1;
+function toggleNoticeOpen(i){ openNoticeIdx = (openNoticeIdx===i) ? -1 : i; renderMe(); }
 function renderNotices(){
-  const ns=effNotices();
+  const ns=effNotices().map(normalizeNoticeV);
   let inner='';
   // 시스템 고정 알림: 방문 후기 남기기 (미리보기가 아닐 때만)
   if(myVisit && !myVisit.preview){
@@ -1310,19 +1316,22 @@ function renderNotices(){
         <span class="ni-arw">→</span>
       </button>`;
   }
-  if(adminMode){
-    inner += ns.map((n,i)=>`<div class="notice-item edit"><textarea class="ed-area sm" oninput="editNotice(${i},this.value)">${esc(n)}</textarea><button class="del" onclick="delNotice(${i})">×</button></div>`).join('')
-      + `<div class="ed-actions"><button class="mini-add" onclick="addNotice()">+ 공지 추가</button><button class="save-conf" onclick="saveConf('notices')">공지 저장</button></div>
-      <p style="font-size:11.5px;color:var(--sage-soft);margin-top:10px">※ '방문 후기 남기기'는 항상 고정으로 보이는 항목이라 여기서 지울 수 없어요.</p>`;
-  }else{
-    inner += ns.map(n=>`<div class="notice-item">${esc(n)}</div>`).join('');
-    if(!inner) return ''; // 보여줄 게 정말 없으면 빈 박스를 만들지 않음
+  inner += ns.map((n,i)=>{
+    const isOpen = openNoticeIdx===i;
+    return `<div class="notice-item" style="padding:0;border-top:1px solid var(--line)">
+      <button onclick="toggleNoticeOpen(${i})" style="width:100%;text-align:left;background:none;border:0;padding:11px 0;font-family:inherit;font-size:14.5px;color:var(--ink);display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer">
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.title)||"공지"}</span>
+        <span style="flex-shrink:0;color:var(--sage-soft);font-size:12px">${isOpen?"▲":"▼"}</span>
+      </button>
+      ${isOpen?`<div style="padding:0 0 12px;font-size:13.5px;line-height:1.7;color:var(--ink-soft);min-width:0;overflow-wrap:anywhere;white-space:pre-line">${esc(n.body)}</div>`:""}
+    </div>`;
+  }).join('');
+  if(adminMode && ns.length){
+    inner += `<p style="font-size:11.5px;color:var(--sage-soft);margin-top:10px">※ 공지 내용은 집사 앱 "방문 신청" 화면에서 편집해주세요.</p>`;
   }
-  return `<div class="notice-wrap"><div class="notice-head">집사의 알림${adminMode?' <span class="admin-tag">관리자</span>':''}</div>${inner}</div>`;
+  if(!inner) return ''; // 보여줄 게 정말 없으면 빈 박스를 만들지 않음
+  return `<div class="notice-wrap"><div class="notice-head">집사의 알림</div>${inner}</div>`;
 }
-function addNotice(){ ensureConf('notices').push('전할 내용을 적어주세요'); renderMe(); }
-function editNotice(i,val){ ensureConf('notices')[i]=val; }
-function delNotice(i){ ensureConf('notices').splice(i,1); renderMe(); }
 
 /* ===== 일정 수정 ===== */
 function editRequest(){
@@ -1439,7 +1448,7 @@ async function submitCheckout(){
     }
     const list=effCheckout();
     const checksObj={}; list.forEach((t,i)=>checksObj[t]=!!checkoutState.checks[i]);
-    const item={ id:'co_'+Date.now(), date:new Date().toISOString().slice(0,10),
+    const item={ id:'co_'+Date.now(), date:ymd(new Date()),
       who:(myVisit&&myVisit.name)||'방문자', owner:'guest',
       checks:checksObj, photos:photosObj, closed:true, updatedAt:Date.now() };
     await fetch(SYNC_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
