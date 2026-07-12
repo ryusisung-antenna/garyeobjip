@@ -365,10 +365,11 @@
   /* ===== 내 방문: 상태 버튼 줄 / 공지 ===== */
   .status-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
   .notice-wrap{background:var(--paper-2);border:1px solid var(--line);border-radius:16px;
-    padding:18px 20px;margin-top:16px;box-shadow:var(--shadow)}
+    padding:18px 20px;margin-top:16px;box-shadow:var(--shadow);overflow:hidden}
   .notice-head{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--sage);
     font-weight:700;margin-bottom:12px}
-  .notice-item{font-size:14.5px;line-height:1.7;color:var(--ink);padding:11px 0;border-top:1px solid var(--line)}
+  .notice-item{font-size:14.5px;line-height:1.7;color:var(--ink);padding:11px 0;border-top:1px solid var(--line);
+    overflow-wrap:anywhere;word-break:break-word;min-width:0}
   .notice-item:first-of-type{border-top:0}
   .notice-item.edit{display:flex;gap:8px;align-items:flex-start;border-top:0;padding:6px 0}
   .notice-item.action{display:flex;align-items:center;gap:12px;width:100%;background:none;
@@ -809,6 +810,7 @@ function go(id,fromHistory){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $(id).classList.add('on');
   window.scrollTo({top:0,behavior:'instant'});
+  if(id!=='s-dash') stopDashPolling();
   if(id==='s-cal') renderCal();
   if(id==='s-review'){revIdx=0;renderReview();}
   if(id==='s-form'){ syncFormDates(); if(editing){ prefillForm(); } else { const b=$('form-edit-banner'); if(b) b.style.display='none'; } }
@@ -853,10 +855,55 @@ function guideBack(){ guideOrigin==='dash' ? openDash('me') : go('s-home'); }
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
 
 /* ===== 안내서 렌더 ===== */
+let editingChapterIdx=-1;
+function chapterBodyText(c){
+  return (c.blocks||[]).map(b=>{
+    if(b.p) return String(b.p).replace(/<[^>]+>/g,'');
+    if(b.h) return '## '+b.h;
+    if(b.sub) return b.sub;
+    if(b.list) return b.list.map(x=>'- '+x).join('\n');
+    if(b.note) return '* '+b.note;
+    if(b.callout) return (b.callout.lab?'['+b.callout.lab+'] ':'')+b.callout.x;
+    if(b.contact) return b.contact.k+': '+b.contact.x;
+    return ''; // fee/spaces/check/places/r5 같은 특수 서식은 수정 시 일반 문단으로 단순화됨
+  }).filter(Boolean).join('\n\n');
+}
+function textToBlocks(text){
+  return (text||'').split(/\n\n+/).map(t=>t.trim()).filter(Boolean).map(t=>{
+    if(t.indexOf('## ')===0) return {h:t.slice(3)};
+    if(t.indexOf('- ')===0) return {list:t.split('\n').map(l=>l.replace(/^- /,'').trim()).filter(Boolean)};
+    if(t.indexOf('* ')===0) return {note:t.slice(2)};
+    return {p:t};
+  });
+}
+function hasSpecialBlocks(c){
+  return (c.blocks||[]).some(b=>b.fee||b.spaces||b.check||b.places||b.r5);
+}
 function renderChapter(){
-  const c=CHAPTERS[chIdx];
-  $('g-sub').textContent=`${chIdx+1} / ${CHAPTERS.length}`;
-  $('g-prog').style.width=Math.round((chIdx+1)/CHAPTERS.length*100)+'%';
+  const G=effGuide();
+  const c=G[chIdx];
+  $('g-sub').textContent=`${chIdx+1} / ${G.length}`;
+  $('g-prog').style.width=Math.round((chIdx+1)/G.length*100)+'%';
+
+  if(adminMode && editingChapterIdx===chIdx){
+    $('g-body').innerHTML=`<div class="chapter">
+      <div class="ch-h" style="margin-top:0">이 장 수정하기 <span class="admin-tag">관리자</span></div>
+      <div class="field"><label>구분(작은 라벨)</label><input id="ce-cat" value="${esc(c.cat||'')}"></div>
+      <div class="field"><label>제목</label><input id="ce-title" value="${esc(c.title||'')}"></div>
+      <div class="field"><label>도입 문장 (선택)</label><input id="ce-lead" value="${esc(c.lead||'')}"></div>
+      <div class="field"><label>본문</label><textarea id="ce-body" style="min-height:220px">${esc(chapterBodyText(c))}</textarea></div>
+      ${hasSpecialBlocks(c)?`<div class="ch-note">⚠ 이 장은 표·지도·번호목록 같은 특수 서식이 있어요. 저장하면 위 본문처럼 일반 문단으로 단순해져요.</div>`:''}
+      <div class="ch-nav" style="margin-top:20px">
+        <button class="ch-prev" onclick="cancelEditChapter()">취소</button>
+        <button class="ch-next" onclick="saveEditChapter(${chIdx})">이 장 저장</button>
+      </div>
+      <button class="submit" style="margin-top:10px;background:transparent;border:1px solid var(--clay);color:var(--clay)" onclick="deleteChapterConfirm(${chIdx})">이 장 삭제</button>
+    </div>`;
+    $('ch-nav').style.display='none';
+    $('swipe-hint').style.display='none';
+    return;
+  }
+
   let h=`<div class="chapter"><div><span class="ch-no serif">${String(chIdx+1).padStart(2,'0')}</span><span class="ch-cat">${c.cat}</span></div>`;
   h+=`<h3 class="ch-title serif">${c.title}</h3>`;
   if(c.lead) h+=`<p class="ch-lead serif">${c.lead}</p>`;
@@ -875,10 +922,16 @@ function renderChapter(){
     else if(b.r5)      h+=`<ul class="r5">${b.r5.map(r=>`<li><div class="rt"><em>${r.e}</em>${r.t}</div><div class="rd">${r.d}</div></li>`).join('')}</ul>`;
   });
   if(c.closing) h+=`<div class="callout" style="margin-top:24px"><span class="lab">${c.closingLab||'가볍집'}</span>${c.closing}</div>`;
+  if(adminMode){
+    h+=`<div style="display:flex;gap:8px;margin-top:22px">
+      <button class="ch-prev" style="flex:1" onclick="startEditChapter(${chIdx})">✎ 이 장 수정</button>
+      <button class="ch-prev" style="flex:1" onclick="addNewChapter()">+ 새 장 추가</button>
+    </div>`;
+  }
   h+=`</div>`;
   $('g-body').innerHTML=h;
   $('g-prev').disabled=chIdx===0;
-  const isLast=chIdx===CHAPTERS.length-1;
+  const isLast=chIdx===G.length-1;
   $('g-next').textContent = isLast
     ? (guideOrigin==='dash' ? '다 봤어요 · 돌아가기' : '다 읽었어요 · 방문 신청하기')
     : '다음';
@@ -893,12 +946,45 @@ function renderChapter(){
     : '← → 화살표 키를 누르거나, 마우스로 옆으로 밀어보세요';
   hint.style.display = (guideOrigin==='dash' && !isLast) ? 'block' : 'none';
 }
+function startEditChapter(i){ ensureConf('guide'); editingChapterIdx=i; renderChapter(); }
+function cancelEditChapter(){ editingChapterIdx=-1; renderChapter(); }
+async function saveEditChapter(i){
+  const G=ensureConf('guide');
+  const cat=($('ce-cat').value||'').trim();
+  const title=($('ce-title').value||'').trim();
+  const lead=($('ce-lead').value||'').trim();
+  const body=$('ce-body').value||'';
+  if(!title){ toast('제목을 적어주세요'); return; }
+  G[i]={cat, title, lead, blocks:textToBlocks(body)};
+  editingChapterIdx=-1;
+  await saveConf('guide');
+  renderChapter();
+}
+function deleteChapterConfirm(i){
+  const G=ensureConf('guide');
+  if(G.length<=1){ toast('마지막 장은 지울 수 없어요'); return; }
+  if(!confirm('이 장을 정말 삭제할까요?')) return;
+  G.splice(i,1);
+  editingChapterIdx=-1;
+  chIdx=Math.max(0,Math.min(G.length-1,i));
+  saveConf('guide');
+  renderChapter();
+}
+function addNewChapter(){
+  const G=ensureConf('guide');
+  G.push({cat:'새 안내', title:'새 장', lead:'', blocks:[{p:'내용을 입력해주세요.'}]});
+  chIdx=G.length-1;
+  editingChapterIdx=chIdx;
+  saveConf('guide');
+  renderChapter();
+}
 function chStep(d){
-  if(chIdx===CHAPTERS.length-1 && d>0){
+  const G=effGuide();
+  if(chIdx===G.length-1 && d>0){
     guideOrigin==='dash' ? openDash('me') : (calOrigin='onboarding', go('s-cal'));
     return;
   }
-  chIdx=Math.max(0,Math.min(CHAPTERS.length-1,chIdx+d));
+  chIdx=Math.max(0,Math.min(G.length-1,chIdx+d));
   renderChapter();
   window.scrollTo({top:0,behavior:'auto'}); // 넘길 때마다 제목부터 보이게
 }
@@ -907,7 +993,7 @@ function toggleToc(){
   tocOpen=!tocOpen;
   const el=$('g-toc');
   if(tocOpen){
-    el.innerHTML=CHAPTERS.map((c,i)=>
+    el.innerHTML=effGuide().map((c,i)=>
       `<button class="toc-item ${i===chIdx?'on':''}" onclick="jumpChapter(${i})">
         <span class="toc-no">${String(i+1).padStart(2,'0')}</span>
         <span class="toc-t">${c.title}</span></button>`).join('');
@@ -1078,11 +1164,12 @@ function effPlaces(){ return CONF.places || PLACES; }
 function effNotices(){ return CONF.notices || []; }
 function ensureConf(key){
   if(!CONF[key]){
-    const base = key==='prep'?PREP : key==='checkout'?CHECKOUT_LIST : key==='places'?PLACES : [];
+    const base = key==='prep'?PREP : key==='checkout'?CHECKOUT_LIST : key==='places'?PLACES : key==='guide'?CHAPTERS : [];
     CONF[key]=JSON.parse(JSON.stringify(base));
   }
   return CONF[key];
 }
+function effGuide(){ return (CONF.guide && CONF.guide.length) ? CONF.guide : CHAPTERS; }
 
 function saveVisit(){ try{ localStorage.setItem('gbj_visit', JSON.stringify(myVisit)); }catch(e){} }
 function loadVisit(){ try{ const s=localStorage.getItem('gbj_visit'); if(s) myVisit=JSON.parse(s); }catch(e){} }
@@ -1090,7 +1177,7 @@ function savePrep(){ try{ localStorage.setItem('gbj_prep', JSON.stringify(prepCh
 function loadPrep(){ try{ const s=localStorage.getItem('gbj_prep'); if(s) prepChecked=JSON.parse(s); }catch(e){} }
 
 async function saveConf(key){
-  const val = key==='prep'?effPrep() : key==='checkout'?effCheckout() : key==='places'?effPlaces() : effNotices();
+  const val = key==='prep'?effPrep() : key==='checkout'?effCheckout() : key==='places'?effPlaces() : key==='guide'?ensureConf('guide') : effNotices();
   try{
     await fetch(SYNC_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({resource:'config',op:'upsert',item:{id:key,key:key,value:JSON.stringify(val),updatedAt:Date.now()}})});
@@ -1099,7 +1186,7 @@ async function saveConf(key){
 }
 
 /* ===== 라우팅 ===== */
-function openDash(tab){ go('s-dash'); dashTab(tab||'me'); }
+function openDash(tab){ go('s-dash'); dashTab(tab||'me'); startDashPolling(); }
 function dashTab(tab){
   if(tab==='guide'){ openGuideFromDash(); return; } // 안내서는 별도 화면(챕터 넘김)
   document.querySelectorAll('#tabbar .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
@@ -1355,12 +1442,22 @@ async function loadBookings(){
     if(d.visitRequests){ // 대기중 신청도 겹침 방지에 포함
       d.visitRequests.filter(v=>v.status!=='거절'&&v.status!=='보류'&&v.start&&v.end)
         .forEach(v=>BOOKINGS.push({id:v.id,who:v.name,start:v.start,end:v.end}));
+      if(myVisit && !myVisit.preview){ // 내 신청 상태·메시지도 매번 함께 최신화
+        const found=d.visitRequests.find(x=>x.id===myVisit.id);
+        if(found){ myVisit.status=found.status||'대기'; myVisit.messages=found.messages||[]; saveVisit(); }
+      }
     }
     loadConfFrom(d);
     if($('s-cal').classList.contains('on')) renderCal();
     if($('s-dash').classList.contains('on')) redrawTab();
   }catch(e){ /* 미리보기 환경에선 시드 데이터 사용 */ }
 }
+let _dashPollTimer=null;
+function startDashPolling(){
+  stopDashPolling();
+  _dashPollTimer=setInterval(()=>{ if($('s-dash').classList.contains('on')) loadBookings(); }, 20000);
+}
+function stopDashPolling(){ if(_dashPollTimer){ clearInterval(_dashPollTimer); _dashPollTimer=null; } }
 /* ===== 안내서 넘기기 — 터치 스와이프 · 마우스 드래그 · 키보드 화살표 =====
    Pointer Events로 터치와 마우스를 하나로 통일: 폰에서는 손가락으로,
    노트북에서는 마우스로 눌러 밀거나 ← → 키로 장을 넘길 수 있음. */
