@@ -233,6 +233,10 @@ nav button .ic.blob i{font-size:16px}
 .row2{display:flex;gap:10px}.row2>*{flex:1}
 .modal-actions{display:flex;gap:10px;margin-top:20px}
 .modal-actions .btn{flex:1;justify-content:center;padding:13px}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:var(--paper);padding:13px 22px;border-radius:12px;font-size:14px;
+  opacity:0;pointer-events:none;transition:.3s;z-index:60;max-width:88%;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .swatch-pick{display:flex;gap:9px;flex-wrap:wrap}
 .swatch-pick button{width:30px;height:30px;border-radius:50%;border:2.5px solid transparent;transition:transform .12s}
 .swatch-pick button.sel{border-color:var(--ink);transform:scale(1.12)}
@@ -340,6 +344,7 @@ nav button .ic.blob i{font-size:16px}
 </nav>
 
 <div class="modal-bg" id="modalBg"><div class="modal" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
 <div class="lightbox" id="lightbox" onclick="closePhoto()"><img id="lightboxImg" src="" onclick="event.stopPropagation()"><button class="lightbox-close" onclick="closePhoto()">✕ 닫기</button></div>
 
 <script>
@@ -470,8 +475,9 @@ let todos = []; // {id, text, who, done, createdAt}
 let notes = []; // {id, who, text, photo, createdAt}
 
 /* ── 방문자 앱 연동: 신청 대기열 · 후기 ── */
-let visitRequests = []; // {id,name,phone,people,companions,start,end,question,wantsSurvey,status,decidedBy,updatedAt}
+let visitRequests = []; // {id,name,phone,people,companions,start,end,question,wantsSurvey,status,decidedBy,updatedAt,messages}
 let reviews = []; // {id,comfort,period,good,bad,suggest,bestmoment,worstmoment,guidehelp,guidemore,hadong,revisit,contact,updatedAt}
+let config = []; // {id,key,value,updatedAt} — 방문자 앱과 공유하는 전체 공지(key:'notices') 등
 
 /* ── 집사 (이 기기에 기억) ── */
 const CARETAKERS = ["류시성","유성희","송혜경","이흥선","김해숙"];
@@ -539,6 +545,7 @@ async function syncPullAll(silent){
     if(d.notes)notes=mergeKeepPending(notes,d.notes);
     if(d.visitRequests)visitRequests=mergeKeepPending(visitRequests,d.visitRequests);
     if(d.reviews)reviews=mergeKeepPending(reviews,d.reviews);
+    if(d.config)config=mergeKeepPending(config,d.config);
     setSync(true,"동기화됨");renderAll();saveCache();
   }catch(e){if(!silent)setSync(false,"동기화 실패");}
 }
@@ -571,7 +578,7 @@ function startPolling(){
 function saveCache(){
   try{
     localStorage.setItem(CACHE_KEY, JSON.stringify({
-      timelineManual,minutes,visits,activities,visitLogs,todos,notes,visitRequests,reviews
+      timelineManual,minutes,visits,activities,visitLogs,todos,notes,visitRequests,reviews,config
     }));
   }catch(e){} // 용량 문제 등은 조용히 무시 — 캐시는 있으면 좋은 것일 뿐
 }
@@ -583,7 +590,7 @@ function loadCache(){
     if(d.timelineManual)timelineManual=d.timelineManual;
     if(d.minutes)minutes=d.minutes;if(d.visits)visits=d.visits;if(d.activities)activities=d.activities;
     if(d.visitLogs)visitLogs=d.visitLogs;if(d.todos)todos=d.todos;if(d.notes)notes=d.notes;
-    if(d.visitRequests)visitRequests=d.visitRequests;if(d.reviews)reviews=d.reviews;
+    if(d.visitRequests)visitRequests=d.visitRequests;if(d.reviews)reviews=d.reviews;if(d.config)config=d.config;
     return true;
   }catch(e){ return false; }
 }
@@ -591,6 +598,7 @@ function loadCache(){
 
 /* ── 유틸 ── */
 function esc(s){return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function toast(msg){ const t=document.getElementById("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2600); }
 function fmtDate(iso){if(!iso)return"";const p=iso.split("-");return p.length<3?iso:`${p[0]}. ${+p[1]}. ${+p[2]}`;}
 function dow(iso){return ["일","월","화","수","목","금","토"][new Date(iso+"T00:00").getDay()];}
 function todayISO(){const t=new Date();const o=t.getTimezoneOffset();return new Date(t-o*60000).toISOString().slice(0,10);}
@@ -706,7 +714,23 @@ window.addEventListener("popstate",e=>{
   const tab=(e.state&&e.state.tab)||"home";
   goTab(tab,true);
 });
-try{ if(!history.state) history.replaceState({tab:"home"},"","#home"); }catch(e){}
+try{
+  if(!history.state){
+    const h=(location.hash||"").replace("#","");
+    history.replaceState({tab:h||"home"},"",location.hash||"#home");
+  }
+}catch(e){}
+// 브라우저 자체 새로고침(F5·당겨서 새로고침)에도 보고 있던 탭으로 돌아오게
+function restoreTabOnLoad(){
+  try{
+    const fromState=history.state&&history.state.tab;
+    const fromHash=(location.hash||"").replace("#","");
+    const target=fromState||fromHash;
+    if(target && target!=="home" && document.getElementById("view-"+target)){
+      goTab(target,true);
+    }
+  }catch(e){}
+}
 
 /* ============================================================
    화면 1 — 걸어온 길 (고정 + 회의록 자동 + 손추가)
@@ -1383,58 +1407,161 @@ function delNote(id){if(!confirm("이 글을 지울까요?"))return;notes=notes.
 /* ============================================================
    화면 — 방문 신청 (방문자 앱에서 들어온 신청을 승인·거절)
    ============================================================ */
+/* ===== 전체 공지 관리 (방문자 앱 "내 방문"에 항상 뜨는 공통 알림) ===== */
+let noticesAdminOpen=false, _localNotices=null;
+function getServerNotices(){
+  const row=(config||[]).find(c=>c.key==="notices");
+  if(!row) return [];
+  try{ return typeof row.value==="string"?JSON.parse(row.value):(row.value||[]); }catch(e){ return []; }
+}
+function editingNotices(){
+  if(_localNotices===null) _localNotices=getServerNotices().slice();
+  return _localNotices;
+}
+function toggleNoticesAdmin(){ noticesAdminOpen=!noticesAdminOpen; renderVisitReq(); }
+function editGlobalNotice(i,val){ editingNotices()[i]=val; }
+function addGlobalNotice(){ editingNotices().push(""); renderVisitReq(); }
+function delGlobalNotice(i){ editingNotices().splice(i,1); renderVisitReq(); }
+async function saveGlobalNotices(){
+  const list=editingNotices().map(s=>(s||"").trim()).filter(Boolean);
+  try{
+    await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"config",op:"upsert",
+      item:{id:"notices",key:"notices",value:JSON.stringify(list),updatedAt:Date.now()}})});
+    toast("저장했어요 · 모든 방문자에게 반영돼요");
+    _localNotices=null;
+    setTimeout(()=>syncPullAll(true),1000);
+  }catch(e){ toast("저장에 실패했어요"); }
+}
+function noticesAdminHtml(){
+  const list=editingNotices();
+  let h=`<div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleNoticesAdmin()">
+      <div>
+        <div style="font-size:13.5px;font-weight:700">모든 방문자에게 보이는 공지</div>
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px">${list.length}개 · 방문자 앱 "내 방문"에 항상 떠요 (예: 여름철 에어컨 사용법)</div>
+      </div>
+      <span style="font-size:13px;color:var(--ink-soft)">${noticesAdminOpen?"▲":"▼"}</span>
+    </div>`;
+  if(noticesAdminOpen){
+    h+=`<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">`;
+    list.forEach((n,i)=>{
+      h+=`<div style="display:flex;gap:8px;align-items:flex-start">
+        <textarea oninput="editGlobalNotice(${i},this.value)" style="flex:1;min-height:48px;border:1.5px solid var(--line);border-radius:12px;padding:9px 11px;background:var(--card);outline:none;line-height:1.5;resize:vertical;font-family:inherit;font-size:13.5px">${esc(n)}</textarea>
+        <button class="btn ghost sm" onclick="delGlobalNotice(${i})">삭제</button>
+      </div>`;
+    });
+    h+=`</div>
+      <div class="modal-actions" style="margin-top:12px">
+        <button class="btn ghost sm" onclick="addGlobalNotice()">+ 공지 추가</button>
+        <button class="btn sm" onclick="saveGlobalNotices()">저장 · 모두에게 반영</button>
+      </div>`;
+  }
+  h+=`</div>`;
+  return h;
+}
 function renderVisitReq(){
   const v=document.getElementById("view-visitreq");
   const waiting=visitRequests.filter(r=>r.status==="대기"||!r.status).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-  const decided=visitRequests.filter(r=>r.status==="승인"||r.status==="거절").sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  const held=visitRequests.filter(r=>r.status==="보류"||r.status==="거절").sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  const approved=visitRequests.filter(r=>r.status==="승인").sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   let h=`<div class="view-head"><div><div class="t">방문 신청</div>
     <div class="d">방문자 앱에서 들어온 신청을 살펴보고 처리합니다</div></div>
     <button class="btn ghost sm" onclick="syncPullAll()">↻ 새로고침</button></div>`;
+  h+=noticesAdminHtml();
   if(!visitRequests.length){
     h+=`<div class="empty"><div class="big">✉️</div>아직 들어온 방문 신청이 없어요.<br>방문자 앱에서 신청이 오면 여기 쌓입니다.</div>`;
   }else{
     if(waiting.length){
       h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:6px 2px 8px">승인 기다리는 중 · ${waiting.length}</div>`;
-      waiting.forEach(r=>{ try{ h+=vreqCard(r,true); }catch(e){ console.error("신청 표시 실패 · id=",r&&r.id,e); } });
+      waiting.forEach(r=>{ try{ h+=vreqCard(r,"waiting"); }catch(e){ console.error("신청 표시 실패 · id=",r&&r.id,e); } });
     }
-    if(decided.length){
-      h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:18px 2px 8px">지난 처리 · ${decided.length}</div>`;
-      decided.forEach(r=>{ try{ h+=vreqCard(r,false); }catch(e){ console.error("신청 표시 실패 · id=",r&&r.id,e); } });
+    if(held.length){
+      h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:18px 2px 8px">승인 보류 중 · ${held.length}</div>`;
+      held.forEach(r=>{ try{ h+=vreqCard(r,"held"); }catch(e){ console.error("신청 표시 실패 · id=",r&&r.id,e); } });
+    }
+    if(approved.length){
+      h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:18px 2px 8px">승인된 일정 · ${approved.length}</div>`;
+      approved.forEach(r=>{ try{ h+=vreqCard(r,"approved"); }catch(e){ console.error("신청 표시 실패 · id=",r&&r.id,e); } });
     }
   }
   v.innerHTML=h;
 }
-function vreqCard(r,pending){
+function vreqCard(r,state){
   const nights=Math.max(0,Math.round((new Date(r.end)-new Date(r.start))/864e5));
-  const badge = pending
+  const badge = state==="waiting"
     ? `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(208,139,99,.16);color:#A85E38">승인 대기</span>`
-    : r.status==="승인"
+    : state==="approved"
       ? `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(142,176,78,.14);color:var(--moss-deep)">승인됨</span>`
-      : `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:var(--line);color:var(--ink-soft)">거절됨</span>`;
+      : `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(201,182,220,.2);color:var(--lilac-deep)">승인 보류</span>`;
+  const titleLine=`${esc(r.name||"이름없음")} <span style="font-size:12.5px;color:var(--ink-soft);font-weight:400">· ${r.people||1}명${r.companions?" · "+esc(r.companions):""}</span>`;
   let h=`<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-      <div><b style="font-size:16px">${esc(r.name||"이름없음")}</b> <span style="font-size:12.5px;color:var(--ink-soft)">${r.people||1}명</span></div>
+      <b style="font-size:16px">${titleLine}</b>
       ${badge}
     </div>
-    <div style="font-size:15.5px;font-weight:700;color:var(--sky);margin-top:9px">${fmtDate(r.start)} — ${fmtDate(r.end)}</div>
-    <div style="font-size:12px;color:var(--ink-soft)">${nights}박 · ${r.start} ~ ${r.end}</div>
+    <div style="font-size:15.5px;font-weight:700;color:var(--sky);margin-top:9px">${fmtDate(r.start)} — ${fmtDate(r.end)} <span style="font-size:12.5px;color:var(--ink-soft);font-weight:400">(${nights}박)</span></div>
     <div style="margin-top:10px;font-size:13.5px;line-height:1.7">
-      ${r.companions?`<div><span style="color:var(--ink-soft)">함께 오는 분</span> · ${esc(r.companions)}</div>`:""}
       ${r.phone?`<div><span style="color:var(--ink-soft)">연락처</span> · <a href="tel:${esc(r.phone.replace(/[^0-9]/g,""))}" style="color:var(--sky)">${esc(r.phone)}</a></div>`:""}
       ${r.question?`<div><span style="color:var(--ink-soft)">문의</span> · ${esc(r.question)}</div>`:""}
-      <div><span style="color:var(--ink-soft)">후기설문</span> · ${r.wantsSurvey?"참여할게요 ✓":"괜찮대요"}</div>
     </div>`;
-  if(pending && reqOverlaps(r)){
+  if(r.messages&&r.messages.length){
+    h+=`<div style="margin-top:10px;background:var(--paper-2);border-radius:10px;padding:9px 12px;display:flex;flex-direction:column;gap:7px">
+      <div style="font-size:10.5px;color:var(--ink-soft);font-weight:700">주고받은 메시지</div>
+      ${r.messages.map(m=>`<div style="font-size:13px;line-height:1.6"><span style="color:var(--ink-soft);font-size:11px">${fmtWhen(m.at)}</span><br>${esc(m.text)}</div>`).join("")}
+    </div>`;
+  }
+  if(state==="waiting" && reqOverlaps(r)){
     h+=`<div style="margin-top:10px;background:rgba(208,139,99,.14);color:#A85E38;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.6">⚠ 이 기간이 이미 확정된 일정과 겹쳐요. 승인 전에 일정 탭을 확인해주세요.</div>`;
   }
-  if(pending){
+  if(state==="waiting"||state==="held"){
     h+=`<div class="modal-actions" style="margin-top:12px">
-      <button class="btn ghost" onclick="decideVisitReq('${r.id}','거절')">거절</button>
+      <button class="btn ghost" onclick="askHold('${r.id}')">${state==="held"?"보류 사유 다시 쓰기":"승인보류"}</button>
       <button class="btn" onclick="decideVisitReq('${r.id}','승인')">승인하고 일정에 넣기</button>
     </div>`;
   }
+  h+=`<button class="btn ghost sm" style="margin-top:10px;width:100%" onclick="askMessage('${r.id}')">✎ 메시지 보내기</button>`;
   h+=`</div>`;
   return h;
+}
+function askHold(id){
+  showModal(`<div class="grab"></div><h3>승인보류 사유</h3>
+    <div style="font-size:13.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6">방문자의 "내 방문" 화면에 그대로 전달돼요. 다른 날짜를 제안하거나, 보류 이유를 적어주세요.</div>
+    <div class="field"><textarea id="hold-reason" placeholder="예) 그 기간엔 이미 다른 팀이 머물러요. 8월 마지막 주는 어떠세요?"></textarea></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">취소</button>
+      <button class="btn" onclick="confirmHold('${id}')">보류로 전달</button>
+    </div>`);
+  setTimeout(()=>{ const el=document.getElementById("hold-reason"); if(el) el.focus(); },50);
+}
+async function confirmHold(id){
+  const el=document.getElementById("hold-reason");
+  const reason=(el&&el.value||"").trim();
+  if(!reason){ toast("보류 사유를 적어주세요"); return; }
+  closeModal();
+  await decideVisitReq(id,"보류",reason);
+}
+function askMessage(id){
+  showModal(`<div class="grab"></div><h3>메시지 보내기</h3>
+    <div style="font-size:13.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6">이 방문자의 "내 방문" 화면에 바로 전달돼요.</div>
+    <div class="field"><textarea id="msg-text" placeholder="예) 머리끈 챙겨오세요 / 에어컨은 이렇게 써주세요"></textarea></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">취소</button>
+      <button class="btn" onclick="sendMessage('${id}')">보내기</button>
+    </div>`);
+  setTimeout(()=>{ const el=document.getElementById("msg-text"); if(el) el.focus(); },50);
+}
+async function sendMessage(id){
+  const el=document.getElementById("msg-text");
+  const text=(el&&el.value||"").trim();
+  if(!text){ toast("내용을 적어주세요"); return; }
+  const req=visitRequests.find(r=>r.id===id); if(!req) return;
+  req.messages=req.messages||[];
+  req.messages.push({text, at:Date.now(), by:me||"집사"});
+  req.updatedAt=Date.now();
+  markPending(req);
+  closeModal();
+  renderVisitReq();
+  await syncUpsert("visitRequests",req);
 }
 function reqOverlaps(req){
   return (visits||[]).some(v=>{
@@ -1442,18 +1569,32 @@ function reqOverlaps(req){
     return req.start<v.end && v.start<req.end;
   });
 }
-async function decideVisitReq(id,status){
+function upsertLocalVisit(item){
+  item.__pending=Date.now();
+  const idx=visits.findIndex(v=>v.id===item.id);
+  if(idx>=0) visits[idx]=item; else visits.push(item);
+}
+function removeLocalVisit(id){ visits=visits.filter(v=>v.id!==id); }
+
+async function decideVisitReq(id,status,reason){
   const req=visitRequests.find(r=>r.id===id); if(!req) return;
   if(status==="승인" && reqOverlaps(req)){
     if(!confirm("이 기간이 다른 일정과 겹쳐요. 그래도 승인할까요?")) return;
-  }else{
+  }else if(!reason){
     if(!confirm(`${req.name||""}님 방문을 ${status} 처리할까요?`)) return;
   }
+  const prevStatus=req.status;
   req.status=status; req.decidedBy=me||""; req.updatedAt=Date.now();
+  if(reason){
+    req.messages=req.messages||[];
+    req.messages.push({text:reason, at:Date.now(), by:me||"집사"});
+  }
   markPending(req);
   if(status==="승인"){
-    visits.push({id:"v_from_"+req.id, who:req.name||"손님", guest:req.companions||"", start:req.start, end:req.end,
+    upsertLocalVisit({id:"v_from_"+req.id, who:req.name||"손님", guest:req.companions||"", start:req.start, end:req.end,
       note:((req.people||1)+"명")+(req.question?" · 문의있음":""), color:"#8FB04E", updatedAt:Date.now()});
+  }else if(prevStatus==="승인"){
+    removeLocalVisit("v_from_"+req.id); // 승인 취소/보류되면 달력에서도 즉시 내려감
   }
   renderVisitReq();renderHome();renderVisits();
   await syncUpsert("visitRequests",req);
@@ -1597,6 +1738,7 @@ document.querySelectorAll("nav button").forEach(b=>{
 loadMe();
 loadCache(); // 폰에 저장해둔 마지막 상태를 먼저 보여줌 — "초기화됐다 다시 뜨는" 느낌 없애기
 renderAll();
+restoreTabOnLoad(); // 브라우저 새로고침 시에도 보고 있던 탭으로 복귀
 updateHeaderMe();
 if(!me)openNameGate(false);
 if(SYNC_URL){ syncPullAll(); startPolling(); } // 초기 1회는 실패시 알려줌, 이후 주기적 폴링만 조용히
