@@ -571,7 +571,7 @@ function startPolling(){
 function saveCache(){
   try{
     localStorage.setItem(CACHE_KEY, JSON.stringify({
-      timelineManual,minutes,visits,activities,visitLogs,todos,notes
+      timelineManual,minutes,visits,activities,visitLogs,todos,notes,visitRequests,reviews
     }));
   }catch(e){} // 용량 문제 등은 조용히 무시 — 캐시는 있으면 좋은 것일 뿐
 }
@@ -583,6 +583,7 @@ function loadCache(){
     if(d.timelineManual)timelineManual=d.timelineManual;
     if(d.minutes)minutes=d.minutes;if(d.visits)visits=d.visits;if(d.activities)activities=d.activities;
     if(d.visitLogs)visitLogs=d.visitLogs;if(d.todos)todos=d.todos;if(d.notes)notes=d.notes;
+    if(d.visitRequests)visitRequests=d.visitRequests;if(d.reviews)reviews=d.reviews;
     return true;
   }catch(e){ return false; }
 }
