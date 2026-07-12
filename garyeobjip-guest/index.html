@@ -825,6 +825,12 @@ function go(id,fromHistory){
 }
 // 뒤로가기(폰 시스템 back·브라우저 back)를 앱 안 화면 이동으로 받기 — 안 그러면 링크 밖으로 나가버림
 window.addEventListener("popstate",e=>{
+  const onDash = document.getElementById('s-dash').classList.contains('on');
+  const onDashGuide = document.getElementById('s-guide').classList.contains('on') && guideOrigin==='dash';
+  if((onDash && currentDashTab!=='me') || onDashGuide){
+    openDash('me'); // 대시보드 안 어느 탭에 있든, 뒤로가기는 먼저 "내 방문"으로
+    return;
+  }
   if(screenStack.length>1) screenStack.pop();
   const target=(e.state&&e.state.screen)||screenStack[screenStack.length-1]||'s-home';
   go(target,true);
@@ -1081,6 +1087,7 @@ async function submitVisit(){
   if(!name){ toast('성함을 적어주세요'); $('f-name').focus(); return; }
   if(!$('c1').checked||!$('c2').checked||!$('c3').checked){ toast('지침 세 가지에 함께해주세요'); return; }
 
+  const wasHeld = editing && myVisit && (myVisit.status==='보류' || myVisit.status==='거절');
   const item={
     id: (editing && myVisit) ? myVisit.id : ('req_'+Date.now()),
     name, phone:$('f-phone').value.trim(),
@@ -1089,7 +1096,7 @@ async function submitVisit(){
     start:sel.start, end:sel.end,
     agree:true, question:$('f-q').value.trim(),
     wantsSurvey:$('f-survey').classList.contains('on'),
-    status:'대기', updatedAt:Date.now()
+    status:'대기', resubmitted:wasHeld, updatedAt:Date.now()
   };
 
   const btn=$('f-submit'); btn.disabled=true; btn.textContent='보내는 중…';
@@ -1187,8 +1194,10 @@ async function saveConf(key){
 
 /* ===== 라우팅 ===== */
 function openDash(tab){ go('s-dash'); dashTab(tab||'me'); startDashPolling(); }
+let currentDashTab='me';
 function dashTab(tab){
   if(tab==='guide'){ openGuideFromDash(); return; } // 안내서는 별도 화면(챕터 넘김)
+  currentDashTab=tab;
   document.querySelectorAll('#tabbar .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
   if(tab==='me') renderMe();
   else if(tab==='places') renderPlaces();
@@ -1227,7 +1236,7 @@ function renderMe(){
             : st==='preview'?'<span class="status-badge st-wait">● 미리보기</span>'
             : '<span class="status-badge st-wait">● 승인 기다리는 중</span>';
   const msg = st==='승인'?'방문이 확정되었어요! 도착 전 안내서와 준비물을 한 번 더 살펴봐 주세요.'
-            : (st==='보류'||st==='거절')?'아쉽지만 이번 일정은 바로 확정이 어려워요. 아래에서 다른 날짜로 다시 신청해 주세요.'
+            : (st==='보류'||st==='거절')? (v.holdReason ? esc(v.holdReason) : '아쉽지만 이번 일정은 바로 확정이 어려워요. 아래에서 다른 날짜로 다시 신청해 주세요.')
             : st==='preview'?'실제로 저장된 신청은 아니에요. 아래 탭들을 자유롭게 둘러보실 수 있어요.'
             : '집사들이 함께 살펴본 뒤 문자로도 결과를 알려드려요. 편안한 마음으로 기다려 주세요.';
   const nights=Math.max(0,Math.round((new Date(v.end)-new Date(v.start))/864e5));
@@ -1235,7 +1244,13 @@ function renderMe(){
   const editLabel = (st==='보류'||st==='거절') ? '📅 다른 날짜로 다시 신청하기' : '✏️ 일정·인원 수정';
   const msgList = (v.messages&&v.messages.length) ? `<div class="notice-wrap" style="margin-top:14px">
       <div class="notice-head">집사님이 보낸 메시지</div>
-      ${v.messages.map(m=>`<div class="notice-item"><div style="font-size:11px;color:var(--sage-soft);margin-bottom:3px">${fmtWhen2(m.at)}</div>${esc(m.text)}</div>`).join("")}
+      ${v.messages.map((m,i)=>`<div class="notice-item">
+        <div style="font-size:11px;color:var(--sage-soft);margin-bottom:3px">${fmtWhen2(m.at)}</div>
+        <div style="min-width:0;overflow-wrap:anywhere">${esc(m.text)}</div>
+        <div style="margin-top:7px">${m.read
+          ? `<span style="font-size:11.5px;color:var(--sage)">✓ 확인했어요</span>`
+          : `<button onclick="markMessageRead(${i})" style="background:none;border:1px solid var(--line);border-radius:8px;padding:5px 11px;font-size:11.5px;color:var(--sage);cursor:pointer;font-family:inherit">확인했어요</button>`}</div>
+      </div>`).join("")}
     </div>` : "";
   $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">내 방문</div><div class="dash-sub">신청 현황과 소식</div>
     <div class="status-card">
@@ -1260,13 +1275,24 @@ function fmtWhen2(ms){
   const rel = days<=0 ? "오늘" : days===1 ? "어제" : `${days}일 전`;
   return `${dt.getMonth()+1}.${dt.getDate()} ${ap} ${h12}:${String(mi).padStart(2,"0")} · ${rel}`;
 }
+async function markMessageRead(i){
+  if(!myVisit || !myVisit.messages || !myVisit.messages[i]) return;
+  myVisit.messages[i].read=true;
+  myVisit.messages[i].readAt=Date.now();
+  saveVisit();
+  renderMe();
+  try{
+    await fetch(SYNC_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({resource:'visitRequests',op:'upsert',item:myVisit})});
+  }catch(e){}
+}
 async function refreshStatus(){
   if(!myVisit) return;
   const b=$('st-refresh'); if(b) b.classList.add('spin');
   try{
     const r=await fetch(SYNC_URL,{method:'GET'}); const d=await r.json();
     const found=(d.visitRequests||[]).find(x=>x.id===myVisit.id);
-    if(found){ myVisit.status=found.status||'대기'; myVisit.messages=found.messages||[]; saveVisit(); }
+    if(found){ myVisit.status=found.status||'대기'; myVisit.messages=found.messages||[]; myVisit.holdReason=found.holdReason||''; saveVisit(); }
     loadConfFrom(d);
     renderMe();
   }catch(e){ toast('상태를 불러오지 못했어요'); const bb=$('st-refresh'); if(bb) bb.classList.remove('spin'); }
@@ -1444,7 +1470,7 @@ async function loadBookings(){
         .forEach(v=>BOOKINGS.push({id:v.id,who:v.name,start:v.start,end:v.end}));
       if(myVisit && !myVisit.preview){ // 내 신청 상태·메시지도 매번 함께 최신화
         const found=d.visitRequests.find(x=>x.id===myVisit.id);
-        if(found){ myVisit.status=found.status||'대기'; myVisit.messages=found.messages||[]; saveVisit(); }
+        if(found){ myVisit.status=found.status||'대기'; myVisit.messages=found.messages||[]; myVisit.holdReason=found.holdReason||''; saveVisit(); }
       }
     }
     loadConfFrom(d);
