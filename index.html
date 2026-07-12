@@ -574,9 +574,10 @@ function setSync(live,txt){
 // 다른 집사가 올린 내용을 주기적으로 받아옴 (앱을 켜둔 동안)
 function startPolling(){
   if(!SYNC_URL)return;
-  setInterval(()=>{ if(!syncBusy) syncPullAll(true); }, 25000); // 25초마다
+  const typing=()=>document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName);
+  setInterval(()=>{ if(!syncBusy && !typing()) syncPullAll(true); }, 25000); // 25초마다, 입력 중이면 건너뜀
   document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState==="visible") syncPullAll(true);
+    if(document.visibilityState==="visible" && !typing()) syncPullAll(true);
   });
 }
 // 폰에 마지막 상태를 저장해뒀다가, 새로고침 시 먼저 보여주고
@@ -1415,23 +1416,53 @@ function delNote(id){if(!confirm("이 글을 지울까요?"))return;notes=notes.
 /* ============================================================
    화면 — 방문 신청 (방문자 앱에서 들어온 신청을 승인·거절)
    ============================================================ */
-/* ===== 전체 공지 관리 (방문자 앱 "내 방문"에 항상 뜨는 공통 알림) ===== */
+/* ===== 전체 공지 관리 (방문자 앱 "내 방문"에 항상 뜨는 공통 알림) — 제목+본문, 팝업 편집 ===== */
 let noticesAdminOpen=false, _localNotices=null;
+function normalizeNotice(n){
+  if(n && typeof n==="object") return {title:n.title||"", body:n.body||""};
+  const s=String(n||""); return {title:s.split("\n")[0].slice(0,30), body:s};
+}
 function getServerNotices(){
   const row=(config||[]).find(c=>c.key==="notices");
   if(!row) return [];
-  try{ return typeof row.value==="string"?JSON.parse(row.value):(row.value||[]); }catch(e){ return []; }
+  try{
+    const raw=typeof row.value==="string"?JSON.parse(row.value):(row.value||[]);
+    return raw.map(normalizeNotice);
+  }catch(e){ return []; }
 }
 function editingNotices(){
   if(_localNotices===null) _localNotices=getServerNotices().slice();
   return _localNotices;
 }
 function toggleNoticesAdmin(){ noticesAdminOpen=!noticesAdminOpen; renderVisitReq(); }
-function editGlobalNotice(i,val){ editingNotices()[i]=val; }
-function addGlobalNotice(){ editingNotices().push(""); renderVisitReq(); }
 function delGlobalNotice(i){ editingNotices().splice(i,1); renderVisitReq(); }
+function addGlobalNotice(){
+  const list=editingNotices();
+  list.push({title:"",body:""});
+  renderVisitReq();
+  openNoticeEditor(list.length-1);
+}
+function openNoticeEditor(i){
+  const n=editingNotices()[i]||{title:"",body:""};
+  showModal(`<div class="grab"></div><h3>공지 편집</h3>
+    <div class="field"><label>제목 (방문자 앱엔 이 한 줄만 먼저 보여요)</label><input id="notice-edit-title" value="${esc(n.title)}" placeholder="예) 여름철 에어컨 사용법"></div>
+    <div class="field"><label>내용</label><textarea id="notice-edit-body" style="min-height:180px" placeholder="누르면 펼쳐서 보여줄 자세한 내용을 적어주세요">${esc(n.body)}</textarea></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn ghost" onclick="closeModal()">취소</button>
+      <button class="btn" onclick="saveNoticeEditor(${i})">이 공지 저장</button>
+    </div>`);
+  setTimeout(()=>{ const el=document.getElementById("notice-edit-title"); if(el) el.focus(); },50);
+}
+function saveNoticeEditor(i){
+  const title=(document.getElementById("notice-edit-title").value||"").trim();
+  const body=(document.getElementById("notice-edit-body").value||"").trim();
+  if(!title && !body){ toast("내용을 적어주세요"); return; }
+  editingNotices()[i]={title: title||body.split("\n")[0].slice(0,30), body: body||title};
+  closeModal();
+  renderVisitReq();
+}
 async function saveGlobalNotices(){
-  const list=editingNotices().map(s=>(s||"").trim()).filter(Boolean);
+  const list=editingNotices().filter(n=>n.title||n.body);
   try{
     await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"config",op:"upsert",
       item:{id:"notices",key:"notices",value:JSON.stringify(list),updatedAt:Date.now()}})});
@@ -1453,9 +1484,10 @@ function noticesAdminHtml(){
   if(noticesAdminOpen){
     h+=`<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">`;
     list.forEach((n,i)=>{
-      h+=`<div style="display:flex;gap:8px;align-items:flex-start">
-        <textarea oninput="editGlobalNotice(${i},this.value)" style="flex:1;min-height:48px;border:1.5px solid var(--line);border-radius:12px;padding:9px 11px;background:var(--card);outline:none;line-height:1.5;resize:vertical;font-family:inherit;font-size:13.5px">${esc(n)}</textarea>
-        <button class="btn ghost sm" onclick="delGlobalNotice(${i})">삭제</button>
+      h+=`<div style="display:flex;gap:8px;align-items:center;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0">
+        <div style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.title)||"(제목 없음)"}</div>
+        <button class="btn ghost sm" onclick="openNoticeEditor(${i})">편집</button>
+        <button class="btn ghost sm" onclick="delGlobalNotice(${i})" style="color:#A85E38">삭제</button>
       </div>`;
     });
     h+=`</div>
