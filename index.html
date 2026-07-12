@@ -478,6 +478,12 @@ let notes = []; // {id, who, text, photo, createdAt}
 let visitRequests = []; // {id,name,phone,people,companions,start,end,question,wantsSurvey,status,decidedBy,updatedAt,messages}
 let reviews = []; // {id,comfort,period,good,bad,suggest,bestmoment,worstmoment,guidehelp,guidemore,hadong,revisit,contact,updatedAt}
 let config = []; // {id,key,value,updatedAt} — 방문자 앱과 공유하는 전체 공지(key:'notices') 등
+let lastReviewsViewAt = 0;
+try{ lastReviewsViewAt = Number(localStorage.getItem("gbj_reviews_seen")||0); }catch(e){}
+function markReviewsViewed(){
+  lastReviewsViewAt = Date.now();
+  try{ localStorage.setItem("gbj_reviews_seen", String(lastReviewsViewAt)); }catch(e){}
+}
 
 /* ── 집사 (이 기기에 기억) ── */
 const CARETAKERS = ["류시성","유성희","송혜경","이흥선","김해숙"];
@@ -675,8 +681,9 @@ function renderHome(){
   else waitingReq.slice(0,3).forEach(r=>h+=`<div class="hc-row"><span class="hc-label">· ${esc(r.name||"이름없음")} — ${fmtDate(r.start)} ~ ${fmtDate(r.end)}</span></div>`);
   h+=`</div>`;
   const recentReview=[...reviews].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
+  const newReviewsCount=reviews.filter(r=>(r.updatedAt||0)>lastReviewsViewAt).length;
   h+=`<div class="home-card guest" onclick="goTab('reviews')">
-    <div class="hc-head"><span class="hc-emoji blob blob-g"><i class="ti ti-message-circle"></i></span><span class="hc-title">방문자 후기</span>${reviews.length?`<span class="hc-badge" style="background:var(--lilac-deep)">${reviews.length}</span>`:""}<span class="hc-go">›</span></div>`;
+    <div class="hc-head"><span class="hc-emoji blob blob-g"><i class="ti ti-message-circle"></i></span><span class="hc-title">방문자 후기</span>${newReviewsCount?`<span class="hc-badge" style="background:var(--lilac-deep)">${newReviewsCount}</span>`:""}<span class="hc-go">›</span></div>`;
   if(!recentReview) h+=`<div class="hc-empty">머물다 간 분들의 후기가 여기 모입니다.</div>`;
   else{
     const stSm=n=>{let s="";for(let i=1;i<=5;i++)s+=i<=(n||0)?"★":"☆";return s;};
@@ -701,6 +708,7 @@ function goTab(tab,fromHistory){
   if(navBtn)navBtn.classList.add("on");
   document.getElementById("view-"+tab).classList.add("on");
   window.scrollTo(0,0);
+  if(tab==="reviews") markReviewsViewed();
   if(!fromHistory){
     try{
       const cur=history.state&&history.state.tab;
@@ -1489,16 +1497,19 @@ function renderVisitReq(){
 function vreqCard(r,state){
   const nights=Math.max(0,Math.round((new Date(r.end)-new Date(r.start))/864e5));
   const badge = state==="waiting"
-    ? `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(208,139,99,.16);color:#A85E38">승인 대기</span>`
+    ? `<span style="flex-shrink:0;white-space:nowrap;font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(208,139,99,.16);color:#A85E38">승인 대기</span>`
     : state==="approved"
-      ? `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(142,176,78,.14);color:var(--moss-deep)">승인됨</span>`
-      : `<span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(201,182,220,.2);color:var(--lilac-deep)">승인 보류</span>`;
+      ? `<span style="flex-shrink:0;white-space:nowrap;font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(142,176,78,.14);color:var(--moss-deep)">승인됨</span>`
+      : `<span style="flex-shrink:0;white-space:nowrap;font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(201,182,220,.2);color:var(--lilac-deep)">승인 보류</span>`;
+  const resubmitTag = (state==="waiting" && r.resubmitted) ? `<span style="flex-shrink:0;white-space:nowrap;font-size:11px;font-weight:700;padding:4px 10px;border-radius:9px;background:rgba(95,169,214,.16);color:#3F7CA0">재신청</span>` : "";
   const titleLine=`${esc(r.name||"이름없음")} <span style="font-size:12.5px;color:var(--ink-soft);font-weight:400">· ${r.people||1}명${r.companions?" · "+esc(r.companions):""}</span>`;
+  const holdReasonLine = (state==="held" && r.holdReason) ? `<div style="margin-top:8px;background:rgba(201,182,220,.14);border-radius:9px;padding:8px 11px;font-size:13px;line-height:1.55;color:var(--lilac-deep);min-width:0;overflow-wrap:anywhere">${esc(r.holdReason)}</div>` : "";
   let h=`<div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-      <b style="font-size:16px">${titleLine}</b>
-      ${badge}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <b style="font-size:16px;flex:1;min-width:0">${titleLine}</b>
+      <div style="display:flex;gap:6px;flex-shrink:0">${resubmitTag}${badge}</div>
     </div>
+    ${holdReasonLine}
     <div style="font-size:15.5px;font-weight:700;color:var(--sky);margin-top:9px">${fmtDate(r.start)} — ${fmtDate(r.end)} <span style="font-size:12.5px;color:var(--ink-soft);font-weight:400">(${nights}박)</span></div>
     <div style="margin-top:10px;font-size:13.5px;line-height:1.7">
       ${r.phone?`<div><span style="color:var(--ink-soft)">연락처</span> · <a href="tel:${esc(r.phone.replace(/[^0-9]/g,""))}" style="color:var(--sky)">${esc(r.phone)}</a></div>`:""}
@@ -1507,7 +1518,8 @@ function vreqCard(r,state){
   if(r.messages&&r.messages.length){
     h+=`<div style="margin-top:10px;background:var(--paper-2);border-radius:10px;padding:9px 12px;display:flex;flex-direction:column;gap:7px;overflow:hidden">
       <div style="font-size:10.5px;color:var(--ink-soft);font-weight:700">주고받은 메시지</div>
-      ${r.messages.map(m=>`<div style="font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;word-break:break-word"><span style="color:var(--ink-soft);font-size:11px">${fmtWhen(m.at)}</span><br>${esc(m.text)}</div>`).join("")}
+      ${r.messages.map(m=>`<div style="font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;word-break:break-word">
+        <span style="color:var(--ink-soft);font-size:11px">${fmtWhen(m.at)}${m.read?` · <span style="color:var(--moss-deep)">방문자가 확인함</span>`:""}</span><br>${esc(m.text)}</div>`).join("")}
     </div>`;
   }
   if(state==="waiting" && reqOverlaps(r)){
@@ -1600,8 +1612,7 @@ async function decideVisitReq(id,status,reason){
   const prevStatus=req.status;
   req.status=status; req.decidedBy=me||""; req.updatedAt=Date.now();
   if(reason){
-    req.messages=req.messages||[];
-    req.messages.push({text:reason, at:Date.now(), by:me||"집사"});
+    req.holdReason=reason; // 보류 사유는 개인 메시지와 분리해 상태 배지 옆에 바로 보여줌
   }
   markPending(req);
   if(status==="승인"){
