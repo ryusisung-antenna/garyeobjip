@@ -93,7 +93,7 @@
   .bar .sub{font-size:12px;color:var(--sage-soft);margin-top:1px}
 
   /* ===== 안내서(챕터) ===== */
-  .guide-wrap{padding-top:8px}
+  .guide-wrap{padding-top:8px;touch-action:pan-y}
   .swipe-hint{display:none;text-align:center;font-size:12px;color:var(--sage-soft);
     letter-spacing:.02em;margin:30px 0 4px}
   .progress{height:3px;width:100%;background:var(--line);border-radius:3px;margin:20px 0 26px;overflow:hidden}
@@ -804,14 +804,35 @@ const REVIEW = [
 let chIdx=0, revIdx=0, monOffset=0, sel={start:null,end:null}, review={}, guideOrigin='onboarding', calOrigin='onboarding';
 const $=id=>document.getElementById(id);
 
-function go(id){
+let screenStack=['s-home'];
+function go(id,fromHistory){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $(id).classList.add('on');
   window.scrollTo({top:0,behavior:'instant'});
   if(id==='s-cal') renderCal();
   if(id==='s-review'){revIdx=0;renderReview();}
   if(id==='s-form'){ syncFormDates(); if(editing){ prefillForm(); } else { const b=$('form-edit-banner'); if(b) b.style.display='none'; } }
+  if(!fromHistory){
+    try{
+      if(screenStack[screenStack.length-1]!==id){
+        screenStack.push(id);
+        history.pushState({screen:id},"","#"+id);
+      }
+    }catch(e){ /* file:// 등 히스토리 API가 막힌 환경에서도 화면 전환 자체는 그대로 되게 조용히 넘어감 */ }
+  }
 }
+// 뒤로가기(폰 시스템 back·브라우저 back)를 앱 안 화면 이동으로 받기 — 안 그러면 링크 밖으로 나가버림
+window.addEventListener("popstate",e=>{
+  if(screenStack.length>1) screenStack.pop();
+  const target=(e.state&&e.state.screen)||screenStack[screenStack.length-1]||'s-home';
+  go(target,true);
+});
+try{
+  if(!history.state){
+    const h=(location.hash||"").replace("#","");
+    history.replaceState({screen:h||"s-home"},"",location.hash||"#s-home");
+  }
+}catch(e){}
 function prefillForm(){
   if(!myVisit) return;
   $('f-name').value = myVisit.name||'';
@@ -1115,15 +1136,20 @@ function renderMe(){
   }
   const st=v.preview?'preview':(v.status||'대기');
   const badge= st==='승인'?'<span class="status-badge st-ok">● 승인되었어요</span>'
-            : st==='거절'?'<span class="status-badge st-no">● 이번엔 어렵게 되었어요</span>'
+            : (st==='보류'||st==='거절')?'<span class="status-badge st-no">● 승인 보류</span>'
             : st==='preview'?'<span class="status-badge st-wait">● 미리보기</span>'
             : '<span class="status-badge st-wait">● 승인 기다리는 중</span>';
   const msg = st==='승인'?'방문이 확정되었어요! 도착 전 안내서와 준비물을 한 번 더 살펴봐 주세요.'
-            : st==='거절'?'아쉽지만 이번 일정은 어렵게 되었어요. 다른 날짜로 다시 신청해 주시면 반갑게 맞이할게요.'
+            : (st==='보류'||st==='거절')?'아쉽지만 이번 일정은 바로 확정이 어려워요. 아래에서 다른 날짜로 다시 신청해 주세요.'
             : st==='preview'?'실제로 저장된 신청은 아니에요. 아래 탭들을 자유롭게 둘러보실 수 있어요.'
             : '집사들이 함께 살펴본 뒤 문자로도 결과를 알려드려요. 편안한 마음으로 기다려 주세요.';
   const nights=Math.max(0,Math.round((new Date(v.end)-new Date(v.start))/864e5));
-  const canEdit = !v.preview && st!=='거절';
+  const canEdit = !v.preview;
+  const editLabel = (st==='보류'||st==='거절') ? '📅 다른 날짜로 다시 신청하기' : '✏️ 일정·인원 수정';
+  const msgList = (v.messages&&v.messages.length) ? `<div class="notice-wrap" style="margin-top:14px">
+      <div class="notice-head">집사님이 보낸 메시지</div>
+      ${v.messages.map(m=>`<div class="notice-item"><div style="font-size:11px;color:var(--sage-soft);margin-bottom:3px">${fmtWhen2(m.at)}</div>${esc(m.text)}</div>`).join("")}
+    </div>` : "";
   $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">내 방문</div><div class="dash-sub">신청 현황과 소식</div>
     <div class="status-card">
       ${badge}
@@ -1132,10 +1158,20 @@ function renderMe(){
       <div class="status-msg">${msg}</div>
       <div class="status-actions">
         ${v.preview?'':`<button class="status-refresh" id="st-refresh" onclick="refreshStatus()">↻ 상태 새로고침</button>`}
-        ${canEdit?`<button class="status-refresh" onclick="editRequest()">✏️ 일정·인원 수정</button>`:''}
+        ${canEdit?`<button class="status-refresh" onclick="editRequest()">${editLabel}</button>`:''}
       </div>
     </div>
+    ${msgList}
     ${notices}`;
+}
+function fmtWhen2(ms){
+  if(!ms) return "";
+  const dt=new Date(ms);
+  const hh=dt.getHours(), mi=dt.getMinutes();
+  const ap=hh<12?"오전":"오후", h12=hh%12===0?12:hh%12;
+  const days=Math.floor((Date.now()-ms)/86400000);
+  const rel = days<=0 ? "오늘" : days===1 ? "어제" : `${days}일 전`;
+  return `${dt.getMonth()+1}.${dt.getDate()} ${ap} ${h12}:${String(mi).padStart(2,"0")} · ${rel}`;
 }
 async function refreshStatus(){
   if(!myVisit) return;
@@ -1143,7 +1179,7 @@ async function refreshStatus(){
   try{
     const r=await fetch(SYNC_URL,{method:'GET'}); const d=await r.json();
     const found=(d.visitRequests||[]).find(x=>x.id===myVisit.id);
-    if(found){ myVisit.status=found.status||'대기'; saveVisit(); }
+    if(found){ myVisit.status=found.status||'대기'; myVisit.messages=found.messages||[]; saveVisit(); }
     loadConfFrom(d);
     renderMe();
   }catch(e){ toast('상태를 불러오지 못했어요'); const bb=$('st-refresh'); if(bb) bb.classList.remove('spin'); }
@@ -1317,7 +1353,7 @@ async function loadBookings(){
       BOOKINGS=d.visits.filter(v=>v.start&&v.end).map(v=>({id:v.id,who:v.who||v.guest||'',start:v.start,end:v.end}));
     }
     if(d.visitRequests){ // 대기중 신청도 겹침 방지에 포함
-      d.visitRequests.filter(v=>v.status!=='거절'&&v.start&&v.end)
+      d.visitRequests.filter(v=>v.status!=='거절'&&v.status!=='보류'&&v.start&&v.end)
         .forEach(v=>BOOKINGS.push({id:v.id,who:v.name,start:v.start,end:v.end}));
     }
     loadConfFrom(d);
@@ -1356,9 +1392,18 @@ window.addEventListener('keydown', e=>{
   else if(e.key==='ArrowRight'){ chStep(1); }
 });
 
+// 브라우저 자체 새로고침 시, "내 방문"을 보고 있었다면 그대로 복귀 (다른 화면은 진행 중 상태가 얽혀 있어 홈이 더 안전함)
+function restoreScreenOnLoad(){
+  try{
+    const h=(location.hash||"").replace("#","");
+    if(h==="s-dash" && myVisit){ openDash("me"); }
+  }catch(e){}
+}
+
 loadVisit();
 loadPrep();
 if(myVisit) $('home-myvisit').style.display='block';
+restoreScreenOnLoad();
 loadBookings();
 </script>
 </body>
