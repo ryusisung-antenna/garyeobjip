@@ -589,7 +589,7 @@ function loadCache(){
 
 
 /* ── 유틸 ── */
-function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function esc(s){return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 function fmtDate(iso){if(!iso)return"";const p=iso.split("-");return p.length<3?iso:`${p[0]}. ${+p[1]}. ${+p[2]}`;}
 function dow(iso){return ["일","월","화","수","목","금","토"][new Date(iso+"T00:00").getDay()];}
 function todayISO(){const t=new Date();const o=t.getTimezoneOffset();return new Date(t-o*60000).toISOString().slice(0,10);}
@@ -1491,16 +1491,28 @@ function fmtWhen(ms){
   const rel = days<=0 ? "오늘" : days===1 ? "어제" : `${days}일 전`;
   return `${md} ${hm} · ${rel}`;
 }
+let expandedReviews=new Set(); // 펼친 후기 id 기억 — 25초 자동동기화로 다시 그려져도 안 접히게
 function reviewCard(r){
+  const hasVal=v=>v!==undefined&&v!==null&&v!=="";
   const stars=n=>{let s="";for(let i=1;i<=5;i++)s+=`<span style="color:${i<=(n||0)?"var(--sun)":"var(--line)"}">★</span>`;return s;};
-  const row=(label,val)=>val?`<div style="margin-top:10px"><div style="font-size:11.5px;color:var(--ink-soft);font-weight:700">${label}</div><div style="font-size:14px;line-height:1.65;margin-top:2px;white-space:pre-line">${esc(val)}</div></div>`:"";
-  const snippet=r.good||r.bestmoment||r.suggest||r.bad||r.guidehelp||"";
+  const row=(label,val)=>hasVal(val)?`<div style="background:var(--paper-2);border-radius:10px;padding:9px 12px"><div style="font-size:10px;color:var(--moss-deep);font-weight:700;margin-bottom:2px">${label}</div><div style="font-size:13px;line-height:1.6;color:var(--ink);white-space:pre-line">${esc(val)}</div></div>`:"";
+  // 방문자 앱은 이 두 항목을 척도(0/1/2)로 보내고, 예전 설문 가져온 건 서술형 문장 그대로임 — 둘 다 자연스럽게 보여줌
+  const scaleLabel=(v,opts)=>{
+    if(v===0||v==="0") return opts[0];
+    if(v===1||v==="1") return opts[1];
+    if(v===2||v==="2") return opts[2];
+    return v; // 이미 서술형 문장(옛 설문 데이터)이면 그대로
+  };
+  const guidehelpTxt=hasVal(r.guidehelp)?scaleLabel(r.guidehelp,["별로","보통","많이"]):"";
+  const revisitTxt=hasVal(r.revisit)?scaleLabel(r.revisit,["글쎄요","아마도","꼭이요"]):"";
+  const snippet=r.good||r.bestmoment||r.suggest||r.bad||(typeof r.guidehelp==="string"?r.guidehelp:"")||"";
   const fullFields=[
     ["머문 기간",r.period],["좋았던 점",r.good],["아쉬웠던 점",r.bad],["바라는 점",r.suggest],
     ["가장 편안했던 순간",r.bestmoment],["가장 불편했던 순간",r.worstmoment],
-    ["안내서 도움",r.guidehelp],["안내서 보완점",r.guidemore],
-    ["하동 추천",r.hadong],["재방문 의향",r.revisit],
-  ].filter(([,v])=>v);
+    ["안내서 도움",guidehelpTxt],["안내서 보완점",r.guidemore],
+    ["하동 추천",r.hadong],["재방문 의향",revisitTxt],
+  ].filter(([,v])=>hasVal(v));
+  const isOpen=expandedReviews.has(r.id);
   let h=`<div class="card" id="rev-${r.id}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div>
@@ -1510,10 +1522,13 @@ function reviewCard(r){
       <button class="btn ghost sm" onclick="delReview('${r.id}')">삭제</button>
     </div>
     <div style="margin-top:10px;font-size:13.5px;line-height:1.6;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(snippet)||"새 후기가 도착했어요"}</div>
-    ${fullFields.length?`<button class="rev-toggle" data-count="${fullFields.length}" onclick="toggleReview('${r.id}')" style="margin-top:9px;background:none;border:none;padding:0;font-size:12px;color:var(--sky);font-weight:700;display:flex;align-items:center;gap:3px">전체 답변 ${fullFields.length}개 더보기 <i class="ti ti-chevron-down" style="font-size:14px"></i></button>`:""}
-    <div class="rev-full" style="display:none;margin-top:2px">
-      ${fullFields.map(([l,v])=>row(l,v)).join("")}
-      ${r.contact?`<div style="margin-top:10px;font-size:12.5px;color:var(--ink-soft)">연락처 · ${esc(r.contact)}</div>`:""}
+    ${fullFields.length?`<button class="rev-toggle" data-count="${fullFields.length}" onclick="toggleReview('${r.id}')" style="margin-top:9px;background:none;border:none;padding:0;font-size:12px;color:var(--sky);font-weight:700;display:flex;align-items:center;gap:3px">${isOpen?`접기 <i class="ti ti-chevron-up" style="font-size:14px"></i>`:`전체 답변 ${fullFields.length}개 더보기 <i class="ti ti-chevron-down" style="font-size:14px"></i>`}</button>`:""}
+    <div class="rev-full" style="display:${isOpen?"block":"none"};margin-top:12px">
+      <div style="height:1px;background:var(--line);margin-bottom:12px"></div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        ${fullFields.map(([l,v])=>row(l,v)).join("")}
+        ${r.contact?`<div style="background:var(--paper-2);border-radius:10px;padding:9px 12px"><div style="font-size:10px;color:var(--moss-deep);font-weight:700;margin-bottom:2px">연락처</div><div style="font-size:13px;color:var(--ink)">${esc(r.contact)}</div></div>`:""}
+      </div>
     </div>
   </div>`;
   return h;
@@ -1523,6 +1538,7 @@ function toggleReview(id){
   const full=card.querySelector(".rev-full"), btn=card.querySelector(".rev-toggle");
   const opening=full.style.display==="none";
   full.style.display=opening?"block":"none";
+  if(opening) expandedReviews.add(id); else expandedReviews.delete(id);
   if(btn){
     btn.innerHTML = opening
       ? `접기 <i class="ti ti-chevron-up" style="font-size:14px"></i>`
