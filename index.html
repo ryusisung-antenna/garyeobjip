@@ -551,7 +551,7 @@ async function syncPullAll(silent){
     if(d.notes)notes=mergeKeepPending(notes,d.notes);
     if(d.visitRequests)visitRequests=mergeKeepPending(visitRequests,d.visitRequests);
     if(d.reviews)reviews=mergeKeepPending(reviews,d.reviews);
-    if(d.config)config=mergeKeepPending(config,d.config);
+    if(d.config){ config=mergeKeepPending(config,d.config); if(typeof noticesAdminOpen!=="undefined" && !noticesAdminOpen) _localNotices=null; }
     setSync(true,"동기화됨");renderAll();saveCache();
   }catch(e){if(!silent)setSync(false,"동기화 실패");}
 }
@@ -1417,7 +1417,8 @@ function delNote(id){if(!confirm("이 글을 지울까요?"))return;notes=notes.
    화면 — 방문 신청 (방문자 앱에서 들어온 신청을 승인·거절)
    ============================================================ */
 /* ===== 전체 공지 관리 (방문자 앱 "내 방문"에 항상 뜨는 공통 알림) — 제목+본문, 팝업 편집 ===== */
-let noticesAdminOpen=false, _localNotices=null;
+let noticesAdminOpen=false, _localNotices=null, noticePreviewIdx=-1;
+function toggleNoticePreview(i){ noticePreviewIdx=(noticePreviewIdx===i)?-1:i; renderVisitReq(); }
 function normalizeNotice(n){
   if(n && typeof n==="object") return {title:n.title||"", body:n.body||""};
   const s=String(n||""); return {title:s.split("\n")[0].slice(0,30), body:s};
@@ -1484,10 +1485,21 @@ function noticesAdminHtml(){
   if(noticesAdminOpen){
     h+=`<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">`;
     list.forEach((n,i)=>{
-      h+=`<div style="display:flex;gap:8px;align-items:center;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0">
-        <div style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.title)||"(제목 없음)"}</div>
-        <button class="btn ghost sm" onclick="openNoticeEditor(${i})">편집</button>
-        <button class="btn ghost sm" onclick="delGlobalNotice(${i})" style="color:#A85E38">삭제</button>
+      const isPreview=noticePreviewIdx===i;
+      let bodyView=n.body||"";
+      if(n.title && bodyView.indexOf(n.title)===0){
+        bodyView=bodyView.slice(n.title.length).replace(/^[\s\n]+/,"");
+      }
+      h+=`<div style="border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0">
+        <div style="display:flex;gap:8px;align-items:center;min-width:0">
+          <button onclick="toggleNoticePreview(${i})" style="flex:1;min-width:0;text-align:left;background:none;border:0;font-family:inherit;font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:0">${esc(n.title)||"(제목 없음)"}</button>
+          <button class="btn ghost sm" onclick="openNoticeEditor(${i})">편집</button>
+          <button class="btn ghost sm" onclick="delGlobalNotice(${i})" style="color:#A85E38">삭제</button>
+        </div>
+        ${isPreview?`<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">
+          <div style="font-size:10px;color:var(--ink-soft);font-weight:700;margin-bottom:5px">방문자 앱엔 이렇게 보여요 ↓</div>
+          <div style="font-size:13px;line-height:1.65;color:var(--ink-soft);white-space:pre-line;min-width:0;overflow-wrap:anywhere">${esc(bodyView)||"(내용 없음)"}</div>
+        </div>`:""}
       </div>`;
     });
     h+=`</div>
