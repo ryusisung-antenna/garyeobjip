@@ -1505,9 +1505,9 @@ function vreqCard(r,state){
       ${r.question?`<div><span style="color:var(--ink-soft)">문의</span> · ${esc(r.question)}</div>`:""}
     </div>`;
   if(r.messages&&r.messages.length){
-    h+=`<div style="margin-top:10px;background:var(--paper-2);border-radius:10px;padding:9px 12px;display:flex;flex-direction:column;gap:7px">
+    h+=`<div style="margin-top:10px;background:var(--paper-2);border-radius:10px;padding:9px 12px;display:flex;flex-direction:column;gap:7px;overflow:hidden">
       <div style="font-size:10.5px;color:var(--ink-soft);font-weight:700">주고받은 메시지</div>
-      ${r.messages.map(m=>`<div style="font-size:13px;line-height:1.6"><span style="color:var(--ink-soft);font-size:11px">${fmtWhen(m.at)}</span><br>${esc(m.text)}</div>`).join("")}
+      ${r.messages.map(m=>`<div style="font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;word-break:break-word"><span style="color:var(--ink-soft);font-size:11px">${fmtWhen(m.at)}</span><br>${esc(m.text)}</div>`).join("")}
     </div>`;
   }
   if(state==="waiting" && reqOverlaps(r)){
@@ -1519,7 +1519,10 @@ function vreqCard(r,state){
       <button class="btn" onclick="decideVisitReq('${r.id}','승인')">승인하고 일정에 넣기</button>
     </div>`;
   }
-  h+=`<button class="btn ghost sm" style="margin-top:10px;width:100%" onclick="askMessage('${r.id}')">✎ 메시지 보내기</button>`;
+  h+=`<div style="display:flex;gap:8px;margin-top:10px">
+    <button class="btn ghost sm" style="flex:1" onclick="askMessage('${r.id}')">✎ 메시지 보내기</button>
+    <button class="btn ghost sm" onclick="deleteVisitReq('${r.id}')" style="color:#A85E38">삭제</button>
+  </div>`;
   h+=`</div>`;
   return h;
 }
@@ -1576,6 +1579,17 @@ function upsertLocalVisit(item){
 }
 function removeLocalVisit(id){ visits=visits.filter(v=>v.id!==id); }
 
+async function deleteVisitReq(id){
+  const req=visitRequests.find(r=>r.id===id);
+  if(!confirm(`${req&&req.name||"이"} 신청을 완전히 삭제할까요? (되돌릴 수 없어요)`)) return;
+  visitRequests=visitRequests.filter(r=>r.id!==id);
+  const hadVisit=visits.some(v=>v.id==="v_from_"+id);
+  removeLocalVisit("v_from_"+id);
+  renderVisitReq();renderHome();renderVisits();
+  await syncDelete("visitRequests",id);
+  if(hadVisit) await syncDelete("visits","v_from_"+id);
+  toast("삭제했어요");
+}
 async function decideVisitReq(id,status,reason){
   const req=visitRequests.find(r=>r.id===id); if(!req) return;
   if(status==="승인" && reqOverlaps(req)){
