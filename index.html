@@ -1625,7 +1625,7 @@ async function sendMessage(id){
 function reqOverlaps(req){
   return (visits||[]).some(v=>{
     if(v.id==="v_from_"+req.id) return false;
-    return req.start<v.end && v.start<req.end;
+    return req.start<=v.end && v.start<=req.end; // 퇴실일도 막혀 있는 폐구간 기준 겹침 판정
   });
 }
 function upsertLocalVisit(item){
