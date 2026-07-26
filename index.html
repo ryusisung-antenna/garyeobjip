@@ -228,11 +228,21 @@ nav button .ic.blob i{font-size:16px}
 .field label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:5px;font-weight:700}
 .field input,.field textarea,.field select{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--card);outline:none;transition:border-color .2s}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--moss)}
-.field textarea{resize:vertical;min-height:70px;line-height:1.6}
+.field textarea{resize:none;overflow:hidden;min-height:70px;line-height:1.6}
 .field .hint{font-size:11px;color:var(--ink-soft);margin-top:4px}
 .row2{display:flex;gap:10px}.row2>*{flex:1}
 .modal-actions{display:flex;gap:10px;margin-top:20px}
 .modal-actions .btn{flex:1;justify-content:center;padding:13px}
+.rswitch-wrap{border:1px solid var(--line);border-radius:12px;padding:0 14px;margin-top:6px}
+.rswitch{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--line)}
+.rswitch:first-child{border-top:none}
+.rswitch span{font-size:13.5px;color:var(--ink)}
+.rswitch input[type=checkbox]{appearance:none;-webkit-appearance:none;width:38px;height:22px;border-radius:11px;
+  background:var(--line);position:relative;cursor:pointer;margin:0;flex-shrink:0;transition:.15s;outline:none}
+.rswitch input[type=checkbox]::before{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;
+  border-radius:50%;background:#fff;transition:.15s}
+.rswitch input[type=checkbox]:checked{background:var(--moss-deep)}
+.rswitch input[type=checkbox]:checked::before{left:18px}
 .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
   background:var(--ink);color:var(--paper);padding:13px 22px;border-radius:12px;font-size:14px;
   opacity:0;pointer-events:none;transition:.3s;z-index:60;max-width:88%;text-align:center}
@@ -867,17 +877,19 @@ function readMinute(id){
       <button class="btn ghost sm" style="margin-left:auto" onclick="openMinute('${id}')">수정</button></div>
     ${m.host?`<div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:6px">진행 ${esc(m.host)}</div>`:""}
     <div class="mt-read">`;
-  MT_BLOCKS_BEFORE.forEach(b=>{if(m[b.key])h+=`<h4>${b.label}</h4><div class="body">${esc(m[b.key])}</div>`;});
+  MT_BLOCKS_BEFORE.forEach(b=>{if(m[b.key])h+=`<h4>${b.label}</h4><div class="body">${mdRender(m[b.key])}</div>`;});
   if(m.nextDate)h+=`<h4>다음 회의</h4><div class="body">${fmtDate(m.nextDate)} (${dow(m.nextDate)})${m.nextHost?` · 진행 ${esc(m.nextHost)}`:""}${m.nextNote?`\n${esc(m.nextNote)}`:""}</div>`;
-  MT_BLOCKS_AFTER.forEach(b=>{if(m[b.key])h+=`<h4>${b.label}</h4><div class="body">${esc(m[b.key])}</div>`;});
+  MT_BLOCKS_AFTER.forEach(b=>{if(m[b.key])h+=`<h4>${b.label}</h4><div class="body">${mdRender(m[b.key])}</div>`;});
   h+=`</div>`;
   showModal(h);
 }
 function reminderCheckboxes(prefix,selectedDays){
   const options=[7,3,1];
-  return `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-    ${options.map(d=>`<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;background:var(--paper-2);border:1.5px solid var(--line);border-radius:9px;padding:6px 11px;cursor:pointer">
-      <input type="checkbox" id="${prefix}-${d}" ${selectedDays.indexOf(d)!==-1?"checked":""} style="margin:0">${d}일 전 알림</label>`).join("")}
+  return `<div class="rswitch-wrap">
+    ${options.map(d=>`<label class="rswitch">
+      <span>${d}일 전 알림</span>
+      <input type="checkbox" id="${prefix}-${d}" ${selectedDays.indexOf(d)!==-1?"checked":""}>
+    </label>`).join("")}
   </div>`;
 }
 function readReminderCheckboxes(prefix){
@@ -892,14 +904,14 @@ function openMinute(id){
         <option ${m.kind==="온라인"?"selected":""}>온라인</option>
         <option ${m.kind==="오프라인"?"selected":""}>오프라인</option></select></div></div>
     <div class="field"><label>진행한 사람</label><input id="f-host" value="${esc(m.host)}" placeholder="이번 달 진행 집사"></div>`;
-  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
+  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea>${fmtHint()}</div>`;});
   h+=`<div class="field"><label>📅 다음 회의 <span style="font-weight:400">— 등록하면 일정 캘린더에 자동으로 올라갑니다</span></label>
     <div class="row2"><input type="date" id="f-nextDate" value="${m.nextDate||""}">
     <input id="f-nextHost" value="${esc(m.nextHost)}" placeholder="진행자"></div>
     <input id="f-nextNote" value="${esc(m.nextNote)}" placeholder="메모 (예: 오프라인, 무엇을 준비)" style="margin-top:8px"></div>
     <div class="field"><label>🔔 다음 회의 알림 <span style="font-weight:400">— 날짜를 채운 경우에만 동작해요</span></label>
     ${reminderCheckboxes("f-remind",m.reminderDays||[])}</div>`;
-  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
+  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea>${fmtHint()}</div>`;});
   h+=`<div class="modal-actions">
       ${id?`<button class="btn ghost" onclick="delMinute('${id}')">삭제</button>`:""}
       <button class="btn" onclick="saveMinute('${m.id}')">저장</button></div>`;
@@ -1363,14 +1375,14 @@ function renderTodo(){
 function todoRow(t){
   return `<div class="todo-item${t.done?" done":""}">
     <div class="todo-check" onclick="toggleTodo('${t.id}')">${t.done?"✓":""}</div>
-    <div class="todo-main" onclick="openTodo('${t.id}')"><div class="todo-text">${esc(t.text)}</div>
+    <div class="todo-main" onclick="openTodo('${t.id}')"><div class="todo-text">${mdRender(t.text)}</div>
       <div class="todo-meta">${t.who?`<span class="who">${esc(t.who)}</span> · `:""}${fmtDate(t.createdAt.slice(0,10))}${t.done&&t.doneBy?` · ${esc(t.doneBy)} 처리`:""}</div></div>
     <button class="todo-del" onclick="delTodo('${t.id}')">×</button></div>`;
 }
 function openTodo(id){
   const t=id?todos.find(x=>x.id===id):null;
   let h=`<div class="grab"></div><h3>${t?"할 일 수정":"할 일 올리기"}</h3>
-    <div class="field"><label>필요한 일</label><textarea id="t-text" placeholder="예: 화장실 휴지 떨어져감 / 텃밭 상추 솎아주기">${t?esc(t.text):""}</textarea></div>
+    <div class="field"><label>필요한 일</label><textarea id="t-text" placeholder="예: 화장실 휴지 떨어져감 / 텃밭 상추 솎아주기">${t?esc(t.text):""}</textarea>${fmtHint()}</div>
     <div class="field"><label>올린 사람 <span style="font-weight:400">(선택)</span></label><input id="t-who" value="${t?esc(t.who):esc(me)}" placeholder="집사 이름"></div>
     <div class="modal-actions">${t?`<button class="btn ghost" onclick="delTodo('${t.id}',true)">삭제</button>`:""}<button class="btn clay" onclick="saveTodo('${id||""}')">${t?"저장":"올리기"}</button></div>`;
   showModal(h);
@@ -1404,7 +1416,7 @@ function renderNotes(){
     [...notes].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).forEach(n=>{
       h+=`<div class="card note-card">
         ${n.photo?`<img src="${driveThumb(n.photo)}" class="note-img" onclick="openPhoto('${driveThumb(n.photo).replace(/'/g,"")}')">`:""}
-        <div class="note-text">${esc(n.text)}</div>
+        <div class="note-text">${mdRender(n.text)}</div>
         <div class="note-meta"><span>${n.who?esc(n.who):"이름 없는 마음"}</span>
           <span>${fmtShort(n.createdAt.slice(0,10))}</span>
           <button class="note-del" onclick="delNote('${n.id}')">×</button></div></div>`;
@@ -1414,7 +1426,7 @@ function renderNotes(){
 }
 function openNote(){
   let h=`<div class="grab"></div><h3>사랑방에 올리기</h3>
-    <div class="field"><label>나누고 싶은 마음</label><textarea id="n-text" placeholder="예: 새벽 안개 낀 차밭이 정말 좋았어요 / 쌍계사 가는 길 추천합니다" style="min-height:90px"></textarea></div>
+    <div class="field"><label>나누고 싶은 마음</label><textarea id="n-text" placeholder="예: 새벽 안개 낀 차밭이 정말 좋았어요 / 쌍계사 가는 길 추천합니다" style="min-height:90px"></textarea>${fmtHint()}</div>
     <div class="field"><label>사진 <span style="font-weight:400">(선택)</span></label>
       <div class="photo-slot" id="n-photo-slot" onclick="document.getElementById('n-cam').click()" style="aspect-ratio:16/10;max-width:100%">
         <span class="pemoji">📷</span><span>사진 더하기</span></div>
@@ -1482,7 +1494,7 @@ function openNoticeEditor(i){
   const n=editingNotices()[i]||{title:"",body:""};
   showModal(`<div class="grab"></div><h3>공지 편집</h3>
     <div class="field"><label>제목 (방문자 앱엔 이 한 줄만 먼저 보여요)</label><input id="notice-edit-title" value="${esc(n.title)}" placeholder="예) 여름철 에어컨 사용법"></div>
-    <div class="field"><label>내용</label><textarea id="notice-edit-body" style="min-height:180px" placeholder="누르면 펼쳐서 보여줄 자세한 내용을 적어주세요">${esc(n.body)}</textarea></div>
+    <div class="field"><label>내용</label><textarea id="notice-edit-body" style="min-height:180px" placeholder="누르면 펼쳐서 보여줄 자세한 내용을 적어주세요">${esc(n.body)}</textarea>${fmtHint()}</div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn ghost" onclick="closeModal()">취소</button>
       <button class="btn" onclick="saveNoticeEditor(${i})">이 공지 저장</button>
@@ -1533,7 +1545,7 @@ function noticesAdminHtml(){
         </div>
         ${isPreview?`<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">
           <div style="font-size:10px;color:var(--ink-soft);font-weight:700;margin-bottom:5px">방문자 앱엔 이렇게 보여요 ↓</div>
-          <div style="font-size:13px;line-height:1.65;color:var(--ink-soft);white-space:pre-line;min-width:0;overflow-wrap:anywhere">${esc(bodyView)||"(내용 없음)"}</div>
+          <div style="font-size:13px;line-height:1.65;color:var(--ink-soft);white-space:pre-line;min-width:0;overflow-wrap:anywhere">${mdRender(bodyView)||"(내용 없음)"}</div>
         </div>`:""}
       </div>`;
     });
@@ -1582,7 +1594,7 @@ function vreqCard(r,state){
       : `<span style="flex-shrink:0;white-space:nowrap;font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:9px;background:rgba(201,182,220,.2);color:var(--lilac-deep)">승인 보류</span>`;
   const resubmitTag = (state==="waiting" && r.resubmitted) ? `<span style="flex-shrink:0;white-space:nowrap;font-size:11px;font-weight:700;padding:4px 10px;border-radius:9px;background:rgba(95,169,214,.16);color:#3F7CA0">재신청</span>` : "";
   const titleLine=`${esc(r.name||"이름없음")} <span style="font-size:12.5px;color:var(--ink-soft);font-weight:400">· ${r.people||1}명${r.companions?" · "+esc(r.companions):""}</span>`;
-  const holdReasonLine = (state==="held" && r.holdReason) ? `<div style="margin-top:8px;background:rgba(201,182,220,.14);border-radius:9px;padding:8px 11px;font-size:13px;line-height:1.55;color:var(--lilac-deep);min-width:0;overflow-wrap:anywhere">${esc(r.holdReason)}</div>` : "";
+  const holdReasonLine = (state==="held" && r.holdReason) ? `<div style="margin-top:8px;background:rgba(201,182,220,.14);border-radius:9px;padding:8px 11px;font-size:13px;line-height:1.55;color:var(--lilac-deep);min-width:0;overflow-wrap:anywhere">${mdRender(r.holdReason)}</div>` : "";
   let h=`<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
       <b style="font-size:16px;flex:1;min-width:0">${titleLine}</b>
@@ -1598,7 +1610,7 @@ function vreqCard(r,state){
     h+=`<div style="margin-top:10px;background:var(--paper-2);border-radius:10px;padding:9px 12px;display:flex;flex-direction:column;gap:7px;overflow:hidden">
       <div style="font-size:10.5px;color:var(--ink-soft);font-weight:700">주고받은 메시지</div>
       ${r.messages.map(m=>`<div style="font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;word-break:break-word">
-        <span style="color:var(--ink-soft);font-size:11px">${fmtWhen(m.at)}${m.read?` · <span style="color:var(--moss-deep)">방문자가 확인함</span>`:""}</span><br>${esc(m.text)}</div>`).join("")}
+        <span style="color:var(--ink-soft);font-size:11px">${fmtWhen(m.at)}${m.read?` · <span style="color:var(--moss-deep)">방문자가 확인함</span>`:""}</span><br>${mdRender(m.text)}</div>`).join("")}
     </div>`;
   }
   if(state==="waiting" && reqOverlaps(r)){
@@ -1620,7 +1632,7 @@ function vreqCard(r,state){
 function askHold(id){
   showModal(`<div class="grab"></div><h3>승인보류 사유</h3>
     <div style="font-size:13.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6">방문자의 "내 방문" 화면에 그대로 전달돼요. 다른 날짜를 제안하거나, 보류 이유를 적어주세요.</div>
-    <div class="field"><textarea id="hold-reason" placeholder="예) 그 기간엔 이미 다른 팀이 머물러요. 8월 마지막 주는 어떠세요?"></textarea></div>
+    <div class="field"><textarea id="hold-reason" placeholder="예) 그 기간엔 이미 다른 팀이 머물러요. 8월 마지막 주는 어떠세요?"></textarea>${fmtHint()}</div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn ghost" onclick="closeModal()">취소</button>
       <button class="btn" onclick="confirmHold('${id}')">보류로 전달</button>
@@ -1637,7 +1649,7 @@ async function confirmHold(id){
 function askMessage(id){
   showModal(`<div class="grab"></div><h3>메시지 보내기</h3>
     <div style="font-size:13.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6">이 방문자의 "내 방문" 화면에 바로 전달돼요.</div>
-    <div class="field"><textarea id="msg-text" placeholder="예) 머리끈 챙겨오세요 / 에어컨은 이렇게 써주세요"></textarea></div>
+    <div class="field"><textarea id="msg-text" placeholder="예) 머리끈 챙겨오세요 / 에어컨은 이렇게 써주세요"></textarea>${fmtHint()}</div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn ghost" onclick="closeModal()">취소</button>
       <button class="btn" onclick="sendMessage('${id}')">보내기</button>
@@ -1800,7 +1812,48 @@ function delReview(id){
    공통 — 모달 · 탭 · 시작
    ============================================================ */
 function val(id){return document.getElementById(id).value;}
-function showModal(html){document.getElementById("modalBox").innerHTML=html;document.getElementById("modalBg").classList.add("on");document.getElementById("modalBox").scrollTop=0;}
+function autoGrowTextarea(el){ el.style.height="auto"; el.style.height=(el.scrollHeight+2)+"px"; }
+function autoGrowAllIn(root){ root.querySelectorAll("textarea").forEach(autoGrowTextarea); }
+document.addEventListener("input",e=>{ if(e.target.tagName==="TEXTAREA") autoGrowTextarea(e.target); });
+
+/* ── 서식 있는 글(볼드·밑줄·취소선·색) ──
+   textarea 안에서 윈도우 표준 단축키로 마킹 문법을 삽입하고,
+   보여줄 때만 mdRender()로 실제 서식으로 바꿔서 표시합니다.
+   Ctrl+B 볼드 · Ctrl+U 밑줄 · Ctrl+Shift+X 취소선 · Ctrl+Shift+1~4 색(흙빛·초록·하늘·보라) */
+const MD_COLORS={1:"#A85E38",2:"#6E8C3A",3:"#3F7CA0",4:"#9B7FB8"};
+function wrapSelection(el,before,after){
+  const s=el.selectionStart, e=el.selectionEnd, v=el.value;
+  const mid=v.slice(s,e)||"";
+  el.value=v.slice(0,s)+before+mid+after+v.slice(e);
+  const cs=s+before.length, ce=cs+mid.length;
+  el.setSelectionRange(cs,ce);
+  el.focus();
+  autoGrowTextarea(el);
+}
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName!=="TEXTAREA") return;
+  const ctrl=e.ctrlKey||e.metaKey;
+  if(!ctrl) return;
+  if(!e.shiftKey && e.key.toLowerCase()==="b"){ e.preventDefault(); wrapSelection(e.target,"**","**"); }
+  else if(!e.shiftKey && e.key.toLowerCase()==="u"){ e.preventDefault(); wrapSelection(e.target,"__","__"); }
+  else if(e.shiftKey && e.key.toLowerCase()==="x"){ e.preventDefault(); wrapSelection(e.target,"~~","~~"); }
+  else if(e.shiftKey && MD_COLORS[e.key]){ e.preventDefault(); wrapSelection(e.target,"{{"+e.key+":","}}"); }
+});
+function mdRender(text){
+  if(!text) return "";
+  let s=esc(text); // 먼저 이스케이프해서 안전하게 만든 뒤에만 마킹 문법을 실제 태그로 바꿈
+  Object.keys(MD_COLORS).forEach(k=>{
+    s=s.replace(new RegExp("\\{\\{"+k+":([^}]*)\\}\\}","g"),`<span style="color:${MD_COLORS[k]}">$1</span>`);
+  });
+  s=s.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  s=s.replace(/__([^_]+)__/g,"<u>$1</u>");
+  s=s.replace(/~~([^~]+)~~/g,"<s>$1</s>");
+  return s;
+}
+function fmtHint(){
+  return `<div style="font-size:11px;color:var(--ink-soft);margin-top:-2px">서식: Ctrl+B 볼드 · Ctrl+U 밑줄 · Ctrl+Shift+X 취소선 · Ctrl+Shift+1~4 색</div>`;
+}
+function showModal(html){document.getElementById("modalBox").innerHTML=html;document.getElementById("modalBg").classList.add("on");document.getElementById("modalBox").scrollTop=0;autoGrowAllIn(document.getElementById("modalBox"));}
 function closeModal(){document.getElementById("modalBg").classList.remove("on");}
 document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")closeModal();});
 
