@@ -1193,6 +1193,18 @@ function homeAdminTap(){
   }
 }
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+const MD_COLORS={1:"#A85E38",2:"#6E8C3A",3:"#3F7CA0",4:"#9B7FB8"};
+function mdRender(text){
+  if(!text) return "";
+  let s=esc(text);
+  Object.keys(MD_COLORS).forEach(k=>{
+    s=s.replace(new RegExp("\\{\\{"+k+":([^}]*)\\}\\}","g"),`<span style="color:${MD_COLORS[k]}">$1</span>`);
+  });
+  s=s.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  s=s.replace(/__([^_]+)__/g,"<u>$1</u>");
+  s=s.replace(/~~([^~]+)~~/g,"<s>$1</s>");
+  return s;
+}
 
 /* 효과 데이터 — 관리자가 고친 게 있으면 그걸, 없으면 기본값 */
 function effPrep(){ return CONF.prep || PREP; }
@@ -1298,7 +1310,7 @@ function renderMe(){
             : st==='preview'?'<span class="status-badge st-wait">● 미리보기</span>'
             : '<span class="status-badge st-wait">● 승인 기다리는 중</span>';
   const msg = st==='승인'?'방문이 확정되었어요! 도착 전 안내서와 준비물을 한 번 더 살펴봐 주세요.'
-            : (st==='보류'||st==='거절')? (v.holdReason ? esc(v.holdReason) : '아쉽지만 이번 일정은 바로 확정이 어려워요. 아래에서 다른 날짜로 다시 신청해 주세요.')
+            : (st==='보류'||st==='거절')? (v.holdReason ? mdRender(v.holdReason) : '아쉽지만 이번 일정은 바로 확정이 어려워요. 아래에서 다른 날짜로 다시 신청해 주세요.')
             : st==='preview'?'실제로 저장된 신청은 아니에요. 아래 탭들을 자유롭게 둘러보실 수 있어요.'
             : '집사들이 함께 살펴본 뒤 문자로도 결과를 알려드려요. 편안한 마음으로 기다려 주세요.';
   const canEdit = !v.preview;
@@ -1307,7 +1319,7 @@ function renderMe(){
       <div class="notice-head">집사님이 보낸 메시지</div>
       ${v.messages.map((m,i)=>`<div class="notice-item">
         <div style="font-size:11px;color:var(--sage-soft);margin-bottom:3px">${fmtWhen2(m.at)}</div>
-        <div style="min-width:0;overflow-wrap:anywhere">${esc(m.text)}</div>
+        <div style="min-width:0;overflow-wrap:anywhere">${mdRender(m.text)}</div>
         <div style="margin-top:7px">${m.read
           ? `<span style="font-size:11.5px;color:var(--sage)">✓ 확인했어요</span>`
           : `<button onclick="markMessageRead(${i})" style="background:none;border:1px solid var(--line);border-radius:8px;padding:5px 11px;font-size:11.5px;color:var(--sage);cursor:pointer;font-family:inherit">확인했어요</button>`}</div>
@@ -1389,7 +1401,7 @@ function renderNotices(){
         <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.title)||"공지"}</span>
         <span style="flex-shrink:0;color:var(--sage-soft);font-size:12px">${isOpen?"▲":"▼"}</span>
       </button>
-      ${isOpen && bodyView?`<div style="padding:0 0 12px;font-size:13.5px;line-height:1.7;color:var(--ink-soft);min-width:0;overflow-wrap:anywhere;white-space:pre-line">${esc(bodyView)}</div>`:""}
+      ${isOpen && bodyView?`<div style="padding:0 0 12px;font-size:13.5px;line-height:1.7;color:var(--ink-soft);min-width:0;overflow-wrap:anywhere;white-space:pre-line">${mdRender(bodyView)}</div>`:""}
     </div>`;
   }).join('');
   if(adminMode && ns.length){
