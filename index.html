@@ -904,14 +904,14 @@ function openMinute(id){
         <option ${m.kind==="온라인"?"selected":""}>온라인</option>
         <option ${m.kind==="오프라인"?"selected":""}>오프라인</option></select></div></div>
     <div class="field"><label>진행한 사람</label><input id="f-host" value="${esc(m.host)}" placeholder="이번 달 진행 집사"></div>`;
-  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea>${fmtHint()}</div>`;});
+  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
   h+=`<div class="field"><label>📅 다음 회의 <span style="font-weight:400">— 등록하면 일정 캘린더에 자동으로 올라갑니다</span></label>
     <div class="row2"><input type="date" id="f-nextDate" value="${m.nextDate||""}">
     <input id="f-nextHost" value="${esc(m.nextHost)}" placeholder="진행자"></div>
     <input id="f-nextNote" value="${esc(m.nextNote)}" placeholder="메모 (예: 오프라인, 무엇을 준비)" style="margin-top:8px"></div>
     <div class="field"><label>🔔 다음 회의 알림 <span style="font-weight:400">— 날짜를 채운 경우에만 동작해요</span></label>
     ${reminderCheckboxes("f-remind",m.reminderDays||[])}</div>`;
-  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea>${fmtHint()}</div>`;});
+  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
   h+=`<div class="modal-actions">
       ${id?`<button class="btn ghost" onclick="delMinute('${id}')">삭제</button>`:""}
       <button class="btn" onclick="saveMinute('${m.id}')">저장</button></div>`;
@@ -1382,7 +1382,7 @@ function todoRow(t){
 function openTodo(id){
   const t=id?todos.find(x=>x.id===id):null;
   let h=`<div class="grab"></div><h3>${t?"할 일 수정":"할 일 올리기"}</h3>
-    <div class="field"><label>필요한 일</label><textarea id="t-text" placeholder="예: 화장실 휴지 떨어져감 / 텃밭 상추 솎아주기">${t?esc(t.text):""}</textarea>${fmtHint()}</div>
+    <div class="field"><label>필요한 일</label><textarea id="t-text" placeholder="예: 화장실 휴지 떨어져감 / 텃밭 상추 솎아주기">${t?esc(t.text):""}</textarea></div>
     <div class="field"><label>올린 사람 <span style="font-weight:400">(선택)</span></label><input id="t-who" value="${t?esc(t.who):esc(me)}" placeholder="집사 이름"></div>
     <div class="modal-actions">${t?`<button class="btn ghost" onclick="delTodo('${t.id}',true)">삭제</button>`:""}<button class="btn clay" onclick="saveTodo('${id||""}')">${t?"저장":"올리기"}</button></div>`;
   showModal(h);
@@ -1426,7 +1426,7 @@ function renderNotes(){
 }
 function openNote(){
   let h=`<div class="grab"></div><h3>사랑방에 올리기</h3>
-    <div class="field"><label>나누고 싶은 마음</label><textarea id="n-text" placeholder="예: 새벽 안개 낀 차밭이 정말 좋았어요 / 쌍계사 가는 길 추천합니다" style="min-height:90px"></textarea>${fmtHint()}</div>
+    <div class="field"><label>나누고 싶은 마음</label><textarea id="n-text" placeholder="예: 새벽 안개 낀 차밭이 정말 좋았어요 / 쌍계사 가는 길 추천합니다" style="min-height:90px"></textarea></div>
     <div class="field"><label>사진 <span style="font-weight:400">(선택)</span></label>
       <div class="photo-slot" id="n-photo-slot" onclick="document.getElementById('n-cam').click()" style="aspect-ratio:16/10;max-width:100%">
         <span class="pemoji">📷</span><span>사진 더하기</span></div>
@@ -1494,7 +1494,7 @@ function openNoticeEditor(i){
   const n=editingNotices()[i]||{title:"",body:""};
   showModal(`<div class="grab"></div><h3>공지 편집</h3>
     <div class="field"><label>제목 (방문자 앱엔 이 한 줄만 먼저 보여요)</label><input id="notice-edit-title" value="${esc(n.title)}" placeholder="예) 여름철 에어컨 사용법"></div>
-    <div class="field"><label>내용</label><textarea id="notice-edit-body" style="min-height:180px" placeholder="누르면 펼쳐서 보여줄 자세한 내용을 적어주세요">${esc(n.body)}</textarea>${fmtHint()}</div>
+    <div class="field"><label>내용</label><textarea id="notice-edit-body" style="min-height:180px" placeholder="누르면 펼쳐서 보여줄 자세한 내용을 적어주세요">${esc(n.body)}</textarea></div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn ghost" onclick="closeModal()">취소</button>
       <button class="btn" onclick="saveNoticeEditor(${i})">이 공지 저장</button>
@@ -1632,7 +1632,7 @@ function vreqCard(r,state){
 function askHold(id){
   showModal(`<div class="grab"></div><h3>승인보류 사유</h3>
     <div style="font-size:13.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6">방문자의 "내 방문" 화면에 그대로 전달돼요. 다른 날짜를 제안하거나, 보류 이유를 적어주세요.</div>
-    <div class="field"><textarea id="hold-reason" placeholder="예) 그 기간엔 이미 다른 팀이 머물러요. 8월 마지막 주는 어떠세요?"></textarea>${fmtHint()}</div>
+    <div class="field"><textarea id="hold-reason" placeholder="예) 그 기간엔 이미 다른 팀이 머물러요. 8월 마지막 주는 어떠세요?"></textarea></div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn ghost" onclick="closeModal()">취소</button>
       <button class="btn" onclick="confirmHold('${id}')">보류로 전달</button>
@@ -1649,7 +1649,7 @@ async function confirmHold(id){
 function askMessage(id){
   showModal(`<div class="grab"></div><h3>메시지 보내기</h3>
     <div style="font-size:13.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6">이 방문자의 "내 방문" 화면에 바로 전달돼요.</div>
-    <div class="field"><textarea id="msg-text" placeholder="예) 머리끈 챙겨오세요 / 에어컨은 이렇게 써주세요"></textarea>${fmtHint()}</div>
+    <div class="field"><textarea id="msg-text" placeholder="예) 머리끈 챙겨오세요 / 에어컨은 이렇게 써주세요"></textarea></div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn ghost" onclick="closeModal()">취소</button>
       <button class="btn" onclick="sendMessage('${id}')">보내기</button>
@@ -1850,9 +1850,7 @@ function mdRender(text){
   s=s.replace(/~~([^~]+)~~/g,"<s>$1</s>");
   return s;
 }
-function fmtHint(){
-  return `<div style="font-size:11px;color:var(--ink-soft);margin-top:-2px">서식: Ctrl+B 볼드 · Ctrl+U 밑줄 · Ctrl+Shift+X 취소선 · Ctrl+Shift+1~4 색</div>`;
-}
+
 function showModal(html){document.getElementById("modalBox").innerHTML=html;document.getElementById("modalBg").classList.add("on");document.getElementById("modalBox").scrollTop=0;autoGrowAllIn(document.getElementById("modalBox"));}
 function closeModal(){document.getElementById("modalBg").classList.remove("on");}
 document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")closeModal();});
