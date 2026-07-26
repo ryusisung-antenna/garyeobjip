@@ -426,7 +426,7 @@
 
   <!-- ══════════ 홈 ══════════ -->
   <section class="screen home on" id="s-home">
-    <h1 class="mark">가볍집<small>Gabyeoljip · Hadong</small></h1>
+    <h1 class="mark" onclick="homeAdminTap()">가볍집<small>Gabyeoljip · Hadong</small></h1>
     <svg class="stroke" viewBox="0 0 240 14" style="margin-top:22px;width:170px"><path d="M2 9 C 40 2, 90 12, 140 6 S 220 3, 238 8"/></svg>
     <p class="lede serif">덜어내며 머무는 집.<br><em>가볍게 오셔서, 가볍게 쉬다 가세요.</em></p>
 
@@ -1169,8 +1169,23 @@ async function sendReview(){
 /* ============================================================
    방문자 대시보드 — 신청 후 도착하는 화면 (하단 탭)
    ============================================================ */
-let myVisit=null, editing=false, checkoutState={checks:{}, photos:{}}, prepChecked={};
+let myVisit=null, editing=false, checkoutState={checks:{}, photos:{}}, prepChecked={}, checkoutDone=false;
 let CONF={}, adminMode=false, adminClicks=0, adminTimer=null;
+let homeAdminClicks=0, homeAdminTimer=null;
+function homeAdminTap(){
+  homeAdminClicks++; clearTimeout(homeAdminTimer);
+  homeAdminTimer=setTimeout(()=>homeAdminClicks=0,1600);
+  if(homeAdminClicks>=5){
+    homeAdminClicks=0;
+    adminMode=!adminMode;
+    if(adminMode){
+      toast('관리자 모드 · 바로 고칠 수 있어요');
+      openDash('prep'); // 방문 신청 없이도 바로 편집 가능한 탭으로
+    }else{
+      toast('관리자 모드를 껐어요');
+    }
+  }
+}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 /* 효과 데이터 — 관리자가 고친 게 있으면 그걸, 없으면 기본값 */
@@ -1238,6 +1253,8 @@ function startFreshVisit(){
     localStorage.setItem('gbj_visit_history', JSON.stringify(hist.slice(-10)));
   }catch(e){}
   myVisit=null;
+  checkoutDone=false;
+  checkoutState={checks:{}, photos:{}};
   try{ localStorage.removeItem('gbj_visit'); }catch(e){}
   const el=$('home-myvisit'); if(el) el.style.display='none';
   stopDashPolling();
@@ -1435,6 +1452,12 @@ function addPlace(region){ ensureConf('places')[region].push({t:'새 장소',a:'
 
 /* ===== 퇴실 체크 ===== */
 function renderCheckout(){
+  if(checkoutDone){
+    $('dash-body').innerHTML=`<div class="dash-h serif">퇴실 체크</div>
+      <div class="co-empty">정리 완료를 집사에게 보냈어요. ✓<br>고맙습니다. 편안히 돌아가세요.</div>
+      <button class="submit" style="margin-top:4px" onclick="go('s-review')">방문 후기 작성하러 가기 →</button>`;
+    return;
+  }
   const list=effCheckout();
   if(adminMode){
     const rows=list.map((t,i)=>`<div class="ed-row"><input class="ed-input" value="${esc(t)}" oninput="editCo(${i},this.value)"><button class="del" onclick="delCo(${i})">×</button></div>`).join('');
@@ -1478,8 +1501,7 @@ function pickPhoto(k, input){
 async function submitCheckout(){
   const btn=$('co-submit'); btn.disabled=true; btn.textContent='보내는 중…';
   try{
-    const photosObj={};
-    for(const g of GUARD_PHOTOS){
+    const uploads=await Promise.all(GUARD_PHOTOS.map(async g=>{
       const p=checkoutState.photos[g.k]; let url='';
       try{
         const base64=p.dataUrl.split(',')[1];
@@ -1487,8 +1509,9 @@ async function submitCheckout(){
           body:JSON.stringify({resource:'photo',op:'upload',filename:g.k+'_'+Date.now()+'.jpg',mime:p.mime||'image/jpeg',dataBase64:base64})});
         const j=await res.json(); url=j.url||'';
       }catch(e){ url=''; }
-      photosObj[g.k]=url; // 집사 앱의 4가지 단속 사진 칸(gas/wifi/boiler/elec)과 같은 키로 저장
-    }
+      return [g.k,url]; // 집사 앱의 4가지 단속 사진 칸(gas/wifi/boiler/elec)과 같은 키로 저장
+    }));
+    const photosObj={}; uploads.forEach(([k,url])=>{ photosObj[k]=url; });
     const list=effCheckout();
     const checksObj={}; list.forEach((t,i)=>checksObj[t]=!!checkoutState.checks[i]);
     const item={ id:'co_'+Date.now(), date:ymd(new Date()),
@@ -1496,9 +1519,8 @@ async function submitCheckout(){
       checks:checksObj, photos:photosObj, closed:true, updatedAt:Date.now() };
     await fetch(SYNC_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({resource:'visitLogs',op:'upsert',item})});
-    $('dash-body').innerHTML=`<div class="dash-h serif">퇴실 체크</div>
-      <div class="co-empty">정리 완료를 집사에게 보냈어요. ✓<br>고맙습니다. 편안히 돌아가세요.</div>
-      <button class="submit" style="margin-top:4px" onclick="go('s-review')">방문 후기 작성하러 가기 →</button>`;
+    checkoutDone=true;
+    renderCheckout();
   }catch(e){ toast('전송에 실패했어요. 잠시 뒤 다시 시도해주세요'); btn.disabled=false; btn.textContent='집사에게 정리 완료 보내기'; }
 }
 
