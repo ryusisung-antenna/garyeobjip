@@ -554,7 +554,6 @@ async function syncPullAll(silent){
     if(d.config){
       config=mergeKeepPending(config,d.config);
       if(typeof noticesAdminOpen!=="undefined" && !noticesAdminOpen) _localNotices=null;
-      if(typeof reminderSettingsOpen!=="undefined" && !reminderSettingsOpen) _localReminderDays=null;
     }
     setSync(true,"동기화됨");renderAll();saveCache();
     tryOpenPendingCareLog();
@@ -631,8 +630,6 @@ function renderHome(){
   let h=`<div class="home-hello">
     <div class="hh-greet">${me?`${esc(me)} 집사님,`:"가볍집 집사님,"}</div>
     <div class="hh-sub">오늘도 가볍게. 지금 가볍집은 이래요.</div></div>`;
-
-  h+=reminderSettingsHtml();
 
   // 다가오는 일정 (방문+회의) 최대 3
   const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,3);
@@ -876,8 +873,18 @@ function readMinute(id){
   h+=`</div>`;
   showModal(h);
 }
+function reminderCheckboxes(prefix,selectedDays){
+  const options=[7,3,1];
+  return `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+    ${options.map(d=>`<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;background:var(--paper-2);border:1.5px solid var(--line);border-radius:9px;padding:6px 11px;cursor:pointer">
+      <input type="checkbox" id="${prefix}-${d}" ${selectedDays.indexOf(d)!==-1?"checked":""} style="margin:0">${d}일 전 알림</label>`).join("")}
+  </div>`;
+}
+function readReminderCheckboxes(prefix){
+  return [7,3,1].filter(d=>{ const el=document.getElementById(`${prefix}-${d}`); return el&&el.checked; });
+}
 function openMinute(id){
-  const m=id?minutes.find(x=>x.id===id):{id:"",date:todayISO(),kind:"온라인",host:"",heartOpen:"",notice:"",agenda:"",heartClose:"",nextDate:"",nextHost:"",nextNote:""};
+  const m=id?minutes.find(x=>x.id===id):{id:"",date:todayISO(),kind:"온라인",host:"",heartOpen:"",notice:"",agenda:"",heartClose:"",nextDate:"",nextHost:"",nextNote:"",reminderDays:[]};
   let h=`<div class="grab"></div><h3>${id?"회의록 수정":"새 회의록"}</h3>
     <div class="row2">
       <div class="field"><label>날짜</label><input type="date" id="f-date" value="${m.date}"></div>
@@ -889,7 +896,9 @@ function openMinute(id){
   h+=`<div class="field"><label>📅 다음 회의 <span style="font-weight:400">— 등록하면 일정 캘린더에 자동으로 올라갑니다</span></label>
     <div class="row2"><input type="date" id="f-nextDate" value="${m.nextDate||""}">
     <input id="f-nextHost" value="${esc(m.nextHost)}" placeholder="진행자"></div>
-    <input id="f-nextNote" value="${esc(m.nextNote)}" placeholder="메모 (예: 오프라인, 무엇을 준비)" style="margin-top:8px"></div>`;
+    <input id="f-nextNote" value="${esc(m.nextNote)}" placeholder="메모 (예: 오프라인, 무엇을 준비)" style="margin-top:8px"></div>
+    <div class="field"><label>🔔 다음 회의 알림 <span style="font-weight:400">— 날짜를 채운 경우에만 동작해요</span></label>
+    ${reminderCheckboxes("f-remind",m.reminderDays||[])}</div>`;
   MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
   h+=`<div class="modal-actions">
       ${id?`<button class="btn ghost" onclick="delMinute('${id}')">삭제</button>`:""}
@@ -899,7 +908,8 @@ function openMinute(id){
 function saveMinute(id){
   const o={date:val("f-date"),kind:val("f-kind"),host:val("f-host"),
     heartOpen:val("f-heartOpen"),notice:val("f-notice"),agenda:val("f-agenda"),heartClose:val("f-heartClose"),
-    nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote")};
+    nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote"),
+    reminderDays:readReminderCheckboxes("f-remind")};
   let item;
   if(id){ item=minutes.find(x=>x.id===id); Object.assign(item,o); }
   else{ o.id=uid(); minutes.push(o); item=o; }
@@ -1091,7 +1101,7 @@ function delVisit(id){if(!confirm("이 방문을 삭제할까요?"))return;visit
 
 /* ── 활동·모임 일정 ── */
 function openActivity(id,preset){
-  const a=id?activities.find(x=>x.id===id):{id:"",title:"",start:preset?.start||todayISO(),end:preset?.end||todayISO(),note:""};
+  const a=id?activities.find(x=>x.id===id):{id:"",title:"",start:preset?.start||todayISO(),end:preset?.end||todayISO(),note:"",reminderDays:[]};
   const presets=["매실 따기","찻잎 따기","대청소","감 따기","비누·치약 만들기","침구 세탁","명상수련","텃밭 울력"];
   let h=`<div class="grab"></div><h3>${id?"모임·활동 수정":"모임·활동 등록"}</h3>
     <div class="field"><label>무슨 모임·활동</label><input id="a-title" value="${esc(a.title)}" placeholder="예: 매실 따기, 대청소, 명상수련">
@@ -1100,13 +1110,16 @@ function openActivity(id,preset){
       <div class="field"><label>시작</label><input type="date" id="a-start" value="${a.start}"></div>
       <div class="field"><label>끝</label><input type="date" id="a-end" value="${a.end}"></div></div>
     <div class="field"><label>메모 <span style="font-weight:400">(선택)</span></label><input id="a-note" value="${esc(a.note)}" placeholder="예: 오전 10시 모이기, 장갑 챙기기"></div>
+    <div class="field"><label>🔔 알림 <span style="font-weight:400">— 시작일 기준</span></label>
+    ${reminderCheckboxes("a-remind",a.reminderDays||[])}</div>
     <div class="modal-actions">
       ${id?`<button class="btn ghost" onclick="delActivity('${id}')">삭제</button>`:""}
       <button class="btn" style="background:var(--sky)" onclick="saveActivity('${a.id}')">저장</button></div>`;
   showModal(h);
 }
 function saveActivity(id){
-  const o={title:val("a-title").trim(),start:val("a-start"),end:val("a-end"),note:val("a-note").trim()};
+  const o={title:val("a-title").trim(),start:val("a-start"),end:val("a-end"),note:val("a-note").trim(),
+    reminderDays:readReminderCheckboxes("a-remind")};
   if(!o.title){alert("무슨 모임·활동인지 적어주세요.");return;}
   if(o.end<o.start)o.end=o.start;
   let item;
@@ -1529,57 +1542,6 @@ function noticesAdminHtml(){
         <button class="btn ghost sm" onclick="addGlobalNotice()">+ 공지 추가</button>
         <button class="btn sm" onclick="saveGlobalNotices()">저장 · 모두에게 반영</button>
       </div>`;
-  }
-  h+=`</div>`;
-  return h;
-}
-/* ===== 알림 시점 설정 (회의·방문이 며칠 전에 알림 오게 할지) ===== */
-let reminderSettingsOpen=false, _localReminderDays=null;
-function getReminderDaysLocal(){
-  const row=(config||[]).find(c=>c.key==="reminderDays");
-  if(row){
-    try{
-      const v=typeof row.value==="string"?JSON.parse(row.value):row.value;
-      if(Array.isArray(v)&&v.length){ const nums=v.map(Number).filter(n=>n>0); if(nums.length) return nums; }
-    }catch(e){}
-  }
-  return [7,3,1];
-}
-function editingReminderDays(){
-  if(_localReminderDays===null) _localReminderDays=getReminderDaysLocal().slice();
-  return _localReminderDays;
-}
-function toggleReminderSettings(){ reminderSettingsOpen=!reminderSettingsOpen; renderHome(); }
-async function saveReminderDays(){
-  const raw=(document.getElementById("reminder-days-input").value||"");
-  const days=[...new Set(raw.split(",").map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n)&&n>0))].sort((a,b)=>b-a);
-  if(!days.length){ toast("숫자를 하나 이상 입력해주세요 (예: 7, 3, 1)"); return; }
-  try{
-    await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"config",op:"upsert",
-      item:{id:"reminderDays",key:"reminderDays",value:JSON.stringify(days),updatedAt:Date.now()}})});
-    toast("저장했어요");
-    _localReminderDays=null;
-    reminderSettingsOpen=false;
-    setTimeout(()=>syncPullAll(true),1000);
-  }catch(e){ toast("저장에 실패했어요"); }
-}
-function reminderSettingsHtml(){
-  const days=editingReminderDays();
-  let h=`<div class="home-card" style="cursor:default">
-    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleReminderSettings()">
-      <div>
-        <div style="font-size:13.5px;font-weight:700">알림 시점 설정</div>
-        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px">회의·방문이 ${days.join("일 전 · ")}일 전에 알려드려요</div>
-      </div>
-      <span style="font-size:13px;color:var(--ink-soft)">${reminderSettingsOpen?"▲":"▼"}</span>
-    </div>`;
-  if(reminderSettingsOpen){
-    h+=`<div style="margin-top:12px">
-      <div class="field" style="margin-bottom:10px"><label>며칠 전에 알릴지 (콤마로 구분)</label>
-        <input id="reminder-days-input" value="${days.join(", ")}" placeholder="예: 7, 3, 1"></div>
-      <button class="btn sm" style="width:100%" onclick="saveReminderDays()">저장</button>
-      <p style="font-size:11.5px;color:var(--ink-soft);margin-top:10px;line-height:1.6">다가오는 회의·방문 날짜를 기준으로, 여기 적은 일수만큼 남았을 때 매일 오전 9시에 텔레그램으로 알려드려요.</p>
-    </div>`;
   }
   h+=`</div>`;
   return h;
