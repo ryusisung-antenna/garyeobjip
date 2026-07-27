@@ -1237,7 +1237,7 @@ async function saveConf(key){
 /* ===== 라우팅 ===== */
 function openDash(tab){ go('s-dash'); dashTab(tab||'me'); startDashPolling(); }
 let currentDashTab='me';
-function dashTab(tab){
+function dashTab(tab,silent){
   if(tab==='guide'){ openGuideFromDash(); return; } // 안내서는 별도 화면(챕터 넘김)
   currentDashTab=tab;
   document.querySelectorAll('#tabbar .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
@@ -1245,9 +1245,9 @@ function dashTab(tab){
   else if(tab==='places') renderPlaces();
   else if(tab==='checkout') renderCheckout();
   else if(tab==='prep') renderPrep();
-  window.scrollTo({top:0,behavior:'auto'});
+  if(!silent) window.scrollTo({top:0,behavior:'auto'});
 }
-function redrawTab(){ const cur=document.querySelector('#tabbar .tab.on'); dashTab(cur?cur.dataset.tab:'me'); }
+function redrawTab(){ const cur=document.querySelector('#tabbar .tab.on'); dashTab(cur?cur.dataset.tab:'me',true); } // 자동 새로고침은 스크롤 위치 그대로 유지
 
 /* ===== 관리자 진입 (탭 제목 5번 톡톡, 비밀번호 없이 바로 전환) ===== */
 function adminTap(){
