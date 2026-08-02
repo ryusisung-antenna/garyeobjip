@@ -533,10 +533,20 @@ async function syncDelete(resource,id){
   syncBusy=false;
 }
 // 서버 데이터로 갱신하되, 아직 서버에 못 간(__pending) 로컬 항목은 지키기
+// 단, 서버에 이미 더 새로운 내용이 있으면 서버를 따름 — 예전에 보호표시만 켜진 채
+// 전송되지 않은 사본이 영원히 최신본을 가리는 일을 막기 위함
 function mergeKeepPending(localArr, serverArr){
   const map=new Map();
-  (serverArr||[]).forEach(it=>map.set(it.id,it));
-  (localArr||[]).forEach(it=>{ if(it.__pending) map.set(it.id,it); });
+  const serverMap=new Map();
+  (serverArr||[]).forEach(it=>{ map.set(it.id,it); serverMap.set(it.id,it); });
+  (localArr||[]).forEach(it=>{
+    if(!it || !it.__pending) return;
+    const sv=serverMap.get(it.id);
+    if(!sv){ map.set(it.id,it); return; } // 서버에 아예 없는 진행 중 기록(예: 정리 중)은 지킴
+    const localAt=Number(it.updatedAt)||0, serverAt=Number(sv.updatedAt)||0;
+    if(localAt>serverAt) map.set(it.id,it); // 내 수정이 더 최신일 때만 우선
+    else delete it.__pending;               // 낡은 보호표시는 걷어냄
+  });
   return Array.from(map.values());
 }
 // 서버(시트)에서 온 참/거짓 값이 "FALSE" 같은 문자열일 수 있어 진짜 boolean으로 바로잡음
@@ -616,11 +626,14 @@ function loadCache(){
     return true;
   }catch(e){ return false; }
 }
-// 예전 '수정' 방식 때문에 완료 해제된 채 남은 손님 기록은 어느 화면에도 안 보이므로 되살림
+// 예전 '수정' 방식 때문에 완료 해제되거나 보호표시가 남아 굳어버린 기록을 되살림
 function healGhostCareLogs(){
   let healed=0;
   (visitLogs||[]).forEach(l=>{
-    if(l && l.owner==="guest" && !l.closed){ l.closed=true; healed++; }
+    if(!l) return;
+    if(l.owner==="guest" && !l.closed){ l.closed=true; healed++; }
+    // 손님이 보낸 기록은 이 기기에서 새로 만든 게 아니므로, 서버 최신본을 막던 보호표시를 해제
+    if(l.owner==="guest" && l.__pending){ delete l.__pending; healed++; }
   });
   if(healed){ try{ saveCache(); }catch(e){} }
 }
