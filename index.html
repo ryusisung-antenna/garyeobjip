@@ -1417,11 +1417,12 @@ async function closeCare(id){
   await syncUpsert("visitLogs",log);
   careTab="history";renderCare();
 }
+let careHistoryShown=10;
 function careHistory(){
   const closed=visitLogs.filter(l=>l.closed).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
   if(!closed.length)return `<div class="empty"><div class="big">📋</div>아직 마친 정리 기록이 없습니다.</div>`;
   let h="";
-  closed.forEach(log=>{
+  closed.slice(0,careHistoryShown).forEach(log=>{
     const isGuest=log.owner==="guest";
     let total=0,done=0;
     if(isGuest){
@@ -1440,8 +1441,13 @@ function careHistory(){
         <span style="margin-left:auto;font-size:12px;color:var(--moss-deep)">단속사진 ${photoCount}/4</span></div>
       <div class="vlog-prog"><i style="width:${pct}%"></i></div></div>`;
   });
+  if(closed.length>careHistoryShown){
+    h+=`<button class="btn ghost sm" style="width:100%;margin-top:4px" onclick="loadMoreCareHistory()">
+      더 보기 · ${Math.min(10,closed.length-careHistoryShown)}개씩 (총 ${closed.length}개 중 ${careHistoryShown}개 보는 중)</button>`;
+  }
   return h;
 }
+function loadMoreCareHistory(){ careHistoryShown+=10; renderCare(); }
 function viewCareLog(id){
   const log=visitLogs.find(l=>l.id===id);
   const isGuest=log.owner==="guest";
@@ -1843,26 +1849,26 @@ function searchCorpus(){
   const add=(kind,id,date,title,body,tab,openFn)=>rows.push({kind,id,date:date||"",title:title||"",body:body||"",tab,openFn});
   (visits||[]).forEach(v=>add("방문",v.id,v.start,
     `${v.who||""}${v.guest?" +"+v.guest:""}`,
-    `${v.note||""} ${v.start||""} ${v.end||""}`,"visits",`openVisit('${v.id}')`));
+    `${v.note||""} ${v.start||""} ${v.end||""}`,"visits",()=>openVisit(v.id)));
   (visitRequests||[]).forEach(r=>add("신청",r.id,r.start,
     `${r.name||""}${r.companions?" +"+r.companions:""}`,
-    `${r.question||""} ${r.phone||""} ${r.holdReason||""} ${(r.messages||[]).map(m=>m.text).join(" ")}`,"visitreq",null));
+    `${r.question||""} ${r.phone||""} ${r.holdReason||""} ${(r.messages||[]).map(m=>m.text).join(" ")}`,"visitreq",()=>quickViewRequest(r.id)));
   (reviews||[]).forEach(r=>add("후기",r.id,"",
     r.period||"방문 후기",
     [r.good,r.bad,r.suggest,r.bestmoment,r.worstmoment,r.guidehelp,r.guidemore,r.hadong,r.revisit].filter(x=>typeof x==="string").join(" "),
-    "reviews",null));
+    "reviews",()=>quickViewReview(r.id)));
   (minutes||[]).forEach(m=>add("회의록",m.id,m.date,
     `${m.date||""} 회의${m.host?" · "+m.host:""}`,
     [m.heartOpen,m.agenda,m.notice,m.heartClose,m.nextNote,m.nextHost].filter(Boolean).join(" "),
-    "minutes",`readMinute('${m.id}')`));
+    "minutes",()=>readMinute(m.id)));
   (visitLogs||[]).filter(l=>l.closed).forEach(l=>add("정리",l.id,l.date,
     `${l.who||"이름 없음"}${l.owner==="guest"?" (손님 제출)":""}`,
-    Object.keys(l.checks||{}).join(" "),"care",`viewCareLog('${l.id}')`));
+    Object.keys(l.checks||{}).join(" "),"care",()=>viewCareLog(l.id)));
   (todos||[]).forEach(t=>add("할 일",t.id,"",
-    t.text||"", `${t.who||""} ${t.doneBy||""}`,"todo",null));
+    t.text||"", `${t.who||""} ${t.doneBy||""}`,"todo",()=>openTodo(t.id)));
   (notes||[]).forEach(n=>add("사랑방",n.id,(n.createdAt||"").slice(0,10),
-    n.who||"사랑방 글", n.text||"","notes",null));
-  (activities||[]).forEach(a=>add("모임",a.id,a.start,a.title||"",a.note||"","visits",`openActivity('${a.id}')`));
+    n.who||"사랑방 글", n.text||"","notes",()=>quickViewNote(n.id)));
+  (activities||[]).forEach(a=>add("모임",a.id,a.start,a.title||"",a.note||"","visits",()=>openActivity(a.id)));
   return rows;
 }
 function hi(text,q){
@@ -1905,6 +1911,7 @@ function renderSearchResults(){
     return;
   }
   const all=runSearch();
+  _searchActions=[];
   // 종류별 개수 (거르기 칩용) — 지금 검색어 기준
   const savedKind=searchKind; searchKind="all";
   const counts={}; runSearch().forEach(r=>{counts[r.kind]=(counts[r.kind]||0)+1;});
@@ -1918,9 +1925,11 @@ function renderSearchResults(){
     h+=`<div class="empty"><div class="big">🌿</div>"${esc(q)}"로 찾은 게 없어요.<br>다른 낱말로 찾아보시겠어요?</div>`;
   }else{
     const KIND_ICON={방문:"ti-calendar-event",신청:"ti-mail",후기:"ti-message-circle",회의록:"ti-notebook",정리:"ti-sparkles","할 일":"ti-checklist",사랑방:"ti-flower",모임:"ti-users"};
+    let _idx=0;
     all.slice(0,60).forEach(r=>{
       const snippet=makeSnippet(r.body||r.title,q);
-      h+=`<div class="srch-item" onclick="jumpToResult('${r.tab}',${r.openFn?`'${r.openFn.replace(/'/g,"&#39;")}'`:"null"})">
+      const i=_idx++; _searchActions[i]={tab:r.tab, open:r.openFn};
+      h+=`<div class="srch-item" onclick="runSearchAction(${i})">
         <div class="srch-meta"><i class="ti ${KIND_ICON[r.kind]||"ti-file"}"></i><span>${r.kind}${r.date?" · "+fmtDate(r.date):""}</span></div>
         <div class="srch-txt">${hi(r.title,q)}</div>
         ${snippet?`<div class="srch-txt" style="color:var(--ink-soft);font-size:12.5px;margin-top:3px">${hi(snippet,q)}</div>`:""}
@@ -1940,9 +1949,27 @@ function makeSnippet(text,q){
   const from=Math.max(0,i-20), to=Math.min(s.length,i+q.length+45);
   return (from>0?"…":"")+s.slice(from,to)+(to<s.length?"…":"");
 }
-function jumpToResult(tab,openFn){
-  goTab(tab);
-  if(openFn){ setTimeout(()=>{ try{ eval(openFn); }catch(e){} },60); }
+let _searchActions=[];
+function quickViewReview(id){
+  const r=reviews.find(x=>x.id===id); if(!r) return;
+  showModal(`<div class="grab"></div>${reviewCard(r)}<div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>`);
+}
+function quickViewRequest(id){
+  const r=visitRequests.find(x=>x.id===id); if(!r) return;
+  const state = r.status==="승인" ? "approved" : (r.status==="보류"||r.status==="거절") ? "held" : "waiting";
+  showModal(`<div class="grab"></div>${vreqCard(r,state)}<div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>`);
+}
+function quickViewNote(id){
+  const n=notes.find(x=>x.id===id); if(!n) return;
+  showModal(`<div class="grab"></div><h3>${esc(n.who||"이름 없는 마음")}</h3>
+    ${n.photo?`<img src="${driveThumb(n.photo)}" style="width:100%;border-radius:12px;margin-bottom:10px">`:""}
+    <div style="font-size:14px;line-height:1.7;white-space:pre-line">${mdRender(n.text||"")}</div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>`);
+}
+function runSearchAction(i){
+  const a=_searchActions[i]; if(!a || !a.open) return;
+  // 검색 화면에 그대로 머문 채 팝업만 여는 방식 — 닫으면 검색 결과가 그대로 남아있음
+  try{ a.open(); }catch(e){}
 }
 
 function renderVisitReq(){
@@ -2107,6 +2134,7 @@ async function decideVisitReq(id,status,reason){
 /* ============================================================
    화면 — 방문자 후기
    ============================================================ */
+let reviewsShown=10;
 function renderReviews(){
   const v=document.getElementById("view-reviews");
   const list=[...reviews].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
@@ -2117,14 +2145,19 @@ function renderReviews(){
     h+=`<div class="empty"><div class="big">💬</div>아직 남겨진 후기가 없어요.<br>머문 분들이 후기를 남기면 여기 모입니다.</div>`;
   }else{
     let failed=0;
-    list.forEach(r=>{
+    list.slice(0,reviewsShown).forEach(r=>{
       try{ h+=reviewCard(r); }
       catch(e){ failed++; console.error("후기 표시 실패 · id=",r&&r.id,e); }
     });
     if(failed) h+=`<div style="text-align:center;font-size:12px;color:var(--ink-soft);padding:10px">표시하지 못한 후기 ${failed}건이 있어요 (개발자도구 콘솔 참고)</div>`;
+    if(list.length>reviewsShown){
+      h+=`<button class="btn ghost sm" style="width:100%;margin-top:4px" onclick="loadMoreReviews()">
+        더 보기 (총 ${list.length}개 중 ${reviewsShown}개 보는 중)</button>`;
+    }
   }
   v.innerHTML=h;
 }
+function loadMoreReviews(){ reviewsShown+=10; renderReviews(); }
 function fmtWhen(ms){
   if(!ms) return "";
   const dt=new Date(ms);
