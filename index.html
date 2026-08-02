@@ -612,8 +612,17 @@ function loadCache(){
     if(d.minutes)minutes=d.minutes;if(d.visits)visits=d.visits;if(d.activities)activities=d.activities;
     if(d.visitLogs)visitLogs=d.visitLogs;if(d.todos)todos=d.todos;if(d.notes)notes=d.notes;
     if(d.visitRequests)visitRequests=d.visitRequests;if(d.reviews)reviews=d.reviews;if(d.config)config=d.config;
+    healGhostCareLogs();
     return true;
   }catch(e){ return false; }
+}
+// 예전 '수정' 방식 때문에 완료 해제된 채 남은 손님 기록은 어느 화면에도 안 보이므로 되살림
+function healGhostCareLogs(){
+  let healed=0;
+  (visitLogs||[]).forEach(l=>{
+    if(l && l.owner==="guest" && !l.closed){ l.closed=true; healed++; }
+  });
+  if(healed){ try{ saveCache(); }catch(e){} }
 }
 
 
@@ -1172,10 +1181,18 @@ function careActive(){
       <button class="btn" style="width:100%;justify-content:center;padding:14px" onclick="startCare()">오늘 정리 시작하기</button>`;
   }
   let total=0,done=0;
+  const isStale = log.date!==todayISO();
   let h=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
     <b style="font-size:15px">${fmtDate(log.date)}</b>
     <span style="font-size:12px;color:var(--ink-soft)">${esc(log.who||"정리 중")}</span>
     <button class="btn ghost sm" style="margin-left:auto" onclick="editCareWho('${log.id}')">이름</button></div>`;
+  if(isStale){
+    h+=`<div style="background:rgba(208,139,99,.14);color:#A85E38;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.6;margin-bottom:10px">
+      ⚠ ${fmtDate(log.date)}에 시작해둔 정리가 아직 남아 있어요.<br>
+      오늘 정리라면 마칠 때 오늘 날짜로 바꿔 기록할 수 있어요.
+      <button class="btn ghost sm" style="margin-top:8px" onclick="discardCare('${log.id}')">이 기록 버리고 새로 시작</button>
+    </div>`;
+  }
   CARE_TEMPLATE.forEach((g,gi)=>{
     h+=`<div class="chk-group"><h4>${esc(g.group)}</h4>`;
     g.items.forEach((it,ii)=>{
@@ -1207,6 +1224,13 @@ function careActive(){
     <div style="text-align:center;font-size:12px;color:var(--ink-soft);margin-top:6px">${done} / ${total} 완료</div>
     <div class="modal-actions"><button class="btn lilac" id="closeCareBtn" style="width:100%" onclick="closeCare('${log.id}')">정리 마치기 — 다른 집사도 볼 수 있게</button></div></div>`;
   return h;
+}
+function discardCare(id){
+  const log=visitLogs.find(l=>l.id===id);
+  if(!log) return;
+  if(!confirm(`${fmtDate(log.date)}에 시작해둔 정리 기록을 버릴까요?\n\n아직 공유되지 않은 기록이라 이 기기에서만 사라져요.`)) return;
+  visitLogs=visitLogs.filter(l=>l.id!==id);
+  saveCache();renderCare();renderHome();
 }
 function startCare(){
   const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},closed:false};
@@ -1254,6 +1278,12 @@ function removePhoto(id,key){
 async function closeCare(id){
   const log=visitLogs.find(l=>l.id===id);
   if(!log.who){if(!confirm("정리한 집사 이름이 비어 있어요. 그래도 마칠까요?"))return;}
+  // 며칠 전에 눌러둔 '정리 시작'이 남아있을 수 있어, 실제로 마친 날짜를 확인해서 기록
+  const today=todayISO();
+  if(log.date!==today){
+    const useToday=confirm(`이 정리는 ${fmtDate(log.date)}에 시작해둔 기록이에요.\n\n오늘(${fmtDate(today)}) 날짜로 기록할까요?\n\n[확인] 오늘 날짜로  ·  [취소] ${fmtDate(log.date)} 그대로`);
+    if(useToday) log.date=today;
+  }
   const btn=document.getElementById("closeCareBtn");
   if(btn){btn.textContent="마치는 중…";btn.style.opacity=".7";}
   // 이 순간에 한 번에: 남아있는 사진들을 드라이브로 올리고
@@ -1336,13 +1366,108 @@ function viewCareLog(id){
     <div class="photo4">`;
   PHOTO4.forEach(p=>{const img=log.photos[p.key];
     h+=`<div class="photo-slot${img?" filled":""}" ${img?`onclick="openPhoto('${driveThumb(img).replace(/'/g,"")}')"`:""}>${img?`<img src="${driveThumb(img)}"><div class="pcheck">✓</div>`:`<span class="pemoji" style="color:var(--clay)">✗</span><span style="color:#A85E38">${esc(p.label)}</span>`}</div>`;});
-  h+=`</div><div class="modal-actions"><button class="btn ghost" onclick="delCareLog('${id}')">삭제</button><button class="btn ghost" onclick="reopenCare('${id}')">수정</button><button class="btn" onclick="closeModal()">닫기</button></div>`;
+  h+=`</div><div class="modal-actions"><button class="btn ghost" onclick="delCareLog('${id}')">삭제</button><button class="btn ghost" onclick="editCareLog('${id}')">수정</button><button class="btn" onclick="closeModal()">닫기</button></div>`;
   showModal(h);
 }
-function reopenCare(id){
-  const log=visitLogs.find(l=>l.id===id);
-  log.closed=false;markPending(log);saveCache();
-  closeModal();careTab="checklist";renderCare();goTab("care");
+/* ── 지난 기록을 그 자리에서 수정 ──
+   예전에는 '수정'이 기록을 미완료 상태로 되돌려 진행 화면으로 보냈는데,
+   그러면 지난 기록에서도 사라지고 손님 기록은 어디에도 안 보이게 되어 위험했음.
+   이제 완료 상태를 건드리지 않고 이 화면에서 바로 고칩니다. */
+function editCareLog(id){
+  const log=visitLogs.find(l=>l.id===id); if(!log) return;
+  const isGuest=log.owner==="guest";
+  let h=`<div class="grab"></div><h3>${fmtDate(log.date)} · ${esc(log.who||"이름 없음")} 수정</h3>`;
+  h+=`<div class="field"><label>날짜</label><input type="date" id="ec-date" value="${log.date||""}"></div>
+      <div class="field"><label>정리한 사람</label><input id="ec-who" value="${esc(log.who||"")}"></div>`;
+  h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">정리 항목 — 눌러서 켜고 끄기</div>`;
+  if(isGuest){
+    Object.entries(log.checks||{}).forEach(([label,d],i)=>{
+      h+=`<div class="chk-item${d?" done":""}" id="ec-chk-${i}" onclick="toggleEditChk('${id}',${i})">
+        <div class="chk-box">${d?"✓":""}</div><div class="chk-label">${esc(label)}</div></div>`;
+    });
+  }else{
+    CARE_TEMPLATE.forEach((g,gi)=>{
+      h+=`<div class="chk-group"><h4>${esc(g.group)}</h4>`;
+      g.items.forEach((it,ii)=>{
+        const k=`${gi}-${ii}`, d=!!log.checks[k];
+        h+=`<div class="chk-item${d?" done":""}" id="ec-chk-${k}" onclick="toggleEditChk('${id}','${k}')">
+          <div class="chk-box">${d?"✓":""}</div><div class="chk-label">${esc(it.t)}</div></div>`;
+      });
+      h+=`</div>`;
+    });
+  }
+  h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">4가지 단속 사진 — 눌러서 새로 올리기</div><div class="photo4">`;
+  PHOTO4.forEach(p=>{
+    const img=log.photos[p.key];
+    h+=`<label class="photo-slot${img?" filled":""}">
+      ${img?`<img src="${driveThumb(img)}"><div class="pcheck">✓</div>`:`<span class="pemoji" style="color:var(--clay)">＋</span><span style="color:#A85E38">${esc(p.label)}</span>`}
+      <input type="file" accept="image/*" style="display:none" onchange="replaceCarePhoto('${id}','${p.key}',this)">
+    </label>`;
+  });
+  h+=`</div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn ghost" onclick="viewCareLog('${id}')">취소</button>
+      <button class="btn" id="ec-save" onclick="saveCareLogEdit('${id}')">저장</button>
+    </div>`;
+  showModal(h);
+}
+function toggleEditChk(id,key){
+  const log=visitLogs.find(l=>l.id===id); if(!log) return;
+  const isGuest=log.owner==="guest";
+  // 손님 기록은 항목 이름이 키라서 번호로 찾아 실제 키를 구함
+  const realKey = isGuest ? Object.keys(log.checks||{})[key] : key;
+  if(realKey===undefined) return;
+  log.checks[realKey]=!log.checks[realKey];
+  const el=document.getElementById(`ec-chk-${key}`);
+  if(el){
+    const on=!!log.checks[realKey];
+    el.classList.toggle("done", on);
+    const box=el.querySelector(".chk-box"); if(box) box.textContent = on ? "✓" : "";
+  }
+}
+function replaceCarePhoto(id,key,input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const log=visitLogs.find(l=>l.id===id); if(!log) return;
+  const r=new FileReader();
+  r.onerror=()=>alert("사진을 읽지 못했어요. 다시 시도해주세요.");
+  r.onload=e=>{
+    const img=new Image();
+    img.onerror=()=>alert("사진 형식을 처리하지 못했어요.");
+    img.onload=()=>{
+      try{
+        const max=800,sc=Math.min(1,max/Math.max(img.width,img.height));
+        const c=document.createElement("canvas");
+        c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+        log.photos[key]=c.toDataURL("image/jpeg",0.62); // 저장할 때 드라이브로 올라감
+        editCareLog(id); // 화면 새로 그려 방금 올린 사진 보이게
+      }catch(err){ alert("사진 처리 중 문제가 생겼어요."); }
+    };img.src=e.target.result;
+  };r.readAsDataURL(f);
+}
+async function saveCareLogEdit(id){
+  const log=visitLogs.find(l=>l.id===id); if(!log) return;
+  const btn=document.getElementById("ec-save");
+  if(btn){ btn.disabled=true; btn.textContent="저장 중…"; }
+  const dEl=document.getElementById("ec-date"), wEl=document.getElementById("ec-who");
+  if(dEl && dEl.value) log.date=dEl.value;
+  if(wEl) log.who=wEl.value.trim();
+  // 새로 올린 사진(아직 이 기기 안에만 있는 것)을 드라이브로 올림
+  if(SYNC_URL){
+    const jobs=PHOTO4.filter(p=>{
+      const v=log.photos[p.key];
+      return v && typeof v==="string" && v.startsWith("data:");
+    }).map(async p=>{
+      const url=await syncUploadPhoto(log.photos[p.key],`care_${id}_${p.key}_${Date.now()}.jpg`);
+      if(url) log.photos[p.key]=url;
+    });
+    if(jobs.length) await Promise.all(jobs);
+  }
+  log.updatedAt=Date.now();
+  markPending(log);
+  await syncUpsert("visitLogs",log);
+  renderCare();renderHome();
+  viewCareLog(id); // 수정 결과를 바로 확인
 }
 function openPhoto(src){
   // 정리기록 모달 위에 겹쳐서 크게 보기 — 닫아도 뒤의 기록은 그대로 유지
@@ -1353,7 +1478,13 @@ function closePhoto(){
   document.getElementById("lightbox").classList.remove("on");
   document.getElementById("lightboxImg").src="";
 }
-function delCareLog(id){if(!confirm("이 정리 기록을 삭제할까요?"))return;visitLogs=visitLogs.filter(l=>l.id!==id);syncDelete("visitLogs",id);closeModal();renderCare();}
+function delCareLog(id){
+  const log=visitLogs.find(l=>l.id===id);
+  const who=log&&(log.who||"이름 없음"), when=log&&fmtDate(log.date);
+  const pc=log?PHOTO4.filter(p=>log.photos&&log.photos[p.key]).length:0;
+  if(!confirm(`${when} · ${who}\n단속사진 ${pc}장이 담긴 이 기록을 삭제할까요?\n\n되돌릴 수 없어요.`))return;
+  visitLogs=visitLogs.filter(l=>l.id!==id);syncDelete("visitLogs",id);closeModal();renderCare();
+}
 
 /* ============================================================
    화면 5 — 할 일 게시판
@@ -1881,10 +2012,20 @@ function openNameGate(force){
     <div class="gate-sub">한 번 고르면 이 기기에서 기억해요.<br>정리·할 일·사랑방에 이름이 자동으로 들어갑니다.</div>
     <div class="gate-names">${CARETAKERS.map(n=>`<button onclick="setMe('${n}')">${n}</button>`).join("")}</div>
     <button class="gate-skip" onclick="setMe('')">${force?"나중에 고를게요":"이름 없이 둘러보기"}</button>
+    ${force?`<button class="gate-skip" style="margin-top:6px;font-size:11.5px;opacity:.65" onclick="resetLocalCache()">기록이 안 보이나요? 이 기기 임시저장 비우기</button>`:""}
   </div>`;
   g.innerHTML=h;g.classList.add("on");
 }
 function changeMe(){openNameGate(true);}
+function resetLocalCache(){
+  if(!confirm("이 기기에 저장된 임시 데이터를 비우고, 구글시트에서 처음부터 다시 받아올까요?\n\n서버 기록은 그대로예요. 아직 '정리 마치기'를 안 한 진행 중인 정리가 있다면 사라질 수 있어요."))return;
+  try{
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem("gbj_notify_known");
+    localStorage.removeItem("gbj_notify_baseline_done");
+  }catch(e){}
+  location.reload();
+}
 
 document.querySelectorAll("nav button").forEach(b=>{
   b.addEventListener("click",()=>{goTab(b.dataset.tab);});
