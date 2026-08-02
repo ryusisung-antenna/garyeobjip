@@ -45,6 +45,26 @@ input,textarea,select{font-family:inherit;font-size:16px;color:var(--ink)}
 header{padding:20px 20px 12px;position:sticky;top:0;z-index:30;
   background:linear-gradient(var(--paper) 80%,rgba(251,248,241,0))}
 .brand{display:flex;align-items:center;gap:9px;min-width:0}
+.hdr-search{margin-left:auto;flex:none;width:38px;height:38px;border-radius:50%;
+  background:var(--card);border:1px solid var(--line);color:var(--ink-soft);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
+.hdr-search:active{transform:scale(.94);background:var(--paper-2)}
+.hdr-search svg{width:19px;height:19px}
+.srch-bar{display:flex;align-items:center;gap:9px;background:var(--card);
+  border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:12px}
+.srch-bar input{flex:1;border:none;background:none;outline:none;font-size:15px;font-family:inherit;color:var(--ink);min-width:0}
+.srch-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.srch-chip{font-size:12.5px;border:1px solid var(--line);background:var(--card);color:var(--ink-soft);
+  padding:6px 12px;border-radius:20px;cursor:pointer;font-weight:600}
+.srch-chip.on{background:var(--moss-deep);border-color:var(--moss-deep);color:#fff}
+.srch-item{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:11px 13px;margin-bottom:8px;cursor:pointer}
+.srch-item:active{background:var(--paper-2)}
+.srch-meta{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);margin-bottom:4px}
+.srch-txt{font-size:13.5px;line-height:1.6;color:var(--ink);word-break:break-word;overflow-wrap:anywhere}
+.srch-txt mark{background:rgba(244,196,48,.35);color:inherit;padding:0 2px;border-radius:3px}
+.srch-recent{font-size:12.5px;border:1px solid var(--line);background:var(--card);color:var(--ink-soft);
+  padding:7px 13px;border-radius:20px;cursor:pointer}
 .brand .leaf{width:26px;height:26px;flex:none}
 .brand-text{min-width:0}
 .brand .mark{font-size:23px;font-weight:800;color:var(--moss-deep);letter-spacing:-.03em;line-height:1.25}
@@ -324,6 +344,9 @@ nav button .ic.blob i{font-size:16px}
       <div class="mark">가볍집 집사</div>
       <div class="sub">가볍게 왔다 가볍게 가는 집</div>
     </div>
+    <button class="hdr-search" onclick="openSearch()" aria-label="찾기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    </button>
   </div>
   <div class="me-row" onclick="changeMe()">
     <span id="meLabel"></span>
@@ -343,6 +366,7 @@ nav button .ic.blob i{font-size:16px}
   <section class="view" id="view-minutes"></section>
   <section class="view" id="view-visitreq"></section>
   <section class="view" id="view-reviews"></section>
+  <section class="view" id="view-search"></section>
 </main>
 
 <nav>
@@ -557,25 +581,104 @@ function normalizeFromServer(d){
   if(d.visitRequests) d.visitRequests.forEach(r=>{ r.agree=normBool(r.agree); r.wantsSurvey=normBool(r.wantsSurvey); });
   return d;
 }
+/* ── 화면 보호장치 ──
+   받아오기(데이터)와 다시 그리기(화면)를 분리합니다.
+   무언가 입력 중이거나 창을 열어둔 동안에는 화면을 건드리지 않고,
+   그 일이 끝나면 그때 한 번에 반영합니다. */
+let renderDeferred=false;
+function userIsBusy(){
+  const el=document.activeElement;
+  if(el && ["INPUT","TEXTAREA","SELECT"].includes(el.tagName)) return true;         // 입력 중
+  const mb=document.getElementById("modalBg");
+  if(mb && mb.classList.contains("on")) return true;                                 // 창 열어둔 중
+  if(typeof syncBusy!=="undefined" && syncBusy) return true;                          // 보내는 중
+  return false;
+}
+function safeRenderAll(){
+  if(userIsBusy()){ renderDeferred=true; return false; }
+  renderAll();
+  renderDeferred=false;
+  return true;
+}
+function flushDeferredRender(){
+  if(renderDeferred && !userIsBusy()) safeRenderAll();
+}
+document.addEventListener("focusout",()=>setTimeout(flushDeferredRender,150));
+document.addEventListener("click",()=>setTimeout(flushDeferredRender,150));
+
+let lastSyncAt=0; // 마지막으로 서버에서 받아온 시각 — 다음엔 이 뒤로 바뀐 것만 요청
+// 바뀐 것만 받아왔을 때는 기존 목록 위에 덧씌움 (안 온 것은 그대로 유지)
+function mergePartial(localArr, changedArr){
+  const map=new Map();
+  (localArr||[]).forEach(it=>{ if(it && it.id!=null) map.set(it.id,it); });
+  (changedArr||[]).forEach(sv=>{
+    if(!sv || sv.id==null) return;
+    const mine=map.get(sv.id);
+    if(mine && mine.__pending){
+      const localAt=Number(mine.updatedAt)||0, serverAt=Number(sv.updatedAt)||0;
+      if(localAt>serverAt) return;      // 내 수정이 더 최신이면 지킴
+      delete mine.__pending;            // 낡은 보호표시는 걷어냄
+    }
+    map.set(sv.id,sv);
+  });
+  return Array.from(map.values());
+}
+function applyIncoming(d){
+  let changed=false;
+  const full=!!d.full;
+  const merge=(localArr,incoming)=> full ? mergeKeepPending(localArr,incoming) : mergePartial(localArr,incoming);
+  const put=(key,setter)=>{ if(d[key] && d[key].length){ setter(d[key]); changed=true; } };
+  put("timelineManual",v=>timelineManual=merge(timelineManual,v));
+  put("minutes",v=>minutes=merge(minutes,v));
+  put("visits",v=>visits=merge(visits,v));
+  put("activities",v=>activities=merge(activities,v));
+  put("visitLogs",v=>visitLogs=merge(visitLogs,v));
+  put("todos",v=>todos=merge(todos,v));
+  put("notes",v=>notes=merge(notes,v));
+  put("visitRequests",v=>visitRequests=merge(visitRequests,v));
+  put("reviews",v=>reviews=merge(reviews,v));
+  if(d.config && d.config.length){
+    config=merge(config,d.config);
+    if(typeof noticesAdminOpen!=="undefined" && !noticesAdminOpen) _localNotices=null;
+    changed=true;
+  }
+  return changed;
+}
+// 서버가 알려준 자료별 개수와 내 것이 다르면 = 어딘가 지워짐 → 전체를 다시 받아야 함
+function needsFullRefetch(counts){
+  if(!counts) return false;
+  const local={timelineManual,minutes,visits,activities,visitLogs,todos,notes,visitRequests,reviews,config};
+  return Object.keys(counts).some(k=>{
+    if(!(k in local)) return false;
+    const mine=(local[k]||[]).filter(x=>!x.__pending).length; // 아직 안 보낸 내 것은 셈에서 제외
+    return mine>counts[k];
+  });
+}
 async function syncPullAll(silent){
   if(!SYNC_URL)return;
   try{
-    const r=await fetch(SYNC_URL);let d=await r.json();
+    const url = lastSyncAt ? (SYNC_URL+"?since="+lastSyncAt) : SYNC_URL;
+    const r=await fetch(url);let d=await r.json();
     d=normalizeFromServer(d);
-    if(d.timelineManual)timelineManual=mergeKeepPending(timelineManual,d.timelineManual);
-    if(d.minutes)minutes=mergeKeepPending(minutes,d.minutes);
-    if(d.visits)visits=mergeKeepPending(visits,d.visits);
-    if(d.activities)activities=mergeKeepPending(activities,d.activities);
-    if(d.visitLogs)visitLogs=mergeKeepPending(visitLogs,d.visitLogs);
-    if(d.todos)todos=mergeKeepPending(todos,d.todos);
-    if(d.notes)notes=mergeKeepPending(notes,d.notes);
-    if(d.visitRequests)visitRequests=mergeKeepPending(visitRequests,d.visitRequests);
-    if(d.reviews)reviews=mergeKeepPending(reviews,d.reviews);
-    if(d.config){
-      config=mergeKeepPending(config,d.config);
-      if(typeof noticesAdminOpen!=="undefined" && !noticesAdminOpen) _localNotices=null;
+    let changed=applyIncoming(d);
+    // 삭제가 있었으면 전체를 다시 받아 정확히 맞춤
+    if(!d.full && needsFullRefetch(d.counts)){
+      const r2=await fetch(SYNC_URL); let d2=normalizeFromServer(await r2.json());
+      timelineManual=mergeKeepPending(timelineManual,d2.timelineManual||[]);
+      minutes=mergeKeepPending(minutes,d2.minutes||[]);
+      visits=mergeKeepPending(visits,d2.visits||[]);
+      activities=mergeKeepPending(activities,d2.activities||[]);
+      visitLogs=mergeKeepPending(visitLogs,d2.visitLogs||[]);
+      todos=mergeKeepPending(todos,d2.todos||[]);
+      notes=mergeKeepPending(notes,d2.notes||[]);
+      visitRequests=mergeKeepPending(visitRequests,d2.visitRequests||[]);
+      reviews=mergeKeepPending(reviews,d2.reviews||[]);
+      config=mergeKeepPending(config,d2.config||[]);
+      changed=true;
     }
-    setSync(true,"동기화됨");renderAll();saveCache();
+    lastSyncAt = d.serverNow || Date.now();
+    setSync(true,"동기화됨");
+    if(changed){ safeRenderAll(); saveCache(); }  // 바뀐 게 있을 때만 화면을 다시 그림
     tryOpenPendingCareLog();
   }catch(e){if(!silent)setSync(false,"동기화 실패");}
 }
@@ -598,10 +701,10 @@ function setSync(live,txt){
 // 다른 집사가 올린 내용을 주기적으로 받아옴 (앱을 켜둔 동안)
 function startPolling(){
   if(!SYNC_URL)return;
-  const typing=()=>document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName);
-  setInterval(()=>{ if(!syncBusy && !typing()) syncPullAll(true); }, 25000); // 25초마다, 입력 중이면 건너뜀
+  // 이제는 입력 중이어도 데이터는 계속 받아옴 — 화면만 안 건드림(safeRenderAll이 판단)
+  setInterval(()=>{ if(!syncBusy) syncPullAll(true); }, 25000);
   document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState==="visible" && !typing()) syncPullAll(true);
+    if(document.visibilityState==="visible") syncPullAll(true);
   });
 }
 // 폰에 마지막 상태를 저장해뒀다가, 새로고침 시 먼저 보여주고
@@ -664,7 +767,7 @@ function renderHome(){
     <div class="hh-sub">오늘도 가볍게. 지금 가볍집은 이래요.</div></div>`;
 
   // 다가오는 일정 (방문+회의) 최대 3
-  const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,3);
+  const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>String(a.start||"").localeCompare(String(b.start||""))).slice(0,3);
   h+=`<div class="home-card" onclick="goTab('visits')">
     <div class="hc-head"><span class="hc-emoji blob blob-b"><i class="ti ti-calendar-event"></i></span><span class="hc-title">다가오는 일정</span><span class="hc-go">›</span></div>`;
   if(!up.length)h+=`<div class="hc-empty">예정된 일정이 없어요.</div>`;
@@ -688,7 +791,7 @@ function renderHome(){
     PHOTO4.forEach(p=>{tot++;if(todayLog.photos[p.key])dn++;});
     h+=`<div class="hc-row"><span class="hc-label">오늘 정리 진행 중 — ${dn}/${tot}</span></div>`;
   }else{
-    const lastClosed=visitLogs.filter(l=>l.closed).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const lastClosed=visitLogs.filter(l=>l.closed).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
     h+=`<div class="hc-empty">${lastClosed?`마지막 정리: ${fmtShort(lastClosed.date)} ${esc(lastClosed.who||"")}`:"아직 정리 기록이 없어요."}</div>`;
   }
   h+=`</div>`;
@@ -702,11 +805,11 @@ function renderHome(){
   h+=`</div>`;
 
   // 사랑방 최신
-  const recentNote=[...notes].sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
+  const recentNote=[...notes].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0];
   if(recentNote){
     h+=`<div class="home-card" onclick="goTab('notes')">
       <div class="hc-head"><span class="hc-emoji blob blob-e"><i class="ti ti-flower"></i></span><span class="hc-title">사랑방 새 소식</span><span class="hc-go">›</span></div>
-      <div class="hc-row"><span class="hc-label">${esc(recentNote.text.slice(0,40))}${recentNote.text.length>40?"…":""}</span></div></div>`;
+      <div class="hc-row"><span class="hc-label">${esc(String(recentNote.text||"").slice(0,40))}${String(recentNote.text||"").length>40?"…":""}</span></div></div>`;
   }
 
   // 방문자 앱 연동 — 방문 신청 · 방문자 후기 (은은한 톤으로 구분)
@@ -746,6 +849,7 @@ function goTab(tab,fromHistory){
   document.getElementById("view-"+tab).classList.add("on");
   window.scrollTo(0,0);
   if(tab==="reviews") markReviewsViewed();
+  if(tab==="search" && fromHistory) renderSearch(); // 뒤로가기로 들어와도 화면이 비지 않게
   if(!fromHistory){
     try{
       const cur=history.state&&history.state.tab;
@@ -811,7 +915,7 @@ function buildTimeline(){
   // 연도별 묶기 (2025~)
   const dynYears={};
   [...mtItems,...manItems].forEach(it=>{(dynYears[it.year]=dynYears[it.year]||[]).push(it);});
-  Object.values(dynYears).forEach(arr=>arr.sort((a,b)=>a.date.localeCompare(b.date)));
+  Object.values(dynYears).forEach(arr=>arr.sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))));
   return dynYears;
 }
 function renderTimeline(){
@@ -871,7 +975,7 @@ function renderMinutes(){
     <div class="d">매달 한 번, 마음과 안건을 남깁니다</div></div>
     <button class="btn" onclick="openMinute()">＋ 새 회의록</button></div>`;
   // 다음 회의 안내(가장 최근 회의록의 next)
-  const latest=[...minutes].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const latest=[...minutes].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
   if(latest&&latest.nextDate){
     h+=`<div class="tip" style="border-color:rgba(142,176,78,.3);background:rgba(142,176,78,.07)">
       📌 다음 회의 — <b>${fmtDate(latest.nextDate)} (${dow(latest.nextDate)})</b>
@@ -879,7 +983,7 @@ function renderMinutes(){
   }
   if(!minutes.length){h+=`<div class="empty"><div class="big">📝</div>아직 회의록이 없습니다.</div>`;}
   else{
-    [...minutes].sort((a,b)=>b.date.localeCompare(a.date)).forEach(m=>{
+    [...minutes].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).forEach(m=>{
       const prev=[m.heartOpen,m.notice,m.agenda,m.heartClose].filter(Boolean).join(" · ").slice(0,84);
       h+=`<div class="card mt-card" onclick="readMinute('${m.id}')">
         <div class="mt-top"><span class="mt-date">${fmtDate(m.date)}</span>
@@ -965,7 +1069,7 @@ function meetingEvents(){
       start:m.date,end:m.date,color:MEETING_COLOR,note:m.host?`진행 ${m.host}`:""});
   });
   // 2) 가장 최근 회의록의 '다음 회의' = 아직 회의록이 없는 예정 회의
-  const latest=[...minutes].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const latest=[...minutes].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
   if(latest&&latest.nextDate){
     const exists=minutes.some(m=>m.date===latest.nextDate);
     if(!exists) evs.push({type:"meeting-next",mid:"",who:"예정 회의",host:latest.nextHost||"",
@@ -1022,7 +1126,7 @@ function renderVisits(){
   }
   h+=`</div></div>`;
   const today=todayISO();
-  const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>a.start.localeCompare(b.start));
+  const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>String(a.start||"").localeCompare(String(b.start||"")));
   const visitsUp=up.filter(e=>e.type==="visit");
   const gatherUp=up.filter(isGathering);
   // 방문 목록
@@ -1314,7 +1418,7 @@ async function closeCare(id){
   careTab="history";renderCare();
 }
 function careHistory(){
-  const closed=visitLogs.filter(l=>l.closed).sort((a,b)=>b.date.localeCompare(a.date));
+  const closed=visitLogs.filter(l=>l.closed).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
   if(!closed.length)return `<div class="empty"><div class="big">📋</div>아직 마친 정리 기록이 없습니다.</div>`;
   let h="";
   closed.forEach(log=>{
@@ -1504,8 +1608,9 @@ function renderTodo(){
   let h=`<div class="view-head"><div><div class="t">할 일</div>
     <div class="d">가볍집에 필요한 일을 올리고, 누구든 해두고 갑니다</div></div>
     <button class="btn clay" onclick="openTodo()">＋ 올리기</button></div>`;
-  const open=todos.filter(t=>!t.done).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-  const done=todos.filter(t=>t.done).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const byNewest=(a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""));
+  const open=todos.filter(t=>!t.done).sort(byNewest);
+  const done=todos.filter(t=>t.done).sort(byNewest);
   if(!todos.length){h+=`<div class="empty"><div class="big">📌</div>필요한 일이 있으면 올려보세요.<br>다른 집사가 보고 해둘 수 있어요.</div>`;}
   else{
     open.forEach(t=>h+=todoRow(t));
@@ -1517,7 +1622,7 @@ function todoRow(t){
   return `<div class="todo-item${t.done?" done":""}">
     <div class="todo-check" onclick="toggleTodo('${t.id}')">${t.done?"✓":""}</div>
     <div class="todo-main" onclick="openTodo('${t.id}')"><div class="todo-text">${mdRender(t.text)}</div>
-      <div class="todo-meta">${t.who?`<span class="who">${esc(t.who)}</span> · `:""}${fmtDate(t.createdAt.slice(0,10))}${t.done&&t.doneBy?` · ${esc(t.doneBy)} 처리`:""}</div></div>
+      <div class="todo-meta">${t.who?`<span class="who">${esc(t.who)}</span> · `:""}${t.createdAt?fmtDate(String(t.createdAt).slice(0,10)):""}${t.done&&t.doneBy?` · ${esc(t.doneBy)} 처리`:""}</div></div>
     <button class="todo-del" onclick="delTodo('${t.id}')">×</button></div>`;
 }
 function openTodo(id){
@@ -1554,12 +1659,12 @@ function renderNotes(){
     <button class="btn lilac" onclick="openNote()">＋ 올리기</button></div>`;
   if(!notes.length){h+=`<div class="empty"><div class="big">🌸</div>가볍집에서 느낀 한 조각을<br>여기 남겨보세요.</div>`;}
   else{
-    [...notes].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).forEach(n=>{
+    [...notes].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))).forEach(n=>{
       h+=`<div class="card note-card">
         ${n.photo?`<img src="${driveThumb(n.photo)}" class="note-img" onclick="openPhoto('${driveThumb(n.photo).replace(/'/g,"")}')">`:""}
         <div class="note-text">${mdRender(n.text)}</div>
         <div class="note-meta"><span>${n.who?esc(n.who):"이름 없는 마음"}</span>
-          <span>${fmtShort(n.createdAt.slice(0,10))}</span>
+          <span>${n.createdAt?fmtShort(String(n.createdAt).slice(0,10)):""}</span>
           <button class="note-del" onclick="delNote('${n.id}')">×</button></div></div>`;
     });
   }
@@ -1699,6 +1804,147 @@ function noticesAdminHtml(){
   h+=`</div>`;
   return h;
 }
+/* ============================================================
+   화면 — 통합 검색 (이름·날짜·내용으로 전체를 한 번에)
+   ============================================================ */
+let searchQ="", searchKind="all", searchFrom="home";
+function loadRecentSearches(){ try{ return JSON.parse(localStorage.getItem("gbj_recent_search")||"[]"); }catch(e){ return []; } }
+function pushRecentSearch(q){
+  q=(q||"").trim(); if(q.length<2) return;
+  let arr=loadRecentSearches().filter(x=>x!==q);
+  arr.unshift(q);
+  try{ localStorage.setItem("gbj_recent_search", JSON.stringify(arr.slice(0,8))); }catch(e){}
+}
+function clearRecentSearches(){ try{ localStorage.removeItem("gbj_recent_search"); }catch(e){} renderSearch(); }
+function openSearch(){
+  // 하단 탭이 없는 화면(방문신청·후기 등)에서도 정확히 되돌아가도록 실제 열린 화면 기준으로 기억
+  const cur=document.querySelector(".view.on");
+  const id=cur?cur.id.replace("view-",""):"home";
+  if(id!=="search") searchFrom=id;
+  searchQ=""; searchKind="all";
+  goTab("search");
+  renderSearch();
+  setTimeout(()=>{ const el=document.getElementById("srch-input"); if(el) el.focus(); },80);
+}
+function closeSearch(){ goTab(searchFrom||"home"); }
+function onSearchInput(v){
+  searchQ=v;
+  renderSearchResults();
+}
+function setSearchKind(k){ searchKind=k; renderSearchResults(); }
+function useRecentSearch(q){
+  searchQ=q;
+  const el=document.getElementById("srch-input"); if(el) el.value=q;
+  renderSearchResults();
+}
+// 검색 대상 — 어느 자료의 어떤 글을 훑을지
+function searchCorpus(){
+  const rows=[];
+  const add=(kind,id,date,title,body,tab,openFn)=>rows.push({kind,id,date:date||"",title:title||"",body:body||"",tab,openFn});
+  (visits||[]).forEach(v=>add("방문",v.id,v.start,
+    `${v.who||""}${v.guest?" +"+v.guest:""}`,
+    `${v.note||""} ${v.start||""} ${v.end||""}`,"visits",`openVisit('${v.id}')`));
+  (visitRequests||[]).forEach(r=>add("신청",r.id,r.start,
+    `${r.name||""}${r.companions?" +"+r.companions:""}`,
+    `${r.question||""} ${r.phone||""} ${r.holdReason||""} ${(r.messages||[]).map(m=>m.text).join(" ")}`,"visitreq",null));
+  (reviews||[]).forEach(r=>add("후기",r.id,"",
+    r.period||"방문 후기",
+    [r.good,r.bad,r.suggest,r.bestmoment,r.worstmoment,r.guidehelp,r.guidemore,r.hadong,r.revisit].filter(x=>typeof x==="string").join(" "),
+    "reviews",null));
+  (minutes||[]).forEach(m=>add("회의록",m.id,m.date,
+    `${m.date||""} 회의${m.host?" · "+m.host:""}`,
+    [m.heartOpen,m.agenda,m.notice,m.heartClose,m.nextNote,m.nextHost].filter(Boolean).join(" "),
+    "minutes",`readMinute('${m.id}')`));
+  (visitLogs||[]).filter(l=>l.closed).forEach(l=>add("정리",l.id,l.date,
+    `${l.who||"이름 없음"}${l.owner==="guest"?" (손님 제출)":""}`,
+    Object.keys(l.checks||{}).join(" "),"care",`viewCareLog('${l.id}')`));
+  (todos||[]).forEach(t=>add("할 일",t.id,"",
+    t.text||"", `${t.who||""} ${t.doneBy||""}`,"todo",null));
+  (notes||[]).forEach(n=>add("사랑방",n.id,(n.createdAt||"").slice(0,10),
+    n.who||"사랑방 글", n.text||"","notes",null));
+  (activities||[]).forEach(a=>add("모임",a.id,a.start,a.title||"",a.note||"","visits",`openActivity('${a.id}')`));
+  return rows;
+}
+function hi(text,q){
+  const s=esc(text||"");
+  if(!q) return s;
+  const safe=q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  try{ return s.replace(new RegExp(safe,"gi"),m=>`<mark>${m}</mark>`); }catch(e){ return s; }
+}
+function runSearch(){
+  const q=(searchQ||"").trim().toLowerCase();
+  if(q.length<1) return [];
+  return searchCorpus().filter(r=>{
+    if(searchKind!=="all" && r.kind!==searchKind) return false;
+    return (r.title+" "+r.body+" "+r.date).toLowerCase().includes(q);
+  }).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+}
+function renderSearch(){
+  const v=document.getElementById("view-search");
+  v.innerHTML=`<div class="view-head" style="align-items:center">
+      <button class="btn ghost sm" onclick="closeSearch()">‹ 뒤로</button>
+      <div style="flex:1"></div>
+    </div>
+    <div class="srch-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:18px;height:18px;color:var(--ink-soft);flex:none"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="srch-input" placeholder="이름, 날짜, 내용으로 찾기" value="${esc(searchQ)}" oninput="onSearchInput(this.value)" autocomplete="off">
+    </div>
+    <div id="srch-results"></div>`;
+  renderSearchResults();
+}
+function renderSearchResults(){
+  const box=document.getElementById("srch-results"); if(!box) return;
+  const q=(searchQ||"").trim();
+  if(!q){
+    const recent=loadRecentSearches();
+    box.innerHTML = recent.length
+      ? `<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:4px 2px 8px">최근 찾아본 것</div>
+         <div class="srch-chips">${recent.map(r=>`<button class="srch-recent" onclick="useRecentSearch('${esc(r).replace(/'/g,"&#39;")}')">${esc(r)}</button>`).join("")}</div>
+         <button class="btn ghost sm" onclick="clearRecentSearches()">기록 지우기</button>`
+      : `<div class="empty"><div class="big">🔍</div>찾고 싶은 이름이나 낱말을 적어주세요.<br>방문·후기·회의록·정리기록을 한 번에 찾아요.</div>`;
+    return;
+  }
+  const all=runSearch();
+  // 종류별 개수 (거르기 칩용) — 지금 검색어 기준
+  const savedKind=searchKind; searchKind="all";
+  const counts={}; runSearch().forEach(r=>{counts[r.kind]=(counts[r.kind]||0)+1;});
+  searchKind=savedKind;
+  const total=Object.values(counts).reduce((a,b)=>a+b,0);
+  let h=`<div class="srch-chips">
+    <button class="srch-chip${searchKind==="all"?" on":""}" onclick="setSearchKind('all')">전체 ${total}</button>
+    ${Object.keys(counts).map(k=>`<button class="srch-chip${searchKind===k?" on":""}" onclick="setSearchKind('${k}')">${k} ${counts[k]}</button>`).join("")}
+  </div>`;
+  if(!all.length){
+    h+=`<div class="empty"><div class="big">🌿</div>"${esc(q)}"로 찾은 게 없어요.<br>다른 낱말로 찾아보시겠어요?</div>`;
+  }else{
+    const KIND_ICON={방문:"ti-calendar-event",신청:"ti-mail",후기:"ti-message-circle",회의록:"ti-notebook",정리:"ti-sparkles","할 일":"ti-checklist",사랑방:"ti-flower",모임:"ti-users"};
+    all.slice(0,60).forEach(r=>{
+      const snippet=makeSnippet(r.body||r.title,q);
+      h+=`<div class="srch-item" onclick="jumpToResult('${r.tab}',${r.openFn?`'${r.openFn.replace(/'/g,"&#39;")}'`:"null"})">
+        <div class="srch-meta"><i class="ti ${KIND_ICON[r.kind]||"ti-file"}"></i><span>${r.kind}${r.date?" · "+fmtDate(r.date):""}</span></div>
+        <div class="srch-txt">${hi(r.title,q)}</div>
+        ${snippet?`<div class="srch-txt" style="color:var(--ink-soft);font-size:12.5px;margin-top:3px">${hi(snippet,q)}</div>`:""}
+      </div>`;
+    });
+    if(all.length>60) h+=`<div style="text-align:center;font-size:12px;color:var(--ink-soft);padding:8px">먼저 60개만 보여드려요. 낱말을 더 좁혀보세요.</div>`;
+  }
+  box.innerHTML=h;
+  pushRecentSearch(q);
+}
+// 찾은 낱말 주변만 잘라서 보여줌
+function makeSnippet(text,q){
+  const s=String(text||"").replace(/\s+/g," ").trim();
+  if(!s) return "";
+  const i=s.toLowerCase().indexOf(q.toLowerCase());
+  if(i<0) return s.slice(0,60)+(s.length>60?"…":"");
+  const from=Math.max(0,i-20), to=Math.min(s.length,i+q.length+45);
+  return (from>0?"…":"")+s.slice(from,to)+(to<s.length?"…":"");
+}
+function jumpToResult(tab,openFn){
+  goTab(tab);
+  if(openFn){ setTimeout(()=>{ try{ eval(openFn); }catch(e){} },60); }
+}
+
 function renderVisitReq(){
   const v=document.getElementById("view-visitreq");
   const waiting=visitRequests.filter(r=>r.status==="대기"||!r.status).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
@@ -1996,7 +2242,12 @@ function showModal(html){document.getElementById("modalBox").innerHTML=html;docu
 function closeModal(){document.getElementById("modalBg").classList.remove("on");}
 document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")closeModal();});
 
-function renderAll(){renderHome();renderTimeline();renderMinutes();renderVisits();renderCare();renderTodo();renderNotes();renderVisitReq();renderReviews();}
+function renderAll(){
+  renderHome();renderTimeline();renderMinutes();renderVisits();renderCare();renderTodo();renderNotes();renderVisitReq();renderReviews();
+  // 검색 화면을 보고 있고 입력 중이 아니면 결과도 최신으로
+  const sv=document.getElementById("view-search");
+  if(sv && sv.classList.contains("on") && document.activeElement!==document.getElementById("srch-input")) renderSearchResults();
+}
 
 /* ── 집사 이름 (이 기기에 기억) ── */
 const NAME_KEY="garyeobjip_me";
