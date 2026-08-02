@@ -1189,7 +1189,7 @@ function careActive(){
   if(isStale){
     h+=`<div style="background:rgba(208,139,99,.14);color:#A85E38;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.6;margin-bottom:10px">
       ⚠ ${fmtDate(log.date)}에 시작해둔 정리가 아직 남아 있어요.<br>
-      오늘 정리라면 마칠 때 오늘 날짜로 바꿔 기록할 수 있어요.
+      '정리 마치기'를 누르면 <b>그날 날짜</b>로 기록됩니다.
       <button class="btn ghost sm" style="margin-top:8px" onclick="discardCare('${log.id}')">이 기록 버리고 새로 시작</button>
     </div>`;
   }
@@ -1278,12 +1278,9 @@ function removePhoto(id,key){
 async function closeCare(id){
   const log=visitLogs.find(l=>l.id===id);
   if(!log.who){if(!confirm("정리한 집사 이름이 비어 있어요. 그래도 마칠까요?"))return;}
-  // 며칠 전에 눌러둔 '정리 시작'이 남아있을 수 있어, 실제로 마친 날짜를 확인해서 기록
-  const today=todayISO();
-  if(log.date!==today){
-    const useToday=confirm(`이 정리는 ${fmtDate(log.date)}에 시작해둔 기록이에요.\n\n오늘(${fmtDate(today)}) 날짜로 기록할까요?\n\n[확인] 오늘 날짜로  ·  [취소] ${fmtDate(log.date)} 그대로`);
-    if(useToday) log.date=today;
-  }
+  // 며칠 전에 '정리 시작'만 눌러둔 경우가 있어, 실제로 마치는 오늘 날짜로 기록
+  // (다른 날짜로 남기고 싶으면 지난 기록에서 '수정'으로 바꿀 수 있음)
+  log.date=todayISO();
   const btn=document.getElementById("closeCareBtn");
   if(btn){btn.textContent="마치는 중…";btn.style.opacity=".7";}
   // 이 순간에 한 번에: 남아있는 사진들을 드라이브로 올리고
