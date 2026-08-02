@@ -1502,14 +1502,34 @@ function renderCheckout(){
   const listH=list.map((t,i)=>`<li class="${checks[i]?'on':''}" onclick="toggleCheck(${i})"><span class="box"></span><span>${esc(t)}</span></li>`).join('');
   const slotH=GUARD_PHOTOS.map((g,i)=>{
     const p=photos[g.k];
-    return `<label class="photo-slot ${p?'filled':''}">
-      ${p?`<img src="${p.dataUrl}"><span class="mark">✓</span>`:`<span class="ph">
+    const st=p&&p.status;
+    const badge = st==='saved' ? `<span class="mark">✓</span>`
+                : st==='uploading' ? `<span class="mark" style="background:var(--sage-soft)">…</span>`
+                : st==='failed' ? `<span class="mark" style="background:var(--clay)">!</span>` : ``;
+    const inner = p
+      ? `<img src="${p.dataUrl}">${badge}`
+      : `<span class="ph">
         <svg viewBox="0 0 24 24"><path d="M4 7h3l2-2h6l2 2h3v12H4z"/><circle cx="12" cy="13.5" r="3.2"/></svg>
-        <span class="pl">${i+1}. ${esc(g.label)}</span>${g.sub?`<span class="ps">${esc(g.sub)}</span>`:''}</span>`}
+        <span class="pl">${i+1}. ${esc(g.label)}</span>${g.sub?`<span class="ps">${esc(g.sub)}</span>`:''}</span>`;
+    // 실패한 사진은 라벨을 눌러 다시 올릴 수 있게, 그 외엔 새로 찍기
+    if(st==='failed'){
+      return `<div class="photo-slot filled" style="border-color:var(--clay)">
+        ${inner}
+        <span style="position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62);color:#fff;font-size:11px;padding:5px 4px;text-align:center;line-height:1.35">
+          저장 안 됨<br><b onclick="retryPhoto('${g.k}')" style="text-decoration:underline;cursor:pointer">다시 올리기</b>
+        </span>
+      </div>`;
+    }
+    return `<label class="photo-slot ${p?'filled':''}">
+      ${inner}
+      ${st==='uploading'?`<span style="position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:5px 4px;text-align:center">저장 중…</span>`:''}
       <input type="file" accept="image/*" onchange="pickPhoto('${g.k}',this)">
     </label>`;
   }).join('');
-  const done=list.every((_,i)=>checks[i]) && GUARD_PHOTOS.every(g=>photos[g.k]);
+  const photosAllSaved = GUARD_PHOTOS.every(g=>photos[g.k] && photos[g.k].status==='saved');
+  const anyUploading = GUARD_PHOTOS.some(g=>photos[g.k] && photos[g.k].status==='uploading');
+  const anyFailed = GUARD_PHOTOS.some(g=>photos[g.k] && photos[g.k].status==='failed');
+  const done=list.every((_,i)=>checks[i]) && photosAllSaved;
   $('dash-body').innerHTML=`<div class="dash-h serif" onclick="adminTap()">퇴실 체크</div><div class="dash-sub">떠나기 전, 함께 살펴요</div>
     <div class="ch-h">정리 체크리스트</div>
     <ul class="co-list">${listH}</ul>
@@ -1517,7 +1537,10 @@ function renderCheckout(){
     <p style="font-size:13px;color:var(--sage-soft);margin:-4px 0 12px">사용 여부와 관계 없이, 아래 4장을 찍어 집사에게 보내요.</p>
     <div class="photo-grid">${slotH}</div>
     <button class="submit" id="co-submit" ${done?'':'disabled'} onclick="submitCheckout()">
-      ${done?'집사에게 정리 완료 보내기':'체크리스트와 사진 4장을 모두 채워주세요'}</button>`;
+      ${done?'집사에게 정리 완료 보내기'
+        : anyUploading?'사진 저장 중… 잠시만요'
+        : anyFailed?'저장 안 된 사진을 다시 올려주세요'
+        : '체크리스트와 사진 4장을 모두 채워주세요'}</button>`;
 }
 function toggleCheck(i){ checkoutState.checks[i]=!checkoutState.checks[i]; renderCheckout(); }
 function editCo(i,val){ ensureConf('checkout')[i]=val; }
@@ -1526,8 +1549,27 @@ function addCo(){ ensureConf('checkout').push('새 항목'); renderCheckout(); }
 function pickPhoto(k, input){
   const file=input.files&&input.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=()=>{ checkoutState.photos[k]={dataUrl:reader.result, mime:file.type}; renderCheckout(); };
+  reader.onload=()=>{
+    checkoutState.photos[k]={dataUrl:reader.result, mime:file.type, status:'uploading', uploadedUrl:null};
+    renderCheckout();
+    uploadPhotoNow(k); // 찍는 즉시 드라이브로 올림 — 저장이 확인돼야만 보내기가 열림
+  };
   reader.readAsDataURL(file);
+}
+async function uploadPhotoNow(k){
+  const g=GUARD_PHOTOS.find(x=>x.k===k); if(!g) return;
+  const p=checkoutState.photos[k]; if(!p) return;
+  const url=await uploadOnePhoto(g, p);
+  const cur=checkoutState.photos[k];
+  if(!cur || cur.dataUrl!==p.dataUrl) return; // 그 사이 다시 찍었으면 옛 결과는 버림
+  if(url){ cur.uploadedUrl=url; cur.status='saved'; }
+  else{ cur.status='failed'; }
+  renderCheckout();
+}
+function retryPhoto(k){
+  const p=checkoutState.photos[k]; if(!p) return;
+  p.status='uploading'; renderCheckout();
+  uploadPhotoNow(k);
 }
 async function uploadOnePhoto(g, p){
   // 실패 시 두 번까지 다시 시도 — 시골 인터넷이 느려 한 번에 안 올라가는 경우가 잦음
@@ -1546,35 +1588,21 @@ async function uploadOnePhoto(g, p){
 async function submitCheckout(){
   if(isSubmitting) return; // 이미 보내는 중이면 무시
   const btn=$('co-submit');
+  // 최종 안전장치 — 4장이 모두 드라이브에 저장 확인된 상태가 아니면 절대 보내지 않음
+  const missing=GUARD_PHOTOS.filter(g=>{
+    const p=checkoutState.photos[g.k];
+    return !p || p.status!=='saved' || !p.uploadedUrl;
+  });
+  if(missing.length){
+    alert('아직 저장되지 않은 사진이 있어요.\n\n· ' + missing.map(g=>g.label).join('\n· ') +
+          '\n\n사진을 다시 올린 뒤에 보내주세요.');
+    return;
+  }
   isSubmitting=true;
   btn.disabled=true; btn.textContent='보내는 중…';
   try{
-    // 방문자가 실제로 찍은 사진만 대상으로 함
-    const taken=GUARD_PHOTOS.filter(g=>checkoutState.photos[g.k]);
-    let doneCount=0;
-    const results=[];
-    for(const g of taken){ // 하나씩 올려서 진행 상황을 정확히 보여줌
-      const already=checkoutState.photos[g.k].uploadedUrl;
-      if(already){ results.push([g, already]); doneCount++; continue; } // 이미 올라간 건 건너뜀
-      btn.textContent=`사진 보내는 중… (${doneCount+1}/${taken.length})`;
-      const url=await uploadOnePhoto(g, checkoutState.photos[g.k]);
-      if(url) checkoutState.photos[g.k].uploadedUrl=url; // 성공분 기억 — 재시도 때 다시 안 올리게
-      results.push([g, url]);
-      doneCount++;
-    }
-    const failed=results.filter(([,url])=>!url).map(([g])=>g.label);
-    if(failed.length){
-      // 안전과 직결되는 사진이므로, 일부라도 실패하면 보내지 않고 분명히 알림
-      alert('사진 ' + failed.length + '장이 전송되지 않았어요.\n\n· ' + failed.join('\n· ') +
-            '\n\n인터넷 연결을 확인하고 "집사에게 정리 완료 보내기"를 다시 눌러주세요. 이미 올라간 사진은 다시 찍지 않아도 됩니다.');
-      isSubmitting=false;
-      btn.disabled=false; btn.textContent='집사에게 정리 완료 보내기';
-      return;
-    }
-    btn.textContent='마무리 중…';
     const photosObj={};
-    results.forEach(([g,url])=>{ photosObj[g.k]=url; }); // 집사 앱의 4가지 단속 사진 칸(gas/wifi/boiler/elec)과 같은 키
-    GUARD_PHOTOS.forEach(g=>{ if(!(g.k in photosObj)) photosObj[g.k]=''; }); // 아예 안 찍은 칸은 빈 값
+    GUARD_PHOTOS.forEach(g=>{ photosObj[g.k]=checkoutState.photos[g.k].uploadedUrl; });
     const list=effCheckout();
     const checksObj={}; list.forEach((t,i)=>checksObj[t]=!!checkoutState.checks[i]);
     if(!checkoutId) checkoutId='co_'+Date.now(); // 이 건의 고정 id (두 번 눌려도 같은 기록에 덮어씀)
