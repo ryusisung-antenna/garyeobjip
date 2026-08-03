@@ -898,7 +898,7 @@ function renderHome(){
     <div class="hh-sub">오늘도 가볍게. 지금 가볍집은 이래요.</div></div>`;
 
   // 다가오는 일정 (방문+회의) 최대 3
-  const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>String(a.start||"").localeCompare(String(b.start||""))).slice(0,3);
+  const up=allEvents().filter(e=>e.end>=today && !(e.type==="visit"&&e.completed)).sort((a,b)=>String(a.start||"").localeCompare(String(b.start||""))).slice(0,3);
   h+=`<div class="home-card" onclick="goTab('visits')">
     <div class="hc-head"><span class="hc-emoji blob blob-b"><i class="ti ti-calendar-event"></i></span><span class="hc-title">다가오는 일정</span><span class="hc-go">›</span></div>`;
   if(!up.length)h+=`<div class="hc-empty">예정된 일정이 없어요.</div>`;
@@ -1284,9 +1284,18 @@ function renderVisits(){
   }
   h+=`</div></div>`;
   const today=todayISO();
-  const up=allEvents().filter(e=>e.end>=today).sort((a,b)=>String(a.start||"").localeCompare(String(b.start||"")));
+  const up=allEvents().filter(e=>e.end>=today && !(e.type==="visit"&&e.completed)).sort((a,b)=>String(a.start||"").localeCompare(String(b.start||"")));
   const visitsUp=up.filter(e=>e.type==="visit");
   const gatherUp=up.filter(isGathering);
+  // 지나갔는데 아직 완료 표시가 안 된 방문 — 놓치기 쉬운 지점이라 따로 보여줌
+  const needsConfirm=(visits||[]).filter(v=>v.end<today && !v.completed)
+    .sort((a,b)=>String(b.end||"").localeCompare(String(a.end||"")))
+    .map(v=>({...v,type:"visit"}));
+  if(needsConfirm.length){
+    h+=`<div class="grp grp-visit" style="border-color:var(--clay)">
+      <div class="grp-head" style="color:#A85E38">⚠ 완료 확인 필요 · ${needsConfirm.length}건</div>
+      <div class="vlist">${needsConfirm.map(e=>eventRow(e)).join("")}</div></div>`;
+  }
   // 방문 목록
   h+=`<div class="grp grp-visit"><div class="grp-head">방문</div><div class="vlist">`;
   if(!visitsUp.length)h+=`<div class="hc-empty" style="padding:6px 2px">예정된 방문이 없습니다.</div>`;
@@ -1312,10 +1321,13 @@ function visitMeta(e){
 function eventRow(e){
   const span=e.start===e.end?`${fmtDate(e.start)} (${dow(e.start)})`:`${fmtDate(e.start)} ~ ${fmtDate(e.end)}`;
   if(e.type==="visit"){
-    return `<div class="vrow" onclick="openVisit('${e.id}')">
+    const doneBtn = e.completed
+      ? `<span style="font-size:10.5px;font-weight:700;color:var(--moss-deep);background:rgba(142,176,78,.16);padding:3px 8px;border-radius:7px;flex:none">✓ 완료</span>`
+      : `<button class="btn ghost sm" style="flex:none" onclick="event.stopPropagation();completeVisit('${e.id}')">방문 완료</button>`;
+    return `<div class="vrow" style="align-items:center" onclick="openVisit('${e.id}')">
       <span class="swatch" style="background:${e.color}"></span>
       <div class="vmain"><div class="vwho">${esc(e.who)}${e.guest?` <span class="vguest">+${esc(e.guest)}</span>`:""}</div>
-      <div class="vwhen">${span} · ${visitMeta(e)}</div></div></div>`;
+      <div class="vwhen">${span} · ${visitMeta(e)}</div></div>${doneBtn}</div>`;
   }
   // 회의 이벤트
   if(e.type==="meeting"||e.type==="meeting-next"){
@@ -1359,8 +1371,9 @@ function dayPeek(iso){
   showModal(h);
 }
 function openVisit(id,preset){
-  const v=id?visits.find(x=>x.id===id):{id:"",who:"",color:SWATCHES[visits.length%SWATCHES.length],start:preset?.start||todayISO(),end:preset?.end||todayISO(),guest:"",note:""};
+  const v=id?visits.find(x=>x.id===id):{id:"",who:"",color:SWATCHES[visits.length%SWATCHES.length],start:preset?.start||todayISO(),end:preset?.end||todayISO(),guest:"",note:"",completed:false};
   let h=`<div class="grab"></div><h3>${id?"방문 수정":"방문 등록"}</h3>
+    ${id&&v.completed?`<div style="background:rgba(142,176,78,.14);color:var(--moss-deep);border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:700;margin-bottom:10px">✓ 방문 완료로 표시돼 있어요</div>`:""}
     <div class="field"><label>누가 (집사)</label><input id="v-who" value="${esc(v.who)}" placeholder="집사 이름"></div>
     <div class="field"><label>함께 오는 손님 <span style="font-weight:400">(없으면 비워두세요)</span></label><input id="v-guest" value="${esc(v.guest)}" placeholder="지인·가족 등"></div>
     <div class="row2">
@@ -1372,9 +1385,26 @@ function openVisit(id,preset){
     <div id="v-warn"></div>
     <div class="modal-actions">
       ${id?`<button class="btn ghost" onclick="delVisit('${id}')">삭제</button>`:""}
-      <button class="btn" onclick="saveVisit('${v.id}')">저장</button></div>`;
+      <button class="btn" onclick="saveVisit('${v.id}')">저장</button></div>
+    ${id?`<button class="btn ${v.completed?"ghost":"clay"}" style="width:100%;justify-content:center;margin-top:8px" onclick="${v.completed?`uncompleteVisit('${id}')`:`completeVisit('${id}')`}">${v.completed?"완료 취소하기":"✓ 방문 완료 처리"}</button>`:""}`;
   showModal(h);window._pc=v.color;checkOverlap(id);
   ["v-start","v-end"].forEach(i=>document.getElementById(i).addEventListener("change",()=>{syncEnd();checkOverlap(id);}));
+}
+function completeVisit(id){
+  const v=visits.find(x=>x.id===id);
+  if(!v) return;
+  v.completed=true; v.updatedAt=Date.now();
+  markPending(v); syncUpsert("visits",v);
+  closeModal(); renderVisits(); renderHome();
+  toast(`${v.who||"방문"} — 완료 처리했어요`);
+}
+function uncompleteVisit(id){
+  const v=visits.find(x=>x.id===id);
+  if(!v) return;
+  v.completed=false; v.updatedAt=Date.now();
+  markPending(v); syncUpsert("visits",v);
+  closeModal(); renderVisits(); renderHome();
+  toast("완료 표시를 취소했어요");
 }
 function syncEnd(){const s=val("v-start"),e=document.getElementById("v-end");if(e.value<s)e.value=s;}
 function pickSwatch(b){document.querySelectorAll("#v-swatch button").forEach(x=>x.classList.remove("sel"));b.classList.add("sel");window._pc=b.dataset.c;}
