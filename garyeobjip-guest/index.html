@@ -1608,7 +1608,9 @@ async function submitCheckout(){
     if(!checkoutId) checkoutId='co_'+Date.now(); // 이 건의 고정 id (두 번 눌려도 같은 기록에 덮어씀)
     const item={ id:checkoutId, date:ymd(new Date()),
       who:(myVisit&&myVisit.name)||'방문자', owner:'guest',
-      checks:checksObj, photos:photosObj, closed:true, updatedAt:Date.now() };
+      checks:checksObj, photos:photosObj, closed:true,
+      visitId:(myVisit&&myVisit.id)?('v_from_'+myVisit.id):'', // 승인된 일정과 연결 — 정리 완료 시 자동으로 방문완료 처리됨
+      updatedAt:Date.now() };
     await fetch(SYNC_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({resource:'visitLogs',op:'upsert',item})});
     checkoutDone=true;
