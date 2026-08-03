@@ -935,6 +935,14 @@ function renderHome(){
   else open.slice(0,3).forEach(t=>h+=`<div class="hc-row"><span class="hc-label">· ${esc(t.text)}</span></div>`);
   h+=`</div>`;
 
+  // 사랑방 최신
+  const recentNote=[...notes].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0];
+  if(recentNote){
+    h+=`<div class="home-card" onclick="goTab('notes')">
+      <div class="hc-head"><span class="hc-emoji blob blob-e"><i class="ti ti-flower"></i></span><span class="hc-title">사랑방 새 소식</span><span class="hc-go">›</span></div>
+      <div class="hc-row"><span class="hc-label">${esc(String(recentNote.text||"").slice(0,40))}${String(recentNote.text||"").length>40?"…":""}</span></div></div>`;
+  }
+
   // 회계 장부 최근
   const recentLedger=[...ledger].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,3);
   h+=`<div class="home-card" onclick="openAcctHub('ledger')">
@@ -945,14 +953,6 @@ function renderHome(){
     h+=`<div class="hc-row"><span class="hc-label">· ${esc(l.item)}</span><span class="hc-when">${amtTxt}</span></div>`;
   });
   h+=`</div>`;
-
-  // 사랑방 최신
-  const recentNote=[...notes].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0];
-  if(recentNote){
-    h+=`<div class="home-card" onclick="goTab('notes')">
-      <div class="hc-head"><span class="hc-emoji blob blob-e"><i class="ti ti-flower"></i></span><span class="hc-title">사랑방 새 소식</span><span class="hc-go">›</span></div>
-      <div class="hc-row"><span class="hc-label">${esc(String(recentNote.text||"").slice(0,40))}${String(recentNote.text||"").length>40?"…":""}</span></div></div>`;
-  }
 
   // 방문자 앱 연동 — 방문 신청 · 방문자 후기 (은은한 톤으로 구분)
   const waitingReq=visitRequests.filter(r=>r.status==="대기"||!r.status);
@@ -2495,9 +2495,14 @@ function openReportItemEdit(reportId, kind, idx){
   const row = arr[idx];
   if(!row)return;
   const isGift = kind==="gift";
+  const catList = kind==="income" ? (LEDGER_CATS["수입"]||[]) : (LEDGER_CATS["지출"]||[]);
+  const curCat = row.category||"";
+  const catOpts = catList.map(c=>`<option ${c===curCat?"selected":""}>${esc(c)}</option>`).join("")
+    + (curCat && !catList.includes(curCat) ? `<option selected>${esc(curCat)}</option>` : "");
   let h=`<div class="grab"></div><h3>항목 ${isGift?"":"수정"}</h3>
     <div class="field"><label>날짜</label><input id="ri-date" value="${esc(row.date||"")}" placeholder="예: 3월 15일"></div>
     <div class="field"><label>내용</label><input id="ri-item" value="${esc(row.item||"")}"></div>
+    ${isGift?"":`<div class="field"><label>카테고리 <span style="font-weight:400">— 바꾸면 그 칸으로 옮겨져요</span></label><select id="ri-cat">${catOpts}</select></div>`}
     ${isGift?"":`<div class="field"><label>금액</label><input id="ri-amt" type="text" inputmode="numeric" value="${row.amount!=null?formatWon(row.amount):""}" oninput="this.value=formatWon(this.value)"></div>`}
     <div class="field"><label>비고</label><input id="ri-note" value="${esc(row.note||"")}"></div>
     <div class="modal-actions">
@@ -2546,7 +2551,10 @@ function saveReportItem(reportId, kind, idx){
   row.date=val("ri-date").trim();
   row.item=val("ri-item").trim();
   row.note=val("ri-note").trim();
-  if(kind!=="gift") row.amount=parseWon(val("ri-amt"));
+  if(kind!=="gift"){
+    row.amount=parseWon(val("ri-amt"));
+    const c=val("ri-cat"); if(c) row.category=c; // 다른 카테고리로 옮기기
+  }
   recalcReportSummary(r);
   markPending(r);syncUpsert("acctReports",r);
   closeModal();openAcctReport(reportId);
