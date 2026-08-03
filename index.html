@@ -2201,26 +2201,54 @@ function renderLedgerPanel(){
   const sorted=[...ledger].sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
   if(!sorted.length){
     h+=`<div class="empty"><div class="big">🧾</div>아직 기록이 없어요.<br>물품을 사거나 선물을 받으면 여기 남겨보세요.</div>`;
-  }else{
-    sorted.forEach(l=>h+=ledgerRow(l));
+    return h;
+  }
+  const waiting=sorted.filter(l=>!l.settled);
+  const done=sorted.filter(l=>l.settled);
+  const draft=getDraftReport();
+  if(waiting.length){
+    const sum=waiting.filter(l=>l.kind==="지출").reduce((s,l)=>s+(Number(l.amount)||0),0);
+    h+=`<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:4px 2px 8px">
+      정산 기다리는 중 · ${waiting.length}건${sum?` · 지출 합계 ${sum.toLocaleString()}원`:""}</div>`;
+    if(isAcctManager() && !draft){
+      h+=`<div style="background:rgba(208,139,99,.12);color:#A85E38;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.6;margin-bottom:10px">
+        진행 중인 회계가 없어요. 회계보고서 탭에서 <b>진행 중 회계 열기</b>를 먼저 눌러주세요.</div>`;
+    }
+    waiting.forEach(l=>h+=ledgerRow(l));
+  }
+  if(done.length){
+    h+=`<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:18px 2px 8px">정산 끝난 기록 · ${done.length}건</div>`;
+    done.forEach(l=>h+=ledgerRow(l));
   }
   return h;
 }
 function renderReportPanel(){
   const years=acctReports.filter(r=>r.type==="year").sort((a,b)=>(b.end||"").localeCompare(a.end||""));
-  const quarters=acctReports.filter(r=>r.type==="quarter").sort((a,b)=>(b.end||"").localeCompare(a.end||""));
+  const quarters=acctReports.filter(r=>r.type==="quarter"&&!r.draft).sort((a,b)=>(b.end||"").localeCompare(a.end||""));
+  const draft=acctReports.find(r=>r.draft);
   let h=acctManagerBar();
-  if(isAcctManager()){
-    h+=`<button class="btn clay" style="width:100%;justify-content:center;margin-bottom:14px" onclick="openBuildReportForm()">＋ 새 보고서 만들기</button>`;
-  }
   h+=`<div class="seg" style="margin-bottom:14px">
     <button class="${acctReportSub==='quarter'?'on':''}" onclick="setAcctReportSub('quarter')">분기 회계보고</button>
     <button class="${acctReportSub==='year'?'on':''}" onclick="setAcctReportSub('year')">1년 회계보고</button>
   </div>`;
+  if(acctReportSub==="quarter"){
+    // 진행 중인 회계 — 직전 마감 다음날부터 지금까지, 마감 전까지 계속 쌓임
+    if(draft){
+      const s=draft.summary||{carry:0,income:0,expense:0,balance:0};
+      h+=`<div class="acct-archive-item" style="border-color:var(--moss);background:rgba(142,176,78,.06)" onclick="openAcctReport('${draft.id}')">
+        <div><div class="al">${esc(draft.title)} <span style="font-size:10.5px;font-weight:700;color:var(--moss-deep);background:rgba(142,176,78,.16);padding:2px 8px;border-radius:7px;margin-left:4px">진행 중</span></div>
+          <div class="as">${fmtDate(draft.start)} ~ 아직 마감 전 · 잔액 ${Number(s.balance||0).toLocaleString()}원</div></div>
+        <span class="btn ghost sm">보기</span>
+      </div>`;
+    }else if(isAcctManager()){
+      h+=`<button class="btn clay" style="width:100%;justify-content:center;margin-bottom:14px" onclick="startDraftReport()">＋ 진행 중 회계 열기</button>`;
+    }
+  }
   const list = acctReportSub==="quarter" ? quarters : years;
   if(!list.length){
     h+=`<div class="empty"><div class="big">📑</div>아직 확정된 ${acctReportSub==='quarter'?'분기':'1년'} 보고서가 없어요.</div>`;
   }else{
+    if(draft && acctReportSub==="quarter") h+=`<div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:14px 2px 8px">확정된 보고서</div>`;
     list.forEach(r=>h+=acctArchiveRow(r));
   }
   return h;
@@ -2229,12 +2257,21 @@ function ledgerRow(l){
   const ic = l.kind==="선물" ? "🎁" : (l.kind==="수입" ? "💰" : "🧾");
   const amtCls = l.kind==="선물" ? "gift" : (l.kind==="수입"?"in":"out");
   const amtTxt = l.kind==="선물" ? "기증" : (l.kind==="수입"?"+":"-")+Number(l.amount||0).toLocaleString();
-  return `<div class="ledger-item">
+  const badge = l.settled
+    ? `<span style="font-size:10px;font-weight:700;color:var(--moss-deep);background:rgba(142,176,78,.16);padding:2px 7px;border-radius:6px;margin-left:6px">정산 완료</span>`
+    : `<span style="font-size:10px;font-weight:700;color:#A85E38;background:rgba(208,139,99,.16);padding:2px 7px;border-radius:6px;margin-left:6px">정산 대기</span>`;
+  const action = isAcctManager()
+    ? (l.settled
+        ? `<button class="btn ghost sm" style="margin-top:7px" onclick="unsettleLedgerItem('${l.id}')">정산 취소</button>`
+        : `<button class="btn ghost sm" style="margin-top:7px;color:var(--moss-deep)" onclick="settleLedgerItem('${l.id}')">✓ 정산하고 회계에 올리기</button>`)
+    : "";
+  return `<div class="ledger-item" style="${l.settled?"opacity:.72":""}">
     <span class="ledger-ic">${ic}</span>
-    <div class="ledger-main" onclick="openLedgerForm('${l.id}')">
-      <div class="ledger-who">${esc(l.who||"")} · ${fmtDate(l.date)}</div>
-      <div class="ledger-title">${esc(l.item)}${l.category?`<span class="ledger-cat">${esc(l.category)}</span>`:""}</div>
-      ${l.note?`<div class="ledger-note">${esc(l.note)}</div>`:""}
+    <div class="ledger-main">
+      <div class="ledger-who" onclick="openLedgerForm('${l.id}')">${esc(l.who||"")} · ${fmtDate(l.date)}${badge}</div>
+      <div class="ledger-title" onclick="openLedgerForm('${l.id}')">${esc(l.item)}${l.category?`<span class="ledger-cat">${esc(l.category)}</span>`:""}</div>
+      ${l.note?`<div class="ledger-note" onclick="openLedgerForm('${l.id}')">${esc(l.note)}</div>`:""}
+      ${action}
     </div>
     <span class="ledger-amt ${amtCls}">${amtTxt}</span>
   </div>`;
@@ -2257,9 +2294,9 @@ function openLedgerForm(id){
     <div class="field"><label>남긴 사람 <span style="font-weight:400">(선택)</span></label><input id="lg-who" value="${l?esc(l.who||""):esc(me)}" placeholder="집사 이름"></div>
     <div class="modal-actions">${l?`<button class="btn ghost" onclick="delLedger('${l.id}')">삭제</button>`:""}<button class="btn clay" onclick="saveLedger('${id||""}')">${l?"저장":"기록하기"}</button></div>`;
   showModal(h);
-  ledgerKindChanged();
+  ledgerKindChanged(l?l.category:"");
 }
-function ledgerKindChanged(){
+function ledgerKindChanged(preselect){
   const kind=val("lg-kind");
   const catField=document.getElementById("lg-cat-field");
   const amtField=document.getElementById("lg-amt-field");
@@ -2267,7 +2304,12 @@ function ledgerKindChanged(){
   else{
     catField.style.display=""; amtField.style.display="";
     const catSel=document.getElementById("lg-cat");
-    catSel.innerHTML=LEDGER_CATS[kind].map(c=>`<option>${c}</option>`).join("")+`<option value="__add__">＋ 새 카테고리 만들기</option>`;
+    const list=LEDGER_CATS[kind]||[];
+    // 저장돼 있던 카테고리가 목록에 없어도(삭제된 경우 등) 잃지 않도록 함께 넣어줌
+    const extra=(preselect && !list.includes(preselect)) ? [preselect] : [];
+    catSel.innerHTML=list.concat(extra).map(c=>`<option ${c===preselect?"selected":""}>${c}</option>`).join("")
+      +`<option value="__add__">＋ 새 카테고리 만들기</option>`;
+    if(preselect) catSel.value=preselect; // 수정할 때 원래 고른 값 그대로 유지
   }
 }
 function formatWon(v){ const n=String(v).replace(/[^0-9]/g,""); return n?Number(n).toLocaleString():""; }
@@ -2307,8 +2349,77 @@ function delLedger(id){
   syncDelete("ledger",id);closeModal();renderAcctHub();renderHome();
 }
 function lastQuarterEnd(){
-  const qs=acctReports.filter(r=>r.type==="quarter").sort((a,b)=>(b.end||"").localeCompare(a.end||""));
+  const qs=acctReports.filter(r=>r.type==="quarter"&&!r.draft).sort((a,b)=>(b.end||"").localeCompare(a.end||""));
   return qs.length?qs[0].end:null;
+}
+function getDraftReport(){ return acctReports.find(r=>r.draft); }
+/* ── 진행 중 회계 ──
+   직전 확정 보고서 마감 다음날부터 열려 있는 보고서.
+   기록장에 남긴 지출은 회계 담당자가 실제로 돈을 보낸 뒤 '정산 완료'를 눌러야 여기로 들어옵니다.
+   회계 발표일에 '마감하기'를 누르면 확정 보고서가 됩니다. */
+function startDraftReport(){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
+  if(getDraftReport()){ toast("이미 진행 중인 회계가 있어요"); return; }
+  const lastEnd=lastQuarterEnd();
+  const start=lastEnd?addDaysISO(lastEnd,1):todayISO();
+  const prevQ=acctReports.filter(r=>r.type==="quarter"&&!r.draft).sort((a,b)=>(b.end||"").localeCompare(a.end||""))[0];
+  const carry=prevQ?(prevQ.summary.balance||0):0;
+  const rec={
+    id:uid(), type:"quarter", draft:true,
+    title:`${start.slice(0,4)}년 회계 (진행 중)`,
+    start, end:todayISO(),
+    summary:{carry, income:0, expense:0, balance:carry},
+    incomes:[], expenses:[], gifts:[], createdAt:Date.now(), updatedAt:Date.now()
+  };
+  acctReports.push(rec);
+  markPending(rec); syncUpsert("acctReports",rec);
+  renderAcctHub(); openAcctReport(rec.id);
+  toast("진행 중 회계를 열었어요 — 기록장에서 정산할 때마다 여기 쌓여요");
+}
+function closeDraftReport(id){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
+  const r=acctReports.find(x=>x.id===id);
+  if(!r||!r.draft) return;
+  const end=prompt("회계 마감일을 적어주세요 (예: 2026-09-20)", todayISO());
+  if(!end || !/^\d{4}-\d{2}-\d{2}$/.test(end)){ if(end!==null) alert("날짜를 2026-09-20 형식으로 적어주세요."); return; }
+  const title=prompt("확정 보고서 제목을 정해주세요.", `${end.slice(0,4)}년 ${Math.ceil((Number(end.slice(5,7)))/3)}분기 회계보고`);
+  if(!title || !title.trim()) return;
+  if(!confirm(`'${title.trim()}'(으)로 마감할까요?\n\n마감하면 확정 보고서가 되고, 새 '진행 중' 회계가 열려요.`)) return;
+  r.draft=false; r.end=end; r.title=title.trim(); r.updatedAt=Date.now();
+  recalcReportSummary(r);
+  markPending(r); syncUpsert("acctReports",r);
+  startDraftReport(); // 다음 기간을 곧바로 열어둠
+  toast("회계를 마감했어요");
+}
+/* 기록장 항목을 진행 중 회계로 보내기 (= 실제로 정산했다는 표시) */
+function settleLedgerItem(id){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
+  const l=ledger.find(x=>x.id===id);
+  if(!l) return;
+  const draft=getDraftReport();
+  if(!draft){ alert("진행 중인 회계가 없어요.\n회계보고서 탭에서 '진행 중 회계 열기'를 먼저 눌러주세요."); return; }
+  const amtTxt=l.kind==="선물"?"기증":Number(l.amount||0).toLocaleString()+"원";
+  if(!confirm(`'${l.item}' (${amtTxt})\n\n정산을 마치고 이 회계보고서에 올릴까요?`)) return;
+  const row={date:fmtKDate(l.date), item:l.item, category:l.category, amount:l.amount, note:l.note||""};
+  if(l.kind==="수입") draft.incomes.push(row);
+  else if(l.kind==="지출") draft.expenses.push(row);
+  else draft.gifts.push({date:fmtKDate(l.date), item:l.item, note:l.note||""});
+  recalcReportSummary(draft);
+  markPending(draft); syncUpsert("acctReports",draft);
+  l.settled=true; l.settledAt=Date.now(); l.reportId=draft.id; l.updatedAt=Date.now();
+  markPending(l); syncUpsert("ledger",l);
+  renderAcctHub(); renderHome();
+  toast("정산 완료 — 진행 중 회계에 올렸어요");
+}
+function unsettleLedgerItem(id){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
+  const l=ledger.find(x=>x.id===id);
+  if(!l) return;
+  if(!confirm(`'${l.item}' 정산 표시를 취소할까요?\n\n보고서에 이미 올라간 줄은 보고서에서 직접 지워주세요.`)) return;
+  l.settled=false; l.settledAt=null; l.reportId=""; l.updatedAt=Date.now();
+  markPending(l); syncUpsert("ledger",l);
+  renderAcctHub(); renderHome();
+  toast("정산 표시를 취소했어요");
 }
 function addDaysISO(iso,n){
   const d=new Date(iso+"T00:00");
@@ -2426,7 +2537,9 @@ function openAcctReport(id){
   let h=`<div class="view-head" style="display:block">
     <div class="acct-brand">🌿 가볍집 회계보고</div>
     <div class="t">${esc(r.title)}</div>
-    <div class="d">${fmtDate(r.start)} ~ ${fmtDate(r.end)} · <span class="badge locked">📌 확정된 보고서</span></div>
+    <div class="d">${fmtDate(r.start)} ~ ${r.draft?"아직 마감 전":fmtDate(r.end)} · ${r.draft
+      ?`<span class="badge locked" style="background:rgba(142,176,78,.16);color:var(--moss-deep)">🌱 진행 중</span>`
+      :`<span class="badge locked">📌 확정된 보고서</span>`}</div>
   </div>`;
 
   h+=`<div class="acct-hero">
@@ -2461,7 +2574,8 @@ function openAcctReport(id){
   h+=`<div class="modal-actions" style="margin-top:4px">
     <button class="btn ghost" style="flex:1;justify-content:center" onclick="openAcctHub('report')">← 목록으로</button>
     ${canEdit?`<button class="btn lilac" style="flex:1;justify-content:center" onclick="openEditReport('${r.id}')">✏️ 전체 수정</button>`:""}
-  </div>`;
+  </div>
+  ${r.draft&&canEdit?`<button class="btn clay" style="width:100%;justify-content:center;margin-top:8px" onclick="closeDraftReport('${r.id}')">📑 이 회계 마감하기 (확정 보고서로)</button>`:""}`;
   v.innerHTML=h;
   v.dataset.reportId=id;
   if(!wasShowing){
