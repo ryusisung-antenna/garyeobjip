@@ -347,6 +347,19 @@ nav button .ic.blob i{font-size:16px}
 .ledger-amt.in{color:var(--moss-deep)}
 .ledger-amt.out{color:var(--clay)}
 .ledger-amt.gift{color:var(--lilac-deep)}
+.acct-brand{font-size:11px;font-weight:800;color:var(--moss-deep);display:flex;align-items:center;gap:5px;margin-bottom:2px}
+.acct-hero{background:var(--card);border-radius:16px;padding:16px 16px 14px;margin-bottom:18px;box-shadow:var(--shadow)}
+.acct-hero .lbl{font-size:11.5px;color:var(--ink-soft)}
+.acct-hero .num{font-size:26px;font-weight:800;color:var(--ink);margin:2px 0 12px}
+.acct-herogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.acct-herogrid .item{text-align:center}
+.acct-herogrid .k{font-size:10.5px;color:var(--ink-soft)}
+.acct-herogrid .v{font-size:13.5px;font-weight:800;margin-top:3px}
+.acct-sec-title2{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:var(--ink);margin-bottom:10px}
+.acct-sec-title2 .ic{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.acct-sec-title2 .ic.income{background:#EAF0DD;color:var(--moss-deep)}
+.acct-sec-title2 .ic.expense{background:#F3E4D6;color:var(--clay)}
+.acct-sec-title2 .ic.gift{background:#E8E0F0;color:var(--lilac-deep)}
 .acct-sumgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
 .acct-sumitem{background:var(--paper-2);border-radius:12px;padding:10px 4px;text-align:center}
 .acct-sumitem .k{font-size:10px;color:var(--ink-soft)}
@@ -2073,6 +2086,35 @@ function runSearchAction(i){
    화면 — 회계 (일상 장부 + 확정 분기·연간 보고서)
    ============================================================ */
 let acctHubTab="ledger"; // 'ledger' | 'report'
+/* ── 회계 담당자 권한 ──
+   누구나 장부 기록·보고서 열람은 가능. 확정 보고서를 만들고 고치고 지우는 건
+   지정된 담당자만. 아직 아무도 안 정했으면 누구든 첫 담당자로 지정할 수 있고,
+   이미 정해졌으면 그 사람만 다른 사람으로 넘길 수 있음. (서버에서도 한 번 더 확인함) */
+function getAcctManager(){
+  const row=(config||[]).find(c=>c.key==="acctManager");
+  return row ? row.value : "";
+}
+function isAcctManager(){
+  const mgr=getAcctManager();
+  return !mgr || mgr===me;
+}
+function setAcctManager(){
+  const mgr=getAcctManager();
+  if(mgr && mgr!==me){ alert(`지금 회계 담당자는 ${mgr}님이에요.\n담당자만 다른 사람으로 바꿀 수 있어요.`); return; }
+  const name=prompt("회계 담당자로 지정할 이름을 적어주세요.", me||"");
+  if(!name || !name.trim()) return;
+  syncUpsert("config",{id:"acctManager",key:"acctManager",value:name.trim(),updatedAt:Date.now()});
+  toast(`${name.trim()}님을 회계 담당자로 지정했어요`);
+  setTimeout(renderAcctHub,300);
+}
+function acctManagerBar(){
+  const mgr=getAcctManager();
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--paper-2);border-radius:12px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:var(--ink-soft)">
+    <span>${mgr?`회계 담당자 — <b style="color:var(--ink)">${esc(mgr)}</b>`:"아직 회계 담당자가 정해지지 않았어요"}</span>
+    <button class="btn ghost sm" onclick="setAcctManager()">${mgr?"바꾸기":"내가 맡을게요"}</button>
+  </div>`;
+}
+
 let acctReportSub="quarter"; // 'quarter' | 'year' — 보고서 목록 안 세그먼트
 function openAcctHub(tab){
   acctHubTab=tab||"ledger";
@@ -2113,7 +2155,10 @@ function renderLedgerPanel(){
 function renderReportPanel(){
   const years=acctReports.filter(r=>r.type==="year").sort((a,b)=>(b.end||"").localeCompare(a.end||""));
   const quarters=acctReports.filter(r=>r.type==="quarter").sort((a,b)=>(b.end||"").localeCompare(a.end||""));
-  let h=`<button class="btn clay" style="width:100%;justify-content:center;margin-bottom:14px" onclick="openBuildReportForm()">＋ 새 보고서 만들기</button>`;
+  let h=acctManagerBar();
+  if(isAcctManager()){
+    h+=`<button class="btn clay" style="width:100%;justify-content:center;margin-bottom:14px" onclick="openBuildReportForm()">＋ 새 보고서 만들기</button>`;
+  }
   h+=`<div class="seg" style="margin-bottom:14px">
     <button class="${acctReportSub==='quarter'?'on':''}" onclick="setAcctReportSub('quarter')">분기 회계보고</button>
     <button class="${acctReportSub==='year'?'on':''}" onclick="setAcctReportSub('year')">1년 회계보고</button>
@@ -2214,6 +2259,7 @@ function ledgerItemsInRange(start,end){
   return ledger.filter(l=>l.date>=start && l.date<=end);
 }
 function openBuildReportForm(){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const lastEnd=lastQuarterEnd();
   const start=lastEnd?addDaysISO(lastEnd,1):"";
   let h=`<div class="grab"></div><h3>새 회계보고서 만들기</h3>
@@ -2239,6 +2285,7 @@ function updateBuildPreview(){
   note.textContent=`이 기간 장부에서 ${items.length}건을 찾았어요 — 수입 ${inc}건 · 지출 ${exp}건 · 선물 ${gift}건.`;
 }
 function confirmBuildReport(){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const start=val("br-start"),end=val("br-end");
   if(!start||!end){alert("시작일과 종료일을 확인해주세요.");return;}
   const items=ledgerItemsInRange(start,end);
@@ -2275,6 +2322,7 @@ function openAcctReport(id){
   const v=document.getElementById("view-report");
   const s=r.summary;
   const won=n=>Number(n||0).toLocaleString();
+  const canEdit=isAcctManager();
 
   const groupByCat=(items,kind)=>{
     const map={};
@@ -2293,7 +2341,8 @@ function openAcctReport(id){
     const subtotal=items.reduce((s,i)=>s+(Number(i.amount)||0),0);
     const rows=items.map((i)=>{
       const origIdx=(kind==="income"?r.incomes:r.expenses).indexOf(i);
-      return `<div class="acct-row" onclick="openReportItemEdit('${r.id}','${kind}',${origIdx})">
+      const clickAttr=canEdit?` onclick="openReportItemEdit('${r.id}','${kind}',${origIdx})"`:"";
+      return `<div class="acct-row"${clickAttr} style="${canEdit?"":"cursor:default"}">
         <span class="acct-row-date">${esc(i.date||"")}</span>
         <span class="acct-row-item">${esc(i.item||"")}${i.note?` · <span style="color:var(--ink-soft)">${esc(i.note)}</span>`:""}</span>
         <span class="acct-row-amt">${won(i.amount)}</span>
@@ -2305,46 +2354,54 @@ function openAcctReport(id){
         <span class="acct-cat-amt" style="color:${colorVar}">${won(subtotal)}원 <span class="chev">▾</span></span>
       </summary>
       ${rows}
-      <button class="btn ghost sm" style="margin:8px 0 2px;width:100%;justify-content:center" onclick="event.stopPropagation();openReportItemAdd('${r.id}','${kind}','${esc(cat)}')">＋ ${esc(cat)} 항목 추가</button>
+      ${canEdit?`<button class="btn ghost sm" style="margin:8px 0 2px;width:100%;justify-content:center" onclick="event.stopPropagation();openReportItemAdd('${r.id}','${kind}','${esc(cat)}')">＋ ${esc(cat)} 항목 추가</button>`:""}
     </details>`;
   };
 
-  let h=`<div class="view-head"><div><div class="t">${esc(r.title)}</div>
-    <div class="d">${fmtDate(r.start)} ~ ${fmtDate(r.end)} · <span class="badge locked">📌 확정된 보고서</span></div></div></div>`;
+  let h=`<div class="view-head" style="display:block">
+    <div class="acct-brand">🌿 가볍집 회계보고</div>
+    <div class="t">${esc(r.title)}</div>
+    <div class="d">${fmtDate(r.start)} ~ ${fmtDate(r.end)} · <span class="badge locked">📌 확정된 보고서</span></div>
+  </div>`;
 
-  h+=`<div class="card acct-doc-sec"><h4>① 요약</h4>
-    <div class="acct-sumgrid">
-      <div class="acct-sumitem"><div class="k">이월금</div><div class="v">${won(s.carry)}</div></div>
-      <div class="acct-sumitem"><div class="k">수입</div><div class="v" style="color:var(--moss-deep)">+${won(s.income)}</div></div>
-      <div class="acct-sumitem"><div class="k">지출</div><div class="v" style="color:var(--clay)">-${won(s.expense)}</div></div>
-      <div class="acct-sumitem"><div class="k">잔액</div><div class="v" style="color:var(--sky)">${won(s.balance)}</div></div>
-    </div></div>`;
+  h+=`<div class="acct-hero">
+    <div class="lbl">현재 잔액</div>
+    <div class="num">${won(s.balance)}원</div>
+    <div class="acct-herogrid">
+      <div class="item"><div class="k">이월금</div><div class="v">${won(s.carry)}</div></div>
+      <div class="item"><div class="k">수입</div><div class="v" style="color:var(--moss-deep)">+${won(s.income)}</div></div>
+      <div class="item"><div class="k">지출</div><div class="v" style="color:var(--clay)">-${won(s.expense)}</div></div>
+    </div>
+  </div>`;
 
-  h+=`<div class="acct-sec"><div class="acct-sec-title">💰 세부 수입 내역</div>`;
+  h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic income"><i class="ti ti-plus"></i></span>세부 수입 내역</div>`;
   Object.keys(incMap).forEach(cat=>{ h+=catCard(cat, incMap[cat], "income", "var(--moss-deep)"); });
-  h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="addLedgerCatAndRefreshReport('수입','${r.id}')">＋ 수입 카테고리 추가</button></div>`;
+  if(canEdit) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="addLedgerCatAndRefreshReport('수입','${r.id}')">＋ 수입 카테고리 추가</button>`;
+  h+=`</div>`;
 
-  h+=`<div class="acct-sec"><div class="acct-sec-title">🧾 세부 지출 내역</div>`;
+  h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic expense"><i class="ti ti-minus"></i></span>세부 지출 내역</div>`;
   Object.keys(expMap).forEach(cat=>{ h+=catCard(cat, expMap[cat], "expense", "var(--clay)"); });
-  h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="addLedgerCatAndRefreshReport('지출','${r.id}')">＋ 지출 카테고리 추가</button></div>`;
+  if(canEdit) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="addLedgerCatAndRefreshReport('지출','${r.id}')">＋ 지출 카테고리 추가</button>`;
+  h+=`</div>`;
 
-  h+=`<div class="acct-sec"><div class="acct-sec-title">🎁 선물 · 나눔 · 공유</div>
+  h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic gift"><i class="ti ti-gift"></i></span>선물 · 나눔 · 공유</div>
     <div class="acct-cat" style="padding:4px 0">
-    ${r.gifts.length? r.gifts.map((g,idx)=>`<div class="acct-row" onclick="openReportItemEdit('${r.id}','gift',${idx})">
+    ${r.gifts.length? r.gifts.map((g,idx)=>`<div class="acct-row"${canEdit?` onclick="openReportItemEdit('${r.id}','gift',${idx})"`:""} style="${canEdit?"":"cursor:default"}">
         <span class="acct-row-date">${esc(g.date||"")}</span>
         <span class="acct-row-item">${esc(g.item||"")}${g.note?` · <span style="color:var(--ink-soft)">${esc(g.note)}</span>`:""}</span>
-      </div>`).join("") : `<div class="acct-row-empty">아직 없어요</div>`}
-    <button class="btn ghost sm" style="margin:8px 0 2px;width:100%;justify-content:center" onclick="openReportItemAdd('${r.id}','gift','')">＋ 선물·나눔 항목 추가</button>
+      </div>`).join("") : `<div class="acct-row-empty">이번 기간엔 선물·나눔 기록이 없어요.</div>`}
+    ${canEdit?`<button class="btn ghost sm" style="margin:8px 0 2px;width:100%;justify-content:center" onclick="openReportItemAdd('${r.id}','gift','')">＋ 선물·나눔 항목 추가</button>`:""}
     </div></div>`;
 
   h+=`<div class="modal-actions" style="margin-top:4px">
     <button class="btn ghost" style="flex:1;justify-content:center" onclick="openAcctHub('report')">← 목록으로</button>
-    <button class="btn lilac" style="flex:1;justify-content:center" onclick="openEditReport('${r.id}')">✏️ 전체 수정</button>
+    ${canEdit?`<button class="btn lilac" style="flex:1;justify-content:center" onclick="openEditReport('${r.id}')">✏️ 전체 수정</button>`:""}
   </div>`;
   v.innerHTML=h;
   goTab("report");
 }
 function addLedgerCatAndRefreshReport(kind,reportId){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const name=prompt(`추가할 ${kind} 카테고리 이름을 적어주세요.`);
   if(!name || !name.trim())return;
   const n=name.trim();
@@ -2356,6 +2413,7 @@ function addLedgerCatAndRefreshReport(kind,reportId){
   openAcctReport(reportId);
 }
 function openReportItemEdit(reportId, kind, idx){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const r=acctReports.find(x=>x.id===reportId);
   if(!r)return;
   const arr = kind==="income" ? r.incomes : kind==="expense" ? r.expenses : r.gifts;
@@ -2374,6 +2432,7 @@ function openReportItemEdit(reportId, kind, idx){
   showModal(h);
 }
 function openReportItemAdd(reportId, kind, category){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const r=acctReports.find(x=>x.id===reportId);
   if(!r)return;
   const isGift = kind==="gift";
@@ -2388,6 +2447,7 @@ function openReportItemAdd(reportId, kind, category){
   showModal(h);
 }
 function addReportItem(reportId, kind, category){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const r=acctReports.find(x=>x.id===reportId);
   if(!r)return;
   const row = kind==="gift"
@@ -2402,6 +2462,7 @@ function addReportItem(reportId, kind, category){
   toast("항목을 추가했어요");
 }
 function saveReportItem(reportId, kind, idx){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const r=acctReports.find(x=>x.id===reportId);
   if(!r)return;
   const arr = kind==="income" ? r.incomes : kind==="expense" ? r.expenses : r.gifts;
@@ -2417,6 +2478,7 @@ function saveReportItem(reportId, kind, idx){
   toast("항목을 수정했어요");
 }
 function deleteReportItem(reportId, kind, idx){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   if(!confirm("이 항목을 지울까요?"))return;
   const r=acctReports.find(x=>x.id===reportId);
   if(!r)return;
@@ -2457,6 +2519,7 @@ function editRowHtml(kind, idx, row){
     </div></div>`;
 }
 function openEditReport(id){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const r=acctReports.find(x=>x.id===id);
   if(!r)return;
   let h=`<div class="grab"></div><h3>보고서 수정 — ${esc(r.title)}</h3>
@@ -2489,6 +2552,7 @@ function collectRows(containerId){
   });
 }
 function saveEditReport(id){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const r=acctReports.find(x=>x.id===id);
   if(!r)return;
   r.title=val("er-title").trim()||r.title;
@@ -2504,6 +2568,7 @@ function saveEditReport(id){
   toast("보고서를 수정했어요");
 }
 function delAcctReport(id){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   acctReports=acctReports.filter(r=>r.id!==id);
   syncDelete("acctReports",id);
   closeModal();openAcctHub("report");
