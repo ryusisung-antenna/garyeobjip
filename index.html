@@ -2353,6 +2353,17 @@ function lastQuarterEnd(){
   return qs.length?qs[0].end:null;
 }
 function getDraftReport(){ return acctReports.find(r=>r.draft); }
+/* 보고서에서 쓸 카테고리 목록 —
+   진행 중 회계는 지금 카테고리 목록(LEDGER_CATS)을 그대로 따라가고,
+   확정된 보고서는 만들어질 당시 실제로 쓰인 카테고리만 그대로 유지함
+   (나중에 카테고리를 새로 만들거나 빼도 지난 보고서엔 영향이 없게) */
+function reportCategoryList(r,kindKo){
+  if(r.draft) return (LEDGER_CATS[kindKo]||[]).slice();
+  const items = kindKo==="수입" ? (r.incomes||[]) : (r.expenses||[]);
+  const seen=[];
+  items.forEach(i=>{ const c=i.category||"기타"; if(!seen.includes(c)) seen.push(c); });
+  return seen;
+}
 /* ── 진행 중 회계 ──
    직전 확정 보고서 마감 다음날부터 열려 있는 보고서.
    기록장에 남긴 지출은 회계 담당자가 실제로 돈을 보낸 뒤 '정산 완료'를 눌러야 여기로 들어옵니다.
@@ -2400,10 +2411,10 @@ function settleLedgerItem(id){
   if(!draft){ alert("진행 중인 회계가 없어요.\n회계보고서 탭에서 '진행 중 회계 열기'를 먼저 눌러주세요."); return; }
   const amtTxt=l.kind==="선물"?"기증":Number(l.amount||0).toLocaleString()+"원";
   if(!confirm(`'${l.item}' (${amtTxt})\n\n정산을 마치고 이 회계보고서에 올릴까요?`)) return;
-  const row={date:fmtKDate(l.date), item:l.item, category:l.category, amount:l.amount, note:l.note||""};
+  const row={ledgerId:l.id, date:fmtKDate(l.date), item:l.item, category:l.category, amount:l.amount, note:l.note||""};
   if(l.kind==="수입") draft.incomes.push(row);
   else if(l.kind==="지출") draft.expenses.push(row);
-  else draft.gifts.push({date:fmtKDate(l.date), item:l.item, note:l.note||""});
+  else draft.gifts.push({ledgerId:l.id, date:fmtKDate(l.date), item:l.item, note:l.note||""});
   recalcReportSummary(draft);
   markPending(draft); syncUpsert("acctReports",draft);
   l.settled=true; l.settledAt=Date.now(); l.reportId=draft.id; l.updatedAt=Date.now();
@@ -2415,11 +2426,22 @@ function unsettleLedgerItem(id){
   if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const l=ledger.find(x=>x.id===id);
   if(!l) return;
-  if(!confirm(`'${l.item}' 정산 표시를 취소할까요?\n\n보고서에 이미 올라간 줄은 보고서에서 직접 지워주세요.`)) return;
+  const rep=l.reportId?acctReports.find(r=>r.id===l.reportId):null;
+  if(rep && !rep.draft){
+    alert(`이 기록은 이미 마감된 '${rep.title}'에 들어가 있어요.\n\n확정된 보고서는 함부로 바꾸지 않는 것이 원칙이라, 정말 고쳐야 한다면 그 보고서를 열어 직접 수정해주세요.`);
+    return;
+  }
+  if(!confirm(`'${l.item}' 정산을 취소할까요?\n\n진행 중 회계에 올라간 줄도 함께 빠져요.`)) return;
+  if(rep && rep.draft){
+    const drop=arr=>{ const i=(arr||[]).findIndex(x=>x.ledgerId===l.id); if(i>=0) arr.splice(i,1); };
+    drop(rep.incomes); drop(rep.expenses); drop(rep.gifts);
+    recalcReportSummary(rep);
+    markPending(rep); syncUpsert("acctReports",rep);
+  }
   l.settled=false; l.settledAt=null; l.reportId=""; l.updatedAt=Date.now();
   markPending(l); syncUpsert("ledger",l);
   renderAcctHub(); renderHome();
-  toast("정산 표시를 취소했어요");
+  toast("정산을 취소하고 회계에서도 뺐어요");
 }
 function addDaysISO(iso,n){
   const d=new Date(iso+"T00:00");
@@ -2500,9 +2522,9 @@ function openAcctReport(id){
   const openCats=wasShowing?Array.from(v.querySelectorAll("details.acct-cat[open]")).map(d=>d.dataset.cat):[];
   const scrollY=wasShowing?window.scrollY:0;
 
-  const groupByCat=(items,kind)=>{
+  const groupByCat=(items,kindKo)=>{
     const map={};
-    (LEDGER_CATS[kind]||[]).forEach(c=>map[c]=[]);
+    reportCategoryList(r,kindKo).forEach(c=>map[c]=[]);
     items.forEach(i=>{
       const c=i.category||"기타";
       if(!map[c])map[c]=[];
@@ -2554,12 +2576,13 @@ function openAcctReport(id){
 
   h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic income"><i class="ti ti-plus"></i></span>세부 수입 내역</div>`;
   Object.keys(incMap).forEach(cat=>{ h+=catCard(cat, incMap[cat], "income", "var(--moss-deep)"); });
-  if(canEdit) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="manageCategoriesModal('수입','${r.id}')">⚙ 수입 카테고리 관리</button>`;
+  if(canEdit && r.draft) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="manageCategoriesModal('수입','${r.id}')">⚙ 수입 카테고리 관리</button>`;
+  else if(canEdit) h+=`<div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;padding:0 2px">확정된 보고서는 그때 쓰인 카테고리만 보여요. 새 카테고리는 진행 중 회계에서 관리해주세요.</div>`;
   h+=`</div>`;
 
   h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic expense"><i class="ti ti-minus"></i></span>세부 지출 내역</div>`;
   Object.keys(expMap).forEach(cat=>{ h+=catCard(cat, expMap[cat], "expense", "var(--clay)"); });
-  if(canEdit) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="manageCategoriesModal('지출','${r.id}')">⚙ 지출 카테고리 관리</button>`;
+  if(canEdit && r.draft) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="manageCategoriesModal('지출','${r.id}')">⚙ 지출 카테고리 관리</button>`;
   h+=`</div>`;
 
   h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic gift"><i class="ti ti-gift"></i></span>선물 · 나눔 · 공유</div>
@@ -2609,7 +2632,7 @@ function openReportItemEdit(reportId, kind, idx){
   const row = arr[idx];
   if(!row)return;
   const isGift = kind==="gift";
-  const catList = kind==="income" ? (LEDGER_CATS["수입"]||[]) : (LEDGER_CATS["지출"]||[]);
+  const catList = reportCategoryList(r, kind==="income"?"수입":"지출");
   const curCat = row.category||"";
   const catOpts = catList.map(c=>`<option ${c===curCat?"selected":""}>${esc(c)}</option>`).join("")
     + (curCat && !catList.includes(curCat) ? `<option selected>${esc(curCat)}</option>` : "");
@@ -2680,11 +2703,20 @@ function deleteReportItem(reportId, kind, idx){
   const r=acctReports.find(x=>x.id===reportId);
   if(!r)return;
   const arr = kind==="income" ? r.incomes : kind==="expense" ? r.expenses : r.gifts;
+  const removed = arr[idx];
   arr.splice(idx,1);
+  // 기록장에서 올라온 줄이면, 그 기록을 다시 '정산 대기'로 돌려놔 잊히지 않게 함
+  if(removed && removed.ledgerId){
+    const l=ledger.find(x=>x.id===removed.ledgerId);
+    if(l && l.settled){
+      l.settled=false; l.settledAt=null; l.reportId=""; l.updatedAt=Date.now();
+      markPending(l); syncUpsert("ledger",l);
+    }
+  }
   recalcReportSummary(r);
   markPending(r);syncUpsert("acctReports",r);
   closeModal();openAcctReport(reportId);
-  toast("항목을 지웠어요");
+  toast(removed&&removed.ledgerId?"항목을 지우고, 기록장에서 정산 대기로 되돌렸어요":"항목을 지웠어요");
 }
 function recalcReportSummary(r){
   r.summary.income=r.incomes.reduce((s,i)=>s+(Number(i.amount)||0),0);
@@ -2692,7 +2724,7 @@ function recalcReportSummary(r){
   r.summary.balance=r.summary.carry+r.summary.income-r.summary.expense;
 }
 /* ---------- 확정 보고서 수정 (필요할 때만 열어 고칠 수 있게) ---------- */
-function editRowHtml(kind, idx, row){
+function editRowHtml(kind, idx, row, reportId){
   if(kind==="gift"){
     return `<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px" data-editrow="${kind}-${idx}">
       <div style="display:flex;gap:6px;margin-bottom:6px">
@@ -2704,7 +2736,8 @@ function editRowHtml(kind, idx, row){
         <button class="btn ghost sm" onclick="this.closest('[data-editrow]').remove()">삭제</button>
       </div></div>`;
   }
-  const catList=kind==="income"?LEDGER_CATS["수입"]:LEDGER_CATS["지출"];
+  const rep=reportId?acctReports.find(x=>x.id===reportId):null;
+  const catList=rep?reportCategoryList(rep,kind==="income"?"수입":"지출"):(LEDGER_CATS[kind==="income"?"수입":"지출"]||[]);
   const curCat=row.category||"";
   const catOptions=(catList||[]).map(c=>`<option ${c===curCat?"selected":""}>${esc(c)}</option>`).join("")
     + (curCat&&catList&&!catList.includes(curCat)?`<option selected>${esc(curCat)}</option>`:"");
@@ -2728,7 +2761,7 @@ function openEditReport(id){
   if(!r)return;
   const groupRows=(items,kindKo)=>{
     const map={};
-    (LEDGER_CATS[kindKo]||[]).forEach(c=>map[c]=[]);
+    reportCategoryList(r,kindKo).forEach(c=>map[c]=[]);
     items.forEach((row,i)=>{ const c=row.category||"기타"; if(!map[c])map[c]=[]; map[c].push({row,i}); });
     return map;
   };
@@ -2738,8 +2771,8 @@ function openEditReport(id){
     Object.keys(groups).forEach(cat=>{
       const gid=`er-${kind}-${safeId(cat)}`;
       out+=`<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 6px 2px">${esc(cat)}</div>
-        <div id="${gid}">${groups[cat].map(({row,i})=>editRowHtml(kind,i,row)).join("")}</div>
-        <button class="btn ghost sm" onclick="document.getElementById('${gid}').insertAdjacentHTML('beforeend',editRowHtml('${kind}',Date.now(),{category:'${esc(cat).replace(/'/g,"&#39;")}'}))">＋ ${esc(cat)}에 항목 추가</button>`;
+        <div id="${gid}">${groups[cat].map(({row,i})=>editRowHtml(kind,i,row,r.id)).join("")}</div>
+        <button class="btn ghost sm" onclick="document.getElementById('${gid}').insertAdjacentHTML('beforeend',editRowHtml('${kind}',Date.now(),{category:'${esc(cat).replace(/'/g,"&#39;")}'},'${r.id}'))">＋ ${esc(cat)}에 항목 추가</button>`;
     });
     return out;
   };
