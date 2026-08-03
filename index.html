@@ -808,6 +808,7 @@ async function syncPullAll(silent){
     setSync(true,"동기화됨");
     if(changed){ safeRenderAll(); saveCache(); }  // 바뀐 게 있을 때만 화면을 다시 그림
     tryOpenPendingCareLog();
+    tryOpenPendingReport();
   }catch(e){if(!silent)setSync(false,"동기화 실패");}
 }
 async function syncUploadPhoto(dataUrl,filename){
@@ -1032,10 +1033,25 @@ function restoreTabOnLoad(){
       tryOpenPendingCareLog(); // 이미 캐시에 있으면 바로 열림, 없으면 다음 동기화 때 열림
       return;
     }
+    // 회계보고서 상세는 눌러야 만들어지는 화면이라, 새로고침하면 어느 보고서였는지 알아내 다시 열어줌
+    const reportMatch=/^report-(.+)$/.exec(target);
+    if(reportMatch){
+      _pendingReportOpen=reportMatch[1];
+      tryOpenPendingReport();
+      return;
+    }
+    if(target==="report"){ openAcctHub("report"); return; } // 어느 보고서인지 모르면 목록으로 (빈 화면 방지)
     if(document.getElementById("view-"+target)){
       goTab(target,true);
     }
   }catch(e){}
+}
+let _pendingReportOpen=null;
+function tryOpenPendingReport(){
+  if(typeof _pendingReportOpen==="undefined" || !_pendingReportOpen) return;
+  const r=(typeof acctReports!=="undefined") && acctReports.find(x=>x.id===_pendingReportOpen);
+  if(r){ const id=_pendingReportOpen; _pendingReportOpen=null; openAcctReport(id); }
+  else { acctHubTab="report"; goTab("ledger",true); renderAcctHub(); } // 아직 안 받아왔으면 목록을 먼저 보여줌
 }
 
 /* ============================================================
@@ -2448,7 +2464,11 @@ function openAcctReport(id){
   </div>`;
   v.innerHTML=h;
   v.dataset.reportId=id;
-  if(!wasShowing) goTab("report"); // 이미 이 보고서를 보고 있던 중이면 다시 맨 위로 넘기지 않음
+  if(!wasShowing){
+    goTab("report");
+    // 어느 보고서를 보고 있는지 주소에 남겨둠 — 브라우저 새로고침에도 빈 화면이 되지 않게
+    try{ history.replaceState({tab:"report",reportId:id},"","#report-"+id); }catch(e){}
+  }
   openCats.forEach(key=>{
     const el=v.querySelector(`details.acct-cat[data-cat="${key.replace(/"/g,'\\"')}"]`);
     if(el) el.open=true;
