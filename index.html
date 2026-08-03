@@ -591,6 +591,34 @@ function delLedgerCat(kind,name){
   toast(`'${name}' 카테고리를 뺐어요`);
   renderAcctHub();
 }
+function renameLedgerCat(kind,oldName){
+  const name=prompt(`'${oldName}'을(를) 뭐라고 바꿀까요?`, oldName);
+  if(!name || !name.trim() || name.trim()===oldName) return;
+  const n=name.trim();
+  if(LEDGER_CATS[kind].includes(n)){ toast("이미 있는 이름이에요"); return; }
+  LEDGER_CATS[kind]=LEDGER_CATS[kind].map(c=>c===oldName?n:c);
+  saveLedgerCats();
+  // 아직 장부에 남아있는(확정 안 된) 기록은 새 이름으로 같이 바꿔줌 — 이미 확정된 보고서는 그대로 둠(원칙상 안 건드림)
+  ledger.filter(l=>l.category===oldName).forEach(l=>{ l.category=n; markPending(l); syncUpsert("ledger",l); });
+  toast(`'${oldName}' → '${n}'으로 바꿨어요`);
+  renderAcctHub();
+}
+function manageCategoriesModal(kind,reportId){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
+  const cats=LEDGER_CATS[kind]||[];
+  const rid=reportId?`,'${reportId}'`:"";
+  let h=`<div class="grab"></div><h3>${esc(kind)} 카테고리 관리</h3>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
+      ${cats.length?cats.map(c=>`<div style="display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:8px 10px">
+        <span style="flex:1;font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c)}</span>
+        <button class="btn ghost sm" onclick="renameLedgerCat('${esc(kind)}','${esc(c).replace(/'/g,"&#39;")}');closeModal();manageCategoriesModal('${esc(kind)}'${rid})">이름변경</button>
+        <button class="btn ghost sm" onclick="delLedgerCat('${esc(kind)}','${esc(c).replace(/'/g,"&#39;")}');closeModal();manageCategoriesModal('${esc(kind)}'${rid})" style="color:#A85E38">삭제</button>
+      </div>`).join(""):`<div style="font-size:12.5px;color:var(--ink-soft);padding:6px 2px">아직 카테고리가 없어요.</div>`}
+    </div>
+    <button class="btn ghost sm" style="width:100%;justify-content:center" onclick="addLedgerCat('${esc(kind)}');closeModal();manageCategoriesModal('${esc(kind)}'${rid})">＋ 새 카테고리 추가</button>
+    <div class="modal-actions" style="margin-top:14px"><button class="btn" style="width:100%;justify-content:center" onclick="closeModal();${reportId?`openAcctReport('${reportId}')`:"renderAcctHub()"}">닫기</button></div>`;
+  showModal(h);
+}
 /* ── 회계 보고서: 확정되면 바뀌지 않는 스냅샷 ── */
 // {id, type:'quarter'|'year', title, start, end, summary:{carry,income,expense,balance}, incomes:[], expenses:[], gifts:[], createdAt}
 let acctReports = [];
@@ -838,6 +866,7 @@ function healGhostCareLogs(){
 function esc(s){return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 function toast(msg){ const t=document.getElementById("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2600); }
 function fmtDate(iso){if(!iso)return"";const p=iso.split("-");return p.length<3?iso:`${p[0]}. ${+p[1]}. ${+p[2]}`;}
+function fmtKDate(iso){if(!iso)return"";const p=iso.split("-");return p.length<3?iso:`${+p[1]}월 ${+p[2]}일`;} // "3월 28일" 형식 — 회계 항목 날짜용
 function dow(iso){return ["일","월","화","수","목","금","토"][new Date(iso+"T00:00").getDay()];}
 function todayISO(){const t=new Date();const o=t.getTimezoneOffset();return new Date(t-o*60000).toISOString().slice(0,10);}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
@@ -2198,7 +2227,7 @@ function openLedgerForm(id){
       </select></div>
     <div class="field" id="lg-cat-field"><label>카테고리</label><div style="display:flex;gap:6px"><select id="lg-cat" style="flex:1" onchange="if(this.value==='__add__'){this.value='';ledgerCatAddPrompt();}"></select></div></div>
     <div class="field"><label>내용</label><input id="lg-item" value="${l?esc(l.item):""}" placeholder="예: 휴지 구입"></div>
-    <div class="field" id="lg-amt-field"><label>금액</label><input id="lg-amt" type="number" value="${l&&l.amount!=null?l.amount:""}" placeholder="15900"></div>
+    <div class="field" id="lg-amt-field"><label>금액</label><input id="lg-amt" type="text" inputmode="numeric" value="${l&&l.amount!=null?formatWon(l.amount):""}" oninput="this.value=formatWon(this.value)" placeholder="15,900"></div>
     <div class="field"><label>메모 <span style="font-weight:400">(선택)</span></label><input id="lg-note" value="${l?esc(l.note||""):""}" placeholder="누구에게 받았는지 등"></div>
     <div class="field"><label>남긴 사람 <span style="font-weight:400">(선택)</span></label><input id="lg-who" value="${l?esc(l.who||""):esc(me)}" placeholder="집사 이름"></div>
     <div class="modal-actions">${l?`<button class="btn ghost" onclick="delLedger('${l.id}')">삭제</button>`:""}<button class="btn clay" onclick="saveLedger('${id||""}')">${l?"저장":"기록하기"}</button></div>`;
@@ -2216,6 +2245,8 @@ function ledgerKindChanged(){
     catSel.innerHTML=LEDGER_CATS[kind].map(c=>`<option>${c}</option>`).join("")+`<option value="__add__">＋ 새 카테고리 만들기</option>`;
   }
 }
+function formatWon(v){ const n=String(v).replace(/[^0-9]/g,""); return n?Number(n).toLocaleString():""; }
+function parseWon(v){ return Number(String(v||"").replace(/[^0-9]/g,""))||0; }
 function ledgerCatAddPrompt(){
   const kind=val("lg-kind");
   const name=prompt(`추가할 ${kind} 카테고리 이름을 적어주세요.`);
@@ -2236,7 +2267,7 @@ function saveLedger(id){
     kind,
     category: kind==="선물"?"":val("lg-cat"),
     item,
-    amount: kind==="선물"?null:Number(val("lg-amt")||0),
+    amount: kind==="선물"?null:parseWon(val("lg-amt")),
     note: val("lg-note").trim(),
     who: val("lg-who").trim()||me,
     createdAt: id ? (ledger.find(x=>x.id===id)||{}).createdAt||Date.now() : Date.now()
@@ -2254,7 +2285,11 @@ function lastQuarterEnd(){
   const qs=acctReports.filter(r=>r.type==="quarter").sort((a,b)=>(b.end||"").localeCompare(a.end||""));
   return qs.length?qs[0].end:null;
 }
-function addDaysISO(iso,n){const d=new Date(iso+"T00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function addDaysISO(iso,n){
+  const d=new Date(iso+"T00:00");
+  d.setDate(d.getDate()+n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
 function ledgerItemsInRange(start,end){
   return ledger.filter(l=>l.date>=start && l.date<=end);
 }
@@ -2300,9 +2335,9 @@ function confirmBuildReport(){
   const rec={
     id:uid(), type:"quarter", title, start, end,
     summary:{carry, income:incomeSum, expense:expenseSum, balance:carry+incomeSum-expenseSum},
-    incomes: incomes.map(i=>({date:fmtDate(i.date),item:i.item,category:i.category,amount:i.amount,note:i.note})),
-    expenses: expenses.map(i=>({date:fmtDate(i.date),item:i.item,category:i.category,amount:i.amount,note:i.note})),
-    gifts: gifts.map(i=>({date:fmtDate(i.date),item:i.item,note:i.note})),
+    incomes: incomes.map(i=>({date:fmtKDate(i.date),item:i.item,category:i.category,amount:i.amount,note:i.note})),
+    expenses: expenses.map(i=>({date:fmtKDate(i.date),item:i.item,category:i.category,amount:i.amount,note:i.note})),
+    gifts: gifts.map(i=>({date:fmtKDate(i.date),item:i.item,note:i.note})),
     createdAt: Date.now()
   };
   acctReports.push(rec);
@@ -2323,6 +2358,11 @@ function openAcctReport(id){
   const s=r.summary;
   const won=n=>Number(n||0).toLocaleString();
   const canEdit=isAcctManager();
+
+  // 다시 그리기 전에 지금 펼쳐둔 카테고리와 스크롤 위치를 기억해뒀다가, 다 그린 뒤 그대로 되살림
+  const wasShowing=v.classList.contains("on") && v.dataset.reportId===id;
+  const openCats=wasShowing?Array.from(v.querySelectorAll("details.acct-cat[open]")).map(d=>d.dataset.cat):[];
+  const scrollY=wasShowing?window.scrollY:0;
 
   const groupByCat=(items,kind)=>{
     const map={};
@@ -2348,7 +2388,7 @@ function openAcctReport(id){
         <span class="acct-row-amt">${won(i.amount)}</span>
       </div>`;
     }).join("") || `<div class="acct-row-empty">아직 없어요</div>`;
-    return `<details class="acct-cat">
+    return `<details class="acct-cat" data-cat="${kind}-${esc(cat)}">
       <summary>
         <span>${esc(cat)}</span>
         <span class="acct-cat-amt" style="color:${colorVar}">${won(subtotal)}원 <span class="chev">▾</span></span>
@@ -2376,16 +2416,16 @@ function openAcctReport(id){
 
   h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic income"><i class="ti ti-plus"></i></span>세부 수입 내역</div>`;
   Object.keys(incMap).forEach(cat=>{ h+=catCard(cat, incMap[cat], "income", "var(--moss-deep)"); });
-  if(canEdit) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="addLedgerCatAndRefreshReport('수입','${r.id}')">＋ 수입 카테고리 추가</button>`;
+  if(canEdit) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="manageCategoriesModal('수입','${r.id}')">⚙ 수입 카테고리 관리</button>`;
   h+=`</div>`;
 
   h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic expense"><i class="ti ti-minus"></i></span>세부 지출 내역</div>`;
   Object.keys(expMap).forEach(cat=>{ h+=catCard(cat, expMap[cat], "expense", "var(--clay)"); });
-  if(canEdit) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="addLedgerCatAndRefreshReport('지출','${r.id}')">＋ 지출 카테고리 추가</button>`;
+  if(canEdit) h+=`<button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:6px" onclick="manageCategoriesModal('지출','${r.id}')">⚙ 지출 카테고리 관리</button>`;
   h+=`</div>`;
 
   h+=`<div class="acct-sec"><div class="acct-sec-title2"><span class="ic gift"><i class="ti ti-gift"></i></span>선물 · 나눔 · 공유</div>
-    <div class="acct-cat" style="padding:4px 0">
+    <div class="acct-cat" data-cat="gift-_all_" style="padding:4px 0">
     ${r.gifts.length? r.gifts.map((g,idx)=>`<div class="acct-row"${canEdit?` onclick="openReportItemEdit('${r.id}','gift',${idx})"`:""} style="${canEdit?"":"cursor:default"}">
         <span class="acct-row-date">${esc(g.date||"")}</span>
         <span class="acct-row-item">${esc(g.item||"")}${g.note?` · <span style="color:var(--ink-soft)">${esc(g.note)}</span>`:""}</span>
@@ -2398,7 +2438,13 @@ function openAcctReport(id){
     ${canEdit?`<button class="btn lilac" style="flex:1;justify-content:center" onclick="openEditReport('${r.id}')">✏️ 전체 수정</button>`:""}
   </div>`;
   v.innerHTML=h;
-  goTab("report");
+  v.dataset.reportId=id;
+  if(!wasShowing) goTab("report"); // 이미 이 보고서를 보고 있던 중이면 다시 맨 위로 넘기지 않음
+  openCats.forEach(key=>{
+    const el=v.querySelector(`details.acct-cat[data-cat="${key.replace(/"/g,'\\"')}"]`);
+    if(el) el.open=true;
+  });
+  if(wasShowing) window.scrollTo(0,scrollY);
 }
 function addLedgerCatAndRefreshReport(kind,reportId){
   if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
@@ -2423,7 +2469,7 @@ function openReportItemEdit(reportId, kind, idx){
   let h=`<div class="grab"></div><h3>항목 ${isGift?"":"수정"}</h3>
     <div class="field"><label>날짜</label><input id="ri-date" value="${esc(row.date||"")}" placeholder="예: 3월 15일"></div>
     <div class="field"><label>내용</label><input id="ri-item" value="${esc(row.item||"")}"></div>
-    ${isGift?"":`<div class="field"><label>금액</label><input id="ri-amt" type="number" value="${row.amount!=null?row.amount:""}"></div>`}
+    ${isGift?"":`<div class="field"><label>금액</label><input id="ri-amt" type="text" inputmode="numeric" value="${row.amount!=null?formatWon(row.amount):""}" oninput="this.value=formatWon(this.value)"></div>`}
     <div class="field"><label>비고</label><input id="ri-note" value="${esc(row.note||"")}"></div>
     <div class="modal-actions">
       <button class="btn ghost" onclick="deleteReportItem('${reportId}','${kind}',${idx})">삭제</button>
@@ -2439,7 +2485,7 @@ function openReportItemAdd(reportId, kind, category){
   let h=`<div class="grab"></div><h3>새 항목 추가${category?` — ${esc(category)}`:""}</h3>
     <div class="field"><label>날짜</label><input id="ri-date" value="" placeholder="예: 3월 15일"></div>
     <div class="field"><label>내용</label><input id="ri-item" value="" placeholder="예: 휴지 구입"></div>
-    ${isGift?"":`<div class="field"><label>금액</label><input id="ri-amt" type="number" value="" placeholder="15900"></div>`}
+    ${isGift?"":`<div class="field"><label>금액</label><input id="ri-amt" type="text" inputmode="numeric" value="" oninput="this.value=formatWon(this.value)" placeholder="15,900"></div>`}
     <div class="field"><label>비고</label><input id="ri-note" value=""></div>
     <div class="modal-actions">
       <button class="btn lilac" style="width:100%;justify-content:center" onclick="addReportItem('${reportId}','${kind}','${esc(category||"")}')">추가하기</button>
@@ -2452,7 +2498,7 @@ function addReportItem(reportId, kind, category){
   if(!r)return;
   const row = kind==="gift"
     ? {date:val("ri-date").trim(), item:val("ri-item").trim(), note:val("ri-note").trim()}
-    : {date:val("ri-date").trim(), item:val("ri-item").trim(), category, amount:Number(val("ri-amt")||0), note:val("ri-note").trim()};
+    : {date:val("ri-date").trim(), item:val("ri-item").trim(), category, amount:parseWon(val("ri-amt")), note:val("ri-note").trim()};
   if(!row.item){alert("내용을 적어주세요.");return;}
   const arr = kind==="income" ? r.incomes : kind==="expense" ? r.expenses : r.gifts;
   arr.push(row);
@@ -2471,7 +2517,7 @@ function saveReportItem(reportId, kind, idx){
   row.date=val("ri-date").trim();
   row.item=val("ri-item").trim();
   row.note=val("ri-note").trim();
-  if(kind!=="gift") row.amount=Number(val("ri-amt")||0);
+  if(kind!=="gift") row.amount=parseWon(val("ri-amt"));
   recalcReportSummary(r);
   markPending(r);syncUpsert("acctReports",r);
   closeModal();openAcctReport(reportId);
@@ -2507,13 +2553,20 @@ function editRowHtml(kind, idx, row){
         <button class="btn ghost sm" onclick="this.closest('[data-editrow]').remove()">삭제</button>
       </div></div>`;
   }
+  const catList=kind==="income"?LEDGER_CATS["수입"]:LEDGER_CATS["지출"];
+  const curCat=row.category||"";
+  const catOptions=(catList||[]).map(c=>`<option ${c===curCat?"selected":""}>${esc(c)}</option>`).join("")
+    + (curCat&&catList&&!catList.includes(curCat)?`<option selected>${esc(curCat)}</option>`:"");
   return `<div class="field" style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px" data-editrow="${kind}-${idx}">
     <div style="display:flex;gap:6px;margin-bottom:6px">
       <input placeholder="날짜" value="${esc(row.date||"")}" data-f="date" style="flex:1">
       <input placeholder="내용" value="${esc(row.item||"")}" data-f="item" style="flex:2">
     </div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <select data-f="category" style="flex:1">${catOptions}</select>
+      <input placeholder="금액" type="text" inputmode="numeric" value="${row.amount!=null?formatWon(row.amount):""}" oninput="this.value=formatWon(this.value)" data-f="amount" style="flex:1">
+    </div>
     <div style="display:flex;gap:6px">
-      <input placeholder="금액" type="number" value="${row.amount!=null?row.amount:""}" data-f="amount" style="flex:1">
       <input placeholder="비고" value="${esc(row.note||"")}" data-f="note" style="flex:1">
       <button class="btn ghost sm" onclick="this.closest('[data-editrow]').remove()">삭제</button>
     </div></div>`;
@@ -2522,16 +2575,33 @@ function openEditReport(id){
   if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
   const r=acctReports.find(x=>x.id===id);
   if(!r)return;
+  const groupRows=(items,kindKo)=>{
+    const map={};
+    (LEDGER_CATS[kindKo]||[]).forEach(c=>map[c]=[]);
+    items.forEach((row,i)=>{ const c=row.category||"기타"; if(!map[c])map[c]=[]; map[c].push({row,i}); });
+    return map;
+  };
+  const safeId=s=>String(s).replace(/[^a-zA-Z0-9]/g,"_");
+  const groupBlock=(groups,kind,kindKo)=>{
+    let out="";
+    Object.keys(groups).forEach(cat=>{
+      const gid=`er-${kind}-${safeId(cat)}`;
+      out+=`<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 6px 2px">${esc(cat)}</div>
+        <div id="${gid}">${groups[cat].map(({row,i})=>editRowHtml(kind,i,row)).join("")}</div>
+        <button class="btn ghost sm" onclick="document.getElementById('${gid}').insertAdjacentHTML('beforeend',editRowHtml('${kind}',Date.now(),{category:'${esc(cat).replace(/'/g,"&#39;")}'}))">＋ ${esc(cat)}에 항목 추가</button>`;
+    });
+    return out;
+  };
+  const incGroups=groupRows(r.incomes,"수입");
+  const expGroups=groupRows(r.expenses,"지출");
   let h=`<div class="grab"></div><h3>보고서 수정 — ${esc(r.title)}</h3>
     <div class="note" style="font-size:11.5px;color:var(--ink-soft);margin-bottom:10px">필요할 때 언제든 고칠 수 있어요. 저장하면 이 보고서만 바뀌고 다른 보고서는 그대로예요.</div>
     <div class="field"><label>제목</label><input id="er-title" value="${esc(r.title)}"></div>
-    <div class="field"><label>이월금</label><input id="er-carry" type="number" value="${r.summary.carry}"></div>
+    <div class="field"><label>이월금</label><input id="er-carry" type="text" inputmode="numeric" value="${formatWon(r.summary.carry)}" oninput="this.value=formatWon(this.value)"></div>
     <div style="font-weight:800;margin:14px 0 8px">② 세부 수입 내역</div>
-    <div id="er-incomes">${r.incomes.map((row,i)=>editRowHtml("income",i,row)).join("")}</div>
-    <button class="btn ghost sm" onclick="document.getElementById('er-incomes').insertAdjacentHTML('beforeend',editRowHtml('income',Date.now(),{}))">＋ 수입 항목 추가</button>
+    <div id="er-incomes">${groupBlock(incGroups,"income","수입")}</div>
     <div style="font-weight:800;margin:14px 0 8px">③ 세부 지출 내역</div>
-    <div id="er-expenses">${r.expenses.map((row,i)=>editRowHtml("expense",i,row)).join("")}</div>
-    <button class="btn ghost sm" onclick="document.getElementById('er-expenses').insertAdjacentHTML('beforeend',editRowHtml('expense',Date.now(),{}))">＋ 지출 항목 추가</button>
+    <div id="er-expenses">${groupBlock(expGroups,"expense","지출")}</div>
     <div style="font-weight:800;margin:14px 0 8px">④ 선물 · 나눔 · 공유</div>
     <div id="er-gifts">${r.gifts.map((row,i)=>editRowHtml("gift",i,row)).join("")}</div>
     <button class="btn ghost sm" onclick="document.getElementById('er-gifts').insertAdjacentHTML('beforeend',editRowHtml('gift',Date.now(),{}))">＋ 선물 항목 추가</button>
@@ -2546,7 +2616,7 @@ function collectRows(containerId){
     const obj={};
     box.querySelectorAll("[data-f]").forEach(inp=>{
       const f=inp.dataset.f;
-      obj[f]= f==="amount" ? Number(inp.value||0) : inp.value.trim();
+      obj[f]= f==="amount" ? parseWon(inp.value) : inp.value.trim();
     });
     return obj;
   });
@@ -2556,7 +2626,7 @@ function saveEditReport(id){
   const r=acctReports.find(x=>x.id===id);
   if(!r)return;
   r.title=val("er-title").trim()||r.title;
-  r.summary.carry=Number(val("er-carry")||0);
+  r.summary.carry=parseWon(val("er-carry"));
   r.incomes=collectRows("er-incomes");
   r.expenses=collectRows("er-expenses");
   r.gifts=collectRows("er-gifts");
