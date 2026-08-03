@@ -1321,13 +1321,10 @@ function visitMeta(e){
 function eventRow(e){
   const span=e.start===e.end?`${fmtDate(e.start)} (${dow(e.start)})`:`${fmtDate(e.start)} ~ ${fmtDate(e.end)}`;
   if(e.type==="visit"){
-    const doneBtn = e.completed
-      ? `<span style="font-size:10.5px;font-weight:700;color:var(--moss-deep);background:rgba(142,176,78,.16);padding:3px 8px;border-radius:7px;flex:none">✓ 완료</span>`
-      : `<button class="btn ghost sm" style="flex:none" onclick="event.stopPropagation();completeVisit('${e.id}')">방문 완료</button>`;
-    return `<div class="vrow" style="align-items:center" onclick="openVisit('${e.id}')">
+    return `<div class="vrow" onclick="openVisit('${e.id}')">
       <span class="swatch" style="background:${e.color}"></span>
       <div class="vmain"><div class="vwho">${esc(e.who)}${e.guest?` <span class="vguest">+${esc(e.guest)}</span>`:""}</div>
-      <div class="vwhen">${span} · ${visitMeta(e)}</div></div>${doneBtn}</div>`;
+      <div class="vwhen">${span} · ${visitMeta(e)}</div></div></div>`;
   }
   // 회의 이벤트
   if(e.type==="meeting"||e.type==="meeting-next"){
