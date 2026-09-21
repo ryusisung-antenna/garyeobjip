@@ -1227,7 +1227,7 @@ function openMinute(id){
   const draft=minuteDraftLoad(id);
   const m=draft&&draft.data?Object.assign({},base,draft.data):base;
   let h=`<div class="grab"></div><h3>${id?"회의록 수정":"새 회의록"}</h3>
-    <div style="display:flex;align-items:center;gap:8px;margin:-9px 0 14px"><span id="minuteDraftStatus" style="font-size:11.5px;color:var(--ink-soft)">${draft?"✓ 임시저장본 자동 복구":"입력하면 이 기기에 자동 임시저장"}</span>${draft?`<button class="btn ghost sm" style="margin-left:auto;padding:4px 8px;font-size:11px" onclick="discardMinuteDraft()">임시글 버리기</button>`:""}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:-9px 0 14px"><span id="minuteDraftStatus" style="font-size:11.5px;color:var(--ink-soft)">${draft?"✓ 임시저장본 자동 복구":"입력하면 이 기기에 자동 임시저장"}</span>${draft?`<button class="btn ghost sm" style="margin-left:auto;padding:4px 8px;font-size:11px" onclick="discardMinuteDraft()">임시글 버리기</button>`:""}</div><div style="font-size:11.5px;color:var(--ink-soft);margin:-7px 0 13px;line-height:1.55">Ctrl+B 굵게 · Ctrl+U 밑줄 · Ctrl+I 기울임 · <b>-</b> 말머리 · Tab/Shift+Tab 들여쓰기</div>
     <div class="row2">
       <div class="field"><label>날짜</label><input type="date" id="f-date" value="${m.date}"></div>
       <div class="field"><label>형식</label><select id="f-kind">
@@ -3184,15 +3184,65 @@ function wrapSelection(el,before,after){
   el.setSelectionRange(cs,ce);
   el.focus();
   autoGrowTextarea(el);
+  el.dispatchEvent(new Event("input",{bubbles:true}));
+}
+function replaceTextareaRange(el,start,end,text,selStart,selEnd){
+  const v=el.value;
+  el.value=v.slice(0,start)+text+v.slice(end);
+  const a=selStart==null?start+text.length:selStart;
+  const b=selEnd==null?a:selEnd;
+  el.setSelectionRange(a,b);
+  el.focus();autoGrowTextarea(el);el.dispatchEvent(new Event("input",{bubbles:true}));
+}
+function indentMinuteLines(el,outdent){
+  const v=el.value,s=el.selectionStart,e=el.selectionEnd;
+  const lineStart=v.lastIndexOf("\n",Math.max(0,s-1))+1;
+  let lineEnd=v.indexOf("\n",e);if(lineEnd<0)lineEnd=v.length;
+  const block=v.slice(lineStart,lineEnd);
+  const lines=block.split("\n");
+  const changed=lines.map(function(line){
+    if(outdent){if(line.startsWith("  "))return line.slice(2);if(line.startsWith("\t"))return line.slice(1);return line;}
+    return "  "+line;
+  }).join("\n");
+  const removedOrAdded=changed.length-block.length;
+  replaceTextareaRange(el,lineStart,lineEnd,changed,lineStart,Math.max(lineStart,lineEnd+removedOrAdded));
+}
+function minuteListKey(e,el){
+  const v=el.value,s=el.selectionStart,ePos=el.selectionEnd;
+  // "- "를 입력하면 동그라미 말머리로 즉시 변환
+  if(e.key===" " && s===ePos){
+    const ls=v.lastIndexOf("\n",Math.max(0,s-1))+1;
+    const before=v.slice(ls,s);
+    if(/^\s*-$/.test(before)){e.preventDefault();const indent=before.match(/^\s*/)[0];replaceTextareaRange(el,ls,s,indent+"• ");return true;}
+  }
+  // Enter: 현재 말머리를 다음 줄에도 이어주고, 빈 말머리에서는 목록 종료
+  if(e.key==="Enter" && !e.shiftKey && s===ePos){
+    const ls=v.lastIndexOf("\n",Math.max(0,s-1))+1;
+    const before=v.slice(ls,s);
+    const m=before.match(/^(\s*)(?:•|-)\s?(.*)$/);
+    if(m){
+      e.preventDefault();
+      if(!m[2].trim()){replaceTextareaRange(el,ls,s,m[1]);}
+      else replaceTextareaRange(el,s,s,"\n"+m[1]+"• ");
+      return true;
+    }
+  }
+  return false;
 }
 document.addEventListener("keydown",e=>{
   if(e.target.tagName!=="TEXTAREA") return;
+  const el=e.target;
+  if(minuteEditing){
+    if(e.key==="Tab"){e.preventDefault();indentMinuteLines(el,e.shiftKey);return;}
+    if(minuteListKey(e,el))return;
+  }
   const ctrl=e.ctrlKey||e.metaKey;
   if(!ctrl) return;
-  if(!e.shiftKey && e.key.toLowerCase()==="b"){ e.preventDefault(); wrapSelection(e.target,"**","**"); }
-  else if(!e.shiftKey && e.key.toLowerCase()==="u"){ e.preventDefault(); wrapSelection(e.target,"__","__"); }
-  else if(e.shiftKey && e.key.toLowerCase()==="x"){ e.preventDefault(); wrapSelection(e.target,"~~","~~"); }
-  else if(e.shiftKey && MD_COLORS[e.key]){ e.preventDefault(); wrapSelection(e.target,"{{"+e.key+":","}}"); }
+  if(!e.shiftKey && e.key.toLowerCase()==="b"){ e.preventDefault(); wrapSelection(el,"**","**"); }
+  else if(!e.shiftKey && e.key.toLowerCase()==="u"){ e.preventDefault(); wrapSelection(el,"__","__"); }
+  else if(!e.shiftKey && e.key.toLowerCase()==="i"){ e.preventDefault(); wrapSelection(el,"*","*"); }
+  else if(e.shiftKey && e.key.toLowerCase()==="x"){ e.preventDefault(); wrapSelection(el,"~~","~~"); }
+  else if(e.shiftKey && MD_COLORS[e.key]){ e.preventDefault(); wrapSelection(el,"{{"+e.key+":","}}"); }
 });
 function mdRender(text){
   if(!text) return "";
@@ -3203,6 +3253,8 @@ function mdRender(text){
   s=s.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
   s=s.replace(/__([^_]+)__/g,"<u>$1</u>");
   s=s.replace(/~~([^~]+)~~/g,"<s>$1</s>");
+  s=s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,"$1<i>$2</i>");
+  s=s.replace(/(^|\n)([ \t]*)-\s+/g,"$1$2• ");
   return s;
 }
 
