@@ -579,6 +579,22 @@ const PHOTO4 = [
   {key:"boiler",label:"보일러 전원 끈"},
   {key:"elec",  label:"복도 전기판넬 코드 뺀"},
 ];
+const PHOTO_FILE_LABEL={gas:"가스",wifi:"와이파이",boiler:"보일러",elec:"전기"};
+function photoNamePart(v,fallback){
+  return String(v||fallback||"").trim().replace(/[\\/:*?"<>|#%]/g,"-").replace(/\s+/g,"").slice(0,32)||String(fallback||"사진");
+}
+function photoShortId(id){return String(id||Date.now()).replace(/[^a-zA-Z0-9]/g,"").slice(-6)||String(Date.now()).slice(-6);}
+function carePhotoFilename(log,key){
+  const date=(log&&log.date)||todayISO();
+  const who=photoNamePart(log&&log.who,"이름없음");
+  const kind=log&&log.owner==="guest"?"방문자퇴실":"정리";
+  const label=PHOTO_FILE_LABEL[key]||photoNamePart(key,"사진");
+  return `${date}_${who}_${kind}_${label}_${photoShortId(log&&log.id)}.jpg`;
+}
+function notePhotoFilename(note){
+  const date=String(note&&note.createdAt||todayISO()).slice(0,10);
+  return `${date}_${photoNamePart(note&&note.who,"익명")}_사랑방_${photoShortId(note&&note.id)}.jpg`;
+}
 let visitLogs = []; // {id, date, who, checks:{}, photos:{}}
 
 /* ── 할 일 게시판 ── */
@@ -839,12 +855,13 @@ async function syncPullAll(silent){
     tryOpenPendingReport();
   }catch(e){if(!silent)setSync(false,"동기화 실패");}
 }
-async function syncUploadPhoto(dataUrl,filename){
+async function syncUploadPhoto(dataUrl,filename,folderKind,dateISO){
   if(!SYNC_URL)return null;
   try{
     const [head,base64]=dataUrl.split(",");
     const mime=(head.match(/data:(.*?);/)||[])[1]||"image/jpeg";
-    const r=await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"photo",op:"upload",filename,mime,dataBase64:base64})});
+    const year=String(dateISO||todayISO()).slice(0,4);
+    const r=await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"photo",op:"upload",filename,mime,dataBase64:base64,folderKind:folderKind||"기타",year})});
     const d=await r.json();
     return d.url||null;
   }catch(e){return null;}
@@ -1809,7 +1826,7 @@ async function closeCare(id){
       const v=log.photos[p.key];
       return v && v!=="__loading__" && v.startsWith("data:");
     }).map(async p=>{
-      const url=await syncUploadPhoto(log.photos[p.key],`care_${id}_${p.key}_${Date.now()}.jpg`);
+      const url=await syncUploadPhoto(log.photos[p.key],carePhotoFilename(log,p.key),"정리",log.date);
       if(url) log.photos[p.key]=url;
     });
     if(jobs.length) await Promise.all(jobs);
@@ -1997,7 +2014,7 @@ async function saveCareLogEdit(id){
       const v=log.photos[p.key];
       return v && typeof v==="string" && v.startsWith("data:");
     }).map(async p=>{
-      const url=await syncUploadPhoto(log.photos[p.key],`care_${id}_${p.key}_${Date.now()}.jpg`);
+      const url=await syncUploadPhoto(log.photos[p.key],carePhotoFilename(log,p.key),"정리",log.date);
       if(url) log.photos[p.key]=url;
     });
     if(jobs.length) await Promise.all(jobs);
@@ -2021,7 +2038,7 @@ function delCareLog(id){
   const log=visitLogs.find(l=>l.id===id);
   const who=log&&(log.who||"이름 없음"), when=log&&fmtDate(log.date);
   const pc=log?PHOTO4.filter(p=>log.photos&&log.photos[p.key]).length:0;
-  if(!confirm(`${when} · ${who}\n단속사진 ${pc}장이 담긴 이 기록을 삭제할까요?\n\n되돌릴 수 없어요.`))return;
+  if(!confirm(`${when} · ${who}\n단속사진 ${pc}장이 담긴 이 기록을 삭제할까요?\n\n연결된 Drive 사진도 휴지통으로 이동합니다.`))return;
   visitLogs=visitLogs.filter(l=>l.id!==id);syncDelete("visitLogs",id);closeModal();renderCare();
 }
 
@@ -2124,12 +2141,12 @@ async function saveNote(){
   notes.push(o);markPending(o);
   closeModal();renderNotes();renderHome(); // 우선 이 기기에 바로 보이게
   if(o.photo){
-    const url=await syncUploadPhoto(o.photo,`note_${o.id}.jpg`);
+    const url=await syncUploadPhoto(o.photo,notePhotoFilename(o),"사랑방",String(o.createdAt||todayISO()).slice(0,10));
     if(url){o.photo=url;renderNotes();}
   }
   markPending(o);syncUpsert("notes",o);
 }
-function delNote(id){if(!confirm("이 글을 지울까요?"))return;notes=notes.filter(n=>n.id!==id);syncDelete("notes",id);renderNotes();renderHome();}
+function delNote(id){if(!confirm("이 글과 연결된 사진도 함께 정리할까요?\n\nDrive 사진은 영구삭제하지 않고 휴지통으로 이동합니다."))return;notes=notes.filter(n=>n.id!==id);syncDelete("notes",id);renderNotes();renderHome();}
 
 /* ============================================================
    화면 — 방문 신청 (방문자 앱에서 들어온 신청을 승인·거절)
