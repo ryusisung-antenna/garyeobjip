@@ -292,6 +292,13 @@ nav button .ic.blob i{font-size:16px}
 .log-line.no .log-mark{background:var(--clay)}
 .log-line.ok .log-txt{color:var(--ink)}
 .log-line.no .log-txt{color:#A85E38;font-weight:600}
+.handoff-box{background:rgba(95,169,214,.07);border:1px solid rgba(95,169,214,.18);border-radius:13px;padding:12px;margin-top:14px}
+.handoff-row{display:flex;gap:7px;align-items:flex-start;margin-top:7px}
+.handoff-row input{flex:1;min-width:0;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff;font:inherit;font-size:14px;color:var(--ink)}
+.handoff-del{flex:none;width:32px;height:32px;border-radius:8px;background:var(--paper-2);color:var(--ink-soft);font-size:18px}
+.handoff-view{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;background:rgba(95,169,214,.07);border-radius:10px;margin-bottom:7px}
+.handoff-view .txt{flex:1;min-width:0;font-size:14px;line-height:1.55;white-space:pre-wrap}
+.handoff-view .sent{font-size:11.5px;color:var(--moss-deep);font-weight:700;white-space:nowrap}
 
 /* 홈 */
 .home-hello{padding:10px 4px 18px}
@@ -1607,6 +1614,7 @@ function delActivity(id){if(!confirm("이 모임·활동을 삭제할까요?"))r
    화면 4 — 살림 (퇴실 체크리스트 + 4가지 단속 사진)
    ============================================================ */
 function renderCare(){
+  pullTestGuestCareLogs();
   const v=document.getElementById("view-care");
   let h=`<div class="view-head"><div><div class="t">살림</div>
     <div class="d">가볍집을 청정하게 — 떠나기 전 정리</div></div></div>
@@ -1626,6 +1634,52 @@ function activeLog(){
   const mine=visitLogs.filter(l=>!l.closed && (!l.owner || l.owner===me));
   mine.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   return mine[0];
+}
+function normalizeCareHandoffs(log){
+  if(!log)return [];
+  let raw=log.handoffs;
+  if(typeof raw==="string"){try{raw=JSON.parse(raw);}catch(e){raw=raw.split("\n");}}
+  if(!Array.isArray(raw))raw=[];
+  log.handoffs=raw.map(function(x){
+    if(typeof x==="string")x={text:x};
+    x=x||{};
+    return {id:x.id||uid(),text:String(x.text||""),todoId:x.todoId||"",todoSentAt:x.todoSentAt||""};
+  });
+  return log.handoffs;
+}
+function activeCareHandoffRows(log){
+  const hs=normalizeCareHandoffs(log);
+  let h=`<div class="handoff-box"><div style="font-size:13px;font-weight:800;color:var(--sky)">📣 다음 사람에게 전할 말</div><div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:2px">비품 부족, 고장, 집 상태, 먹어도 되는 작물처럼 다음 방문자나 집사에게 알려둘 내용을 남겨주세요. 없어도 괜찮아요.</div>`;
+  hs.forEach(function(x,i){h+=`<div class="handoff-row"><input value="${esc(x.text)}" placeholder="예: 주방비누가 다 떨어졌어요" oninput="setCareHandoff(\'${log.id}\',${i},this.value)"><button class="handoff-del" onclick="removeCareHandoff(\'${log.id}\',${i})">×</button></div>`;});
+  h+=`<button class="btn ghost sm" style="margin-top:9px" onclick="addCareHandoff(\'${log.id}\')">＋ 전달사항 추가</button></div>`;
+  return h;
+}
+function setCareHandoff(id,i,text){const log=visitLogs.find(x=>x.id===id);if(!log)return;const hs=normalizeCareHandoffs(log);if(!hs[i])return;hs[i].text=text;markPending(log);saveCache();}
+function addCareHandoff(id){const log=visitLogs.find(x=>x.id===id);if(!log)return;normalizeCareHandoffs(log).push({id:uid(),text:"",todoId:"",todoSentAt:""});markPending(log);saveCache();renderCare();setTimeout(function(){const rows=document.querySelectorAll(".handoff-row input");if(rows.length)rows[rows.length-1].focus();},0);}
+function removeCareHandoff(id,i){const log=visitLogs.find(x=>x.id===id);if(!log)return;normalizeCareHandoffs(log).splice(i,1);markPending(log);saveCache();renderCare();}
+function pullTestGuestCareLogs(){
+  if(!TEST_MODE)return;
+  try{
+    const raw=localStorage.getItem("gbj_test_guest_visitlogs");if(!raw)return;
+    const rows=JSON.parse(raw);if(!Array.isArray(rows))return;
+    let changed=false;
+    rows.forEach(function(g){
+      if(!g||!g.id)return;
+      const found=visitLogs.find(x=>x.id===g.id);
+      if(found){if(Number(g.updatedAt||0)>Number(found.updatedAt||0)){Object.assign(found,g);changed=true;}}
+      else{visitLogs.push(g);changed=true;}
+    });
+    if(changed)saveCache();
+  }catch(e){}
+}
+function sendCareHandoffToTodo(logId,handoffId){
+  const log=visitLogs.find(x=>x.id===logId);if(!log)return;
+  const h=normalizeCareHandoffs(log).find(x=>x.id===handoffId);if(!h||!h.text.trim())return;
+  if(h.todoId&&todos.some(t=>t.id===h.todoId)){toast("이미 할 일로 보냈어요");return;}
+  const item={id:uid(),text:h.text.trim(),who:me||log.who||"",done:false,doneBy:"",createdAt:new Date().toISOString(),updatedAt:Date.now()};
+  todos.push(item);h.todoId=item.id;h.todoSentAt=new Date().toISOString();log.updatedAt=Date.now();
+  markPending(item);syncUpsert("todos",item);markPending(log);syncUpsert("visitLogs",log);
+  renderTodo();renderHome();viewCareLog(logId);toast("할 일로 보냈어요");
 }
 function careActive(){
   const log=activeLog();
@@ -1673,6 +1727,7 @@ function careActive(){
     }
   });
   h+=`</div></div>`;
+  h+=activeCareHandoffRows(log);
   const pct=total?Math.round(done/total*100):0;
   h+=`<div class="vlog-prog"><i style="width:${pct}%"></i></div>
     <div style="text-align:center;font-size:12px;color:var(--ink-soft);margin-top:6px">${done} / ${total} 완료</div>
@@ -1687,7 +1742,7 @@ function discardCare(id){
   saveCache();renderCare();renderHome();
 }
 function startCare(){
-  const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},closed:false};
+  const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},handoffs:[],closed:false};
   markPending(log); // 서버엔 안 보내지만, 자동 새로고침이 이 로컬 진행분을 지우지 못하게 보호
   visitLogs.push(log);saveCache();renderCare();renderHome();
 }
@@ -1748,6 +1803,8 @@ async function closeCare(id){
     });
     if(jobs.length) await Promise.all(jobs);
   }
+  // 빈 전달사항은 버리고 최종 상태를 저장
+  log.handoffs=normalizeCareHandoffs(log).filter(x=>x.text.trim()).map(x=>({...x,text:x.text.trim()}));
   // 최종 상태를 서버에 딱 한 번 저장
   log.closed=true;log.updatedAt=Date.now();
   markPending(log);
@@ -1775,6 +1832,7 @@ function careHistory(){
         <b style="font-size:15px">${fmtDate(log.date)}</b>
         <span style="font-size:12.5px;color:var(--ink-soft)">${esc(log.who||"이름 없음")}</span>
         ${isGuest?`<span style="font-size:10.5px;font-weight:700;color:var(--lilac-deep);background:rgba(201,182,220,.18);padding:2px 8px;border-radius:7px">손님 제출</span>`:""}
+        ${normalizeCareHandoffs(log).filter(x=>x.text.trim()).length?`<span style="font-size:10.5px;font-weight:700;color:#3F7CA0;background:rgba(95,169,214,.12);padding:2px 8px;border-radius:7px">전달 ${normalizeCareHandoffs(log).filter(x=>x.text.trim()).length}</span>`:""}
         <span style="margin-left:auto;font-size:12px;color:var(--moss-deep)">단속사진 ${photoCount}/4</span></div>
       <div class="vlog-prog"><i style="width:${pct}%"></i></div></div>`;
   });
@@ -1817,6 +1875,13 @@ function viewCareLog(id){
       });
     });
   }
+  const handoffs=normalizeCareHandoffs(log).filter(x=>x.text.trim());
+  if(handoffs.length){
+    h+=`<div style="font-size:12.5px;color:var(--sky);font-weight:800;margin:17px 2px 8px">📣 전달사항</div>`;
+    handoffs.forEach(function(x){
+      h+=`<div class="handoff-view"><div class="txt">${esc(x.text)}</div>${x.todoId?`<span class="sent">✓ 할 일로 보냄</span>`:`<button class="btn ghost sm" onclick="sendCareHandoffToTodo(\'${log.id}\',\'${x.id}\')">할 일로 보내기</button>`}</div>`;
+    });
+  }
   // 사진
   const pc=PHOTO4.filter(p=>log.photos[p.key]).length;
   h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">4가지 단속 사진 — ${pc}/4</div>
@@ -1853,6 +1918,10 @@ function editCareLog(id){
       h+=`</div>`;
     });
   }
+  const ehs=normalizeCareHandoffs(log);
+  h+=`<div style="font-size:12.5px;color:var(--sky);font-weight:800;margin:16px 2px 7px">📣 전달사항</div>`;
+  if(!ehs.length)h+=`<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">남긴 전달사항 없음</div>`;
+  ehs.forEach(function(x,i){h+=`<div class="field"><input id="ec-handoff-${i}" value="${esc(x.text)}" placeholder="전달사항"></div>`;});
   h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">4가지 단속 사진 — 눌러서 새로 올리기</div><div class="photo4">`;
   PHOTO4.forEach(p=>{
     const img=log.photos[p.key];
@@ -1909,6 +1978,8 @@ async function saveCareLogEdit(id){
   const dEl=document.getElementById("ec-date"), wEl=document.getElementById("ec-who");
   if(dEl && dEl.value) log.date=dEl.value;
   if(wEl) log.who=wEl.value.trim();
+  normalizeCareHandoffs(log).forEach(function(x,i){const el=document.getElementById(`ec-handoff-${i}`);if(el)x.text=el.value.trim();});
+  log.handoffs=normalizeCareHandoffs(log).filter(x=>x.text.trim());
   // 새로 올린 사진(아직 이 기기 안에만 있는 것)을 드라이브로 올림
   if(SYNC_URL){
     const jobs=PHOTO4.filter(p=>{
