@@ -399,7 +399,18 @@ nav button .ic.blob i{font-size:16px}
 .acct-row-item{flex:1;color:var(--ink)}
 .acct-row-amt{font-weight:700;color:var(--ink);white-space:nowrap}
 .acct-row-empty{padding:12px 16px;font-size:12px;color:var(--ink-soft);border-top:1px solid var(--paper-2)}
+.acct-import-card{background:rgba(95,169,214,.07);border:1px solid rgba(95,169,214,.18);border-radius:14px;padding:13px 14px;margin-bottom:14px}
+.acct-import-title{font-size:13.5px;font-weight:800;color:#3F7CA0}
+.acct-import-desc{font-size:11.5px;color:var(--ink-soft);line-height:1.55;margin:3px 0 10px}
+.acct-import-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+.acct-import-summary>div{background:var(--paper-2);border-radius:10px;padding:8px 4px;text-align:center}
+.acct-import-summary .k{font-size:9.5px;color:var(--ink-soft)}
+.acct-import-summary .v{font-size:12.5px;font-weight:800;margin-top:2px}
+.acct-import-ok{background:rgba(142,176,78,.12);color:var(--moss-deep);border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.55;margin:9px 0}
+.acct-import-warn{background:rgba(208,139,99,.12);color:#A85E38;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.55;margin:9px 0}
+.acct-import-cat{font-size:11.5px;color:var(--ink-soft);line-height:1.65;margin:8px 2px}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <header>
@@ -2420,6 +2431,245 @@ function acctManagerBar(){
 }
 
 let acctReportSub="quarter"; // 'quarter' | 'year' — 보고서 목록 안 세그먼트
+let acctImportState=null; // 엑셀은 브라우저 안에서만 읽고, 최종 확인 때 보고서 데이터만 저장
+
+function acctExcelImportCard(type){
+  if(!isAcctManager()) return "";
+  const isYear=type==="year";
+  return `<div class="acct-import-card">
+    <div class="acct-import-title">📥 엑셀에서 ${isYear?"1년":"분기"} 회계보고서 만들기</div>
+    <div class="acct-import-desc">${isYear
+      ?"1년에 한 번 정리한 연간 회계파일을 읽어 보고서로 만듭니다. 여러 연도 시트가 있으면 올릴 시트를 고를 수 있어요."
+      :"평소 작성하던 기간별 회계 엑셀을 읽어 지금 보고서 형식으로 정리합니다."}<br>
+      파일은 먼저 이 기기에서 분석하고, <b>‘이대로 등록’</b>을 눌러야 저장돼요.</div>
+    <button class="btn ghost sm" style="width:100%;justify-content:center;color:#3F7CA0" onclick="openAcctExcelImport('${type}')">엑셀파일 선택</button>
+  </div>`;
+}
+function openAcctExcelImport(type){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
+  if(typeof XLSX==="undefined"){ alert("엑셀 읽기 기능을 불러오지 못했어요. 인터넷 연결을 확인한 뒤 새로고침해주세요."); return; }
+  acctImportState={type};
+  const isYear=type==="year";
+  showModal(`<div class="grab"></div><h3>${isYear?"1년":"분기"} 회계 엑셀 불러오기</h3>
+    <div class="note" style="font-size:12.5px;color:var(--ink-soft);line-height:1.65;margin-bottom:12px">
+      ${isYear?"연간 회계정산 파일을 선택해주세요. 한 파일 안에 여러 연도 시트가 있어도 괜찮아요.":"완료한 기간별 회계파일을 선택해주세요."}<br>
+      <b>원본 엑셀파일 자체는 서버에 업로드하지 않습니다.</b> 이 브라우저에서 내용을 읽어 미리 보여준 뒤, 확인한 보고서 데이터만 저장합니다.
+    </div>
+    <div class="field"><label>엑셀파일</label><input id="acct-xlsx-file" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onchange="acctExcelFilePicked(this,'${type}')"></div>
+    <div id="acct-import-status" style="font-size:12px;color:var(--ink-soft)"></div>`);
+}
+async function acctExcelFilePicked(input,type){
+  const file=input.files&&input.files[0]; if(!file)return;
+  const st=document.getElementById("acct-import-status"); if(st)st.textContent="파일을 읽는 중…";
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:"array"});
+    acctImportState={type,fileName:file.name,wb};
+    if(!wb.SheetNames||!wb.SheetNames.length) throw new Error("시트가 없습니다.");
+    if(wb.SheetNames.length===1) acctExcelChooseSheet(0);
+    else acctExcelShowSheetPicker();
+  }catch(err){
+    console.error(err);
+    if(st)st.textContent="";
+    alert("엑셀파일을 읽지 못했어요. 파일이 손상되지 않았는지 확인해주세요.");
+  }
+}
+function acctExcelShowSheetPicker(){
+  const st=acctImportState;if(!st||!st.wb)return;
+  const isYear=st.type==="year";
+  let h=`<div class="grab"></div><h3>어느 시트를 읽을까요?</h3>
+    <div class="note" style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px">${esc(st.fileName||"")}<br>${isYear?"올릴 연도의 시트를 하나 선택해주세요.":"회계가 들어있는 시트를 선택해주세요."}</div>`;
+  st.wb.SheetNames.forEach((name,i)=>{
+    h+=`<button class="acct-archive-item" style="width:100%;text-align:left" onclick="acctExcelChooseSheet(${i})"><div><div class="al">${esc(name)}</div><div class="as">이 시트 분석하기</div></div><span>›</span></button>`;
+  });
+  showModal(h);
+}
+function acctCellText(v){
+  return String(v==null?"":v).replace(/\u00a0/g," ").trim();
+}
+function acctCellNumber(v){
+  if(typeof v==="number" && Number.isFinite(v))return v;
+  const t=acctCellText(v).replace(/[,원\s]/g,"");
+  if(!t || !/^-?\d+(?:\.\d+)?$/.test(t))return null;
+  const n=Number(t);return Number.isFinite(n)?n:null;
+}
+function acctIsoDate(y,m,d){return String(y).padStart(4,"0")+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
+function acctExtractPeriod(rows){
+  const txt=(rows||[]).slice(0,12).flat().map(acctCellText).filter(Boolean).join(" ");
+  const m=txt.match(/(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?\s*~\s*(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/);
+  return m?{start:acctIsoDate(m[1],m[2],m[3]),end:acctIsoDate(m[4],m[5],m[6])}:null;
+}
+function acctSummaryValue(rows,label){
+  const max=Math.min(16,(rows||[]).length);
+  for(let i=0;i<max;i++){
+    const row=rows[i]||[];
+    for(let j=0;j<row.length;j++){
+      if(acctCellText(row[j])===label){
+        for(let k=j+1;k<row.length;k++){const n=acctCellNumber(row[k]);if(n!==null)return n;}
+      }
+    }
+  }
+  return null;
+}
+function acctImportIncomeCategory(item,section){
+  const sec=acctCellText(section), txt=(sec+" "+acctCellText(item)).toLowerCase();
+  if(sec.includes("회비"))return "회비";
+  if(sec.includes("숙박비"))return "숙박비";
+  if(txt.includes("회비"))return "회비";
+  if(["숙박비","워크샵","명상수련","공간이용료"].some(k=>txt.includes(k)))return "숙박비";
+  if(txt.includes("지원"))return "지원금";
+  if(txt.includes("이자"))return "이자";
+  return "기타수입";
+}
+function acctImportExpenseCategory(item,section){
+  const sec=acctCellText(section), txt=(sec+" "+acctCellText(item)).toLowerCase();
+  // 연간파일은 사람이 이미 나눈 큰 묶음을 우선 존중
+  if(sec.includes("초기정착"))return "초기정착비";
+  if(sec.includes("월세"))return "월세";
+  if(sec.includes("유지비"))return "유지비";
+  if(sec.replace(/\s/g,"").includes("기타잡비"))return "기타잡비";
+  const purchase=["냉장고","세탁기","에어컨","가스레인지","전자레인지","선반","옷걸이","행거","이불","드라이기","의자","건조대","냄비","바구니","찜기","조리도구","칼세트","쓰레기통","밥솥","정리함","구둣주걱","차판","청테이프","무방","led","조명","칫솔꽂이","매트","행주걸이","비누","세제","물품"];
+  if(purchase.some(k=>txt.includes(k)))return "물품비";
+  if(txt.includes("월세"))return "월세";
+  if(["전기","인터넷","수도","가스","기름","주유"].some(k=>txt.includes(k)))return "유지비";
+  if(["보증금","초기"].some(k=>txt.includes(k)))return "초기정착비";
+  return "기타잡비";
+}
+function acctDefaultImportTitle(type,fileName,rows,sheetName,period){
+  if(type==="year"){
+    for(let i=0;i<Math.min(4,rows.length);i++){
+      const t=(rows[i]||[]).map(acctCellText).find(x=>x&&x.includes("회계"));
+      if(t)return t;
+    }
+    const y=(sheetName.match(/20\d{2}/)||[])[0]||(period?period.start.slice(0,4):"");
+    return y?y+" 가볍집 - 1년 회계정산":"가볍집 1년 회계정산";
+  }
+  let base=String(fileName||"").replace(/\.[^.]+$/,"").trim();
+  base=base.replace(/\s*-\s*20\d{2}[.]\d{1,2}[.]\d{1,2}.*$/,"").trim();
+  if(base)return base;
+  return period?`${period.start.replace(/-/g,".")} ~ ${period.end.replace(/-/g,".")} 회계`:"가볍집 회계";
+}
+function acctParseExcelRows(rows,type,fileName,sheetName){
+  const errors=[],warnings=[];
+  const period=acctExtractPeriod(rows);
+  if(!period)errors.push("보고 기간을 찾지 못했어요. 상단에 ‘2026.6.22 ~ 2026.9.13’ 같은 기간 표기가 필요해요.");
+  let header=-1;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i]||[];
+    if(acctCellText(r[0])==="항목" && acctCellText(r[1])==="날짜" && acctCellText(r[2])==="내용" && acctCellText(r[3])==="금액"){header=i;break;}
+  }
+  if(header<0)errors.push("‘항목 / 날짜 / 내용 / 금액’ 표 머리글을 찾지 못했어요.");
+  let state="",section="",last=[null,null,null,null,null];
+  const incomes=[],expenses=[],gifts=[];
+  if(header>=0){
+    for(let i=header+1;i<rows.length;i++){
+      const src=rows[i]||[], cells=[0,1,2,3,4].map(j=>src[j]==null?null:src[j]);
+      for(let j=0;j<5;j++){ if(acctCellText(cells[j])==='"') cells[j]=last[j]; }
+      const a=acctCellText(cells[0]), b=acctCellText(cells[1]), c=acctCellText(cells[2]), note=acctCellText(cells[4]);
+      const amount=acctCellNumber(cells[3]);
+      if(a==="수입"){state="income";section="";}
+      else if(a==="지출"){state="expense";section="";}
+      else if(/선물.*나눔.*공유/.test(a)){state="gift";section="";}
+      // 연간 회계의 카테고리 제목 행: 날짜 칸에 제목이 있고 내용·금액이 비어 있음
+      if((state==="income"||state==="expense") && b && !c && amount===null){section=b;last=cells;continue;}
+      if(c==="합계"||c==="소계"){last=cells;continue;}
+      if(state==="gift"){
+        if(c)gifts.push({date:b,item:c,note});
+      }else if((state==="income"||state==="expense") && c && amount!==null){
+        const row={date:b,item:c,category:state==="income"?acctImportIncomeCategory(c,section):acctImportExpenseCategory(c,section),amount,note};
+        (state==="income"?incomes:expenses).push(row);
+      }
+      last=cells;
+    }
+  }
+  const income=incomes.reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+  const expense=expenses.reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+  const srcCarry=acctSummaryValue(rows,"이월금");
+  const srcIncome=acctSummaryValue(rows,"수입");
+  const srcExpense=acctSummaryValue(rows,"지출");
+  const srcBalance=acctSummaryValue(rows,"잔액");
+  const carry=srcCarry==null?0:srcCarry, balance=carry+income-expense;
+  if(srcIncome!=null && srcIncome!==income)errors.push(`수입 합계가 달라요 — 엑셀 상단 ${Number(srcIncome).toLocaleString()}원 / 세부내역 합계 ${income.toLocaleString()}원`);
+  if(srcExpense!=null && srcExpense!==expense)errors.push(`지출 합계가 달라요 — 엑셀 상단 ${Number(srcExpense).toLocaleString()}원 / 세부내역 합계 ${expense.toLocaleString()}원`);
+  if(srcBalance!=null && srcBalance!==balance)errors.push(`잔액이 달라요 — 엑셀 상단 ${Number(srcBalance).toLocaleString()}원 / 계산값 ${balance.toLocaleString()}원`);
+  if(srcCarry==null)warnings.push("이월금을 찾지 못해 0원으로 읽었어요.");
+  if(!incomes.length&&!expenses.length&&!gifts.length)errors.push("세부 회계내역을 한 건도 읽지 못했어요.");
+  const report={
+    type,draft:false,
+    title:acctDefaultImportTitle(type,fileName,rows,sheetName,period),
+    start:period?period.start:"",end:period?period.end:"",
+    summary:{carry,income,expense,balance},
+    incomes,expenses,gifts,createdAt:Date.now(),updatedAt:Date.now()
+  };
+  return {report,errors,warnings,fileName,sheetName,source:{carry:srcCarry,income:srcIncome,expense:srcExpense,balance:srcBalance}};
+}
+function acctExcelChooseSheet(index){
+  const st=acctImportState;if(!st||!st.wb)return;
+  const name=st.wb.SheetNames[index], ws=st.wb.Sheets[name];
+  try{
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+    const parsed=acctParseExcelRows(rows,st.type,st.fileName,name);
+    acctImportState={...st,sheetName:name,parsed};
+    acctShowImportPreview();
+  }catch(err){
+    console.error(err);alert("이 시트를 분석하지 못했어요.");
+  }
+}
+function acctImportDuplicate(parsed){
+  if(!parsed||!parsed.report)return null;
+  const r=parsed.report;
+  if(r.type==="quarter")return acctReports.find(x=>x.type==="quarter"&&!x.draft&&x.start===r.start&&x.end===r.end)||null;
+  const y=(r.start||"").slice(0,4);
+  return acctReports.find(x=>x.type==="year"&&String(x.start||"").slice(0,4)===y)||null;
+}
+function acctImportCatSummary(items){
+  const m={};(items||[]).forEach(x=>{const c=x.category||"기타";if(!m[c])m[c]={n:0,sum:0};m[c].n++;m[c].sum+=Number(x.amount)||0;});
+  return Object.entries(m).map(([c,v])=>`${esc(c)} ${v.n}건 · ${v.sum.toLocaleString()}원`).join("<br>")||"없음";
+}
+function acctShowImportPreview(){
+  const st=acctImportState,p=st&&st.parsed;if(!p)return;
+  const r=p.report, dup=acctImportDuplicate(p), blocked=p.errors.length>0;
+  let h=`<div class="grab"></div><h3>엑셀 분석 결과</h3>
+    <div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:10px">${esc(p.fileName)} · ${esc(p.sheetName)}</div>
+    <div class="field"><label>보고서 제목 <span style="font-weight:400">— 필요하면 고쳐도 돼요</span></label><input id="ai-title" value="${esc(r.title)}"></div>
+    <div style="font-size:13px;font-weight:700;margin:2px 0 8px">${r.start?fmtDate(r.start):"기간 미확인"} ~ ${r.end?fmtDate(r.end):"기간 미확인"}</div>
+    <div class="acct-import-summary">
+      <div><div class="k">이월금</div><div class="v">${Number(r.summary.carry).toLocaleString()}</div></div>
+      <div><div class="k">수입</div><div class="v" style="color:var(--moss-deep)">+${Number(r.summary.income).toLocaleString()}</div></div>
+      <div><div class="k">지출</div><div class="v" style="color:var(--clay)">-${Number(r.summary.expense).toLocaleString()}</div></div>
+      <div><div class="k">잔액</div><div class="v">${Number(r.summary.balance).toLocaleString()}</div></div>
+    </div>
+    <div class="acct-import-ok">읽은 내역 — 수입 <b>${r.incomes.length}건</b> · 지출 <b>${r.expenses.length}건</b> · 선물·나눔 <b>${r.gifts.length}건</b></div>`;
+  if(p.errors.length)h+=`<div class="acct-import-warn"><b>⚠ 등록하기 전에 원본 확인이 필요해요.</b><br>${p.errors.map(esc).join("<br>")}</div>`;
+  else h+=`<div class="acct-import-ok">✓ 엑셀 상단 합계와 세부내역 계산이 맞습니다.</div>`;
+  if(p.warnings.length)h+=`<div class="acct-import-warn">${p.warnings.map(esc).join("<br>")}</div>`;
+  if(dup)h+=`<div class="acct-import-warn"><b>같은 ${r.type==="year"?(r.start||"").slice(0,4)+"년":"기간"} 보고서가 이미 있어요.</b><br>등록하면 새 보고서를 하나 더 만들지 않고 기존 보고서를 이 파일 내용으로 교체합니다.</div>`;
+  h+=`<details style="margin:10px 0"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">카테고리별 분석 보기</summary>
+    <div class="acct-import-cat"><b>수입</b><br>${acctImportCatSummary(r.incomes)}<br><br><b>지출</b><br>${acctImportCatSummary(r.expenses)}<br><br><b>선물·나눔</b> ${r.gifts.length}건</div></details>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="openAcctExcelImport('${st.type}')">다른 파일</button>
+      <button class="btn lilac" ${blocked?"disabled style='opacity:.45'":""} onclick="acctConfirmExcelImport()">${dup?"기존 보고서 교체":"이대로 등록"}</button>
+    </div>`;
+  showModal(h);
+}
+function acctConfirmExcelImport(){
+  const st=acctImportState,p=st&&st.parsed;if(!p||p.errors.length)return;
+  const src=p.report, dup=acctImportDuplicate(p);
+  const title=(document.getElementById("ai-title")?.value||src.title).trim()||src.title;
+  let rec;
+  if(dup){
+    rec=dup;
+    const createdAt=rec.createdAt||Date.now(), id=rec.id;
+    Object.assign(rec,JSON.parse(JSON.stringify(src)),{id,title,createdAt,updatedAt:Date.now(),draft:false});
+  }else{
+    rec=JSON.parse(JSON.stringify(src));
+    rec.id=uid();rec.title=title;rec.createdAt=Date.now();rec.updatedAt=Date.now();rec.draft=false;
+    acctReports.push(rec);
+  }
+  markPending(rec);syncUpsert("acctReports",rec);
+  closeModal();acctHubTab="report";acctReportSub=rec.type;renderAcctHub();openAcctReport(rec.id);
+  toast(dup?"기존 회계보고서를 엑셀 내용으로 교체했어요":"엑셀에서 회계보고서를 만들었어요");
+}
 function openAcctHub(tab){
   acctHubTab=tab||"ledger";
   goTab("ledger");
@@ -2481,6 +2731,7 @@ function renderReportPanel(){
     <button class="${acctReportSub==='quarter'?'on':''}" onclick="setAcctReportSub('quarter')">분기 회계보고</button>
     <button class="${acctReportSub==='year'?'on':''}" onclick="setAcctReportSub('year')">1년 회계보고</button>
   </div>`;
+  h+=acctExcelImportCard(acctReportSub);
   if(acctReportSub==="quarter"){
     // 진행 중인 회계 — 직전 마감 다음날부터 지금까지, 마감 전까지 계속 쌓임
     if(draft){
