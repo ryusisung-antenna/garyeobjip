@@ -1307,8 +1307,20 @@ function bindMinuteRichEditors(){
     el.addEventListener("keydown",function(e){
       const ctrl=e.ctrlKey||e.metaKey;
       if(ctrl&&!e.shiftKey&&["b","u","i"].includes(e.key.toLowerCase())){e.preventDefault();minuteLastRich=el;minuteRichCommand(e.key.toLowerCase()==="b"?"bold":e.key.toLowerCase()==="u"?"underline":"italic");return;}
-      const li=(window.getSelection()&&window.getSelection().anchorNode&&window.getSelection().anchorNode.parentElement)?window.getSelection().anchorNode.parentElement.closest("li"):null;
-      if(e.key==="Tab"&&li&&el.contains(li)){e.preventDefault();minuteLastRich=el;minuteRichCommand(e.shiftKey?"outdent":"indent");return;}
+      const sel=window.getSelection();
+      const anchor=sel&&sel.anchorNode;
+      let anchorEl=null;
+      if(anchor){
+        anchorEl=anchor.nodeType===1?anchor:anchor.parentElement;
+      }
+      const li=anchorEl&&anchorEl.closest?anchorEl.closest("li"):null;
+      if(e.key==="Tab"&&li&&el.contains(li)){
+        e.preventDefault();
+        e.stopPropagation();
+        minuteLastRich=el;
+        minuteRichCommand(e.shiftKey?"outdent":"indent");
+        return;
+      }
       if(e.key===" "&&!e.shiftKey&&!ctrl){if(minuteRichDashToList(el)){e.preventDefault();return;}}
     });
   });
