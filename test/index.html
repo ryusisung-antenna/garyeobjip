@@ -24,7 +24,7 @@
   --shadow:0 1px 2px rgba(58,53,46,.04),0 10px 30px rgba(58,53,46,.06);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;overscroll-behavior-x:none}
 body{
   background:var(--paper);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
@@ -34,8 +34,8 @@ body{
 h1,h2,h3,h4{font-weight:700;letter-spacing:-.02em;margin:0}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,textarea,select{font-family:inherit;font-size:16px;color:var(--ink)}
-/* 회의록 편집 중 PC 브라우저의 좌우 과도 드래그/트랙패드가 뒤로가기 제스처로 이어지는 것을 막음 */
-html.minute-editing,html.minute-editing body,html.minute-editing #modalBox{overscroll-behavior-x:none}
+/* 좌우 히스토리 스와이프는 앱 전체에서 차단. 회의록 텍스트 선택과 충돌하지 않게 함 */
+#modalBox{overscroll-behavior-x:none}
 
 /* 햇살 장식 (안내서 모티프) */
 .sunburst{position:absolute;width:40px;height:40px;pointer-events:none;opacity:.9}
@@ -251,6 +251,13 @@ nav button .ic.blob i{font-size:16px}
 .field input,.field textarea,.field select{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--card);outline:none;transition:border-color .2s}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--moss)}
 .field textarea{resize:none;overflow:hidden;min-height:70px;line-height:1.6}
+.minute-rich{width:100%;min-height:96px;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--card);outline:none;font-size:16px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;transition:border-color .2s}
+.minute-rich:focus{border-color:var(--moss)}
+.minute-rich ul{margin:5px 0 5px 1.2em;padding-left:1.1em}
+.minute-rich li{margin:2px 0;padding-left:2px}
+.minute-toolbar{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 12px}
+.minute-toolbar button{min-width:34px;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:13px;font-weight:700;color:var(--ink-soft)}
+.minute-toolbar button:active{background:var(--paper-2)}
 .field .hint{font-size:11px;color:var(--ink-soft);margin-top:4px}
 .row2{display:flex;gap:10px}.row2>*{flex:1}
 .modal-actions{display:flex;gap:10px;margin-top:20px}
@@ -1139,7 +1146,7 @@ function minuteDraftClear(id){try{localStorage.removeItem(minuteDraftKey(id));}c
 function minuteDraftClock(ms){if(!ms)return "";const d=new Date(ms);return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");}
 function minuteFormData(){
   if(!document.getElementById("f-date"))return null;
-  return {date:val("f-date"),kind:val("f-kind"),host:val("f-host"),heartOpen:val("f-heartOpen"),notice:val("f-notice"),agenda:val("f-agenda"),heartClose:val("f-heartClose"),nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote"),reminderDays:readReminderCheckboxes("f-remind")};
+  return {date:val("f-date"),kind:val("f-kind"),host:val("f-host"),heartOpen:minuteRichValue("f-heartOpen"),notice:minuteRichValue("f-notice"),agenda:minuteRichValue("f-agenda"),heartClose:minuteRichValue("f-heartClose"),nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote"),reminderDays:readReminderCheckboxes("f-remind")};
 }
 function minuteDraftStatus(txt,busy){const el=document.getElementById("minuteDraftStatus");if(!el)return;el.textContent=txt;el.style.color=busy?"var(--clay)":"var(--moss-deep)";}
 function minuteDraftSaveNow(){
@@ -1149,7 +1156,7 @@ function minuteDraftSaveNow(){
   try{localStorage.setItem(minuteDraftKey(minuteEditId),JSON.stringify({savedAt:savedAt,data:data}));minuteDraftStatus("✓ 임시저장됨 · "+minuteDraftClock(savedAt),false);}catch(e){minuteDraftStatus("임시저장 실패",true);}
 }
 function scheduleMinuteDraftSave(){if(!minuteEditing)return;minuteDraftStatus("● 작성 중…",true);clearTimeout(minuteDraftTimer);minuteDraftTimer=setTimeout(minuteDraftSaveNow,700);}
-function bindMinuteDraftAutosave(){const root=document.getElementById("modalBox");if(!root)return;root.querySelectorAll("input,textarea,select").forEach(function(el){el.addEventListener("input",scheduleMinuteDraftSave);el.addEventListener("change",scheduleMinuteDraftSave);});}
+function bindMinuteDraftAutosave(){const root=document.getElementById("modalBox");if(!root)return;root.querySelectorAll("input,textarea,select,.minute-rich").forEach(function(el){el.addEventListener("input",scheduleMinuteDraftSave);el.addEventListener("change",scheduleMinuteDraftSave);});}
 function resetMinuteEditorState(){clearTimeout(minuteDraftTimer);minuteDraftTimer=null;minuteEditing=false;minuteEditId="";document.documentElement.classList.remove("minute-editing");}
 function canLeaveMinuteEditor(){
   if(!minuteEditing)return true;
@@ -1222,37 +1229,119 @@ function reminderCheckboxes(prefix,selectedDays){
 function readReminderCheckboxes(prefix){
   return [7,3,1].filter(d=>{ const el=document.getElementById(`${prefix}-${d}`); return el&&el.checked; });
 }
+let minuteLastRich=null;
+function minuteInlineToMarkdown(node){
+  if(node.nodeType===3)return node.nodeValue||"";
+  if(node.nodeType!==1)return "";
+  const tag=node.tagName;
+  if(tag==="BR")return "";
+  if(tag==="UL"||tag==="OL")return "";
+  let inner="";Array.from(node.childNodes).forEach(function(ch){if(ch.nodeType===1&&(ch.tagName==="UL"||ch.tagName==="OL"))return;inner+=minuteInlineToMarkdown(ch);});
+  if(tag==="B"||tag==="STRONG")return "**"+inner+"**";
+  if(tag==="U")return "__"+inner+"__";
+  if(tag==="I"||tag==="EM")return "*"+inner+"*";
+  if(tag==="S"||tag==="STRIKE"||tag==="DEL")return "~~"+inner+"~~";
+  return inner;
+}
+function minuteListToMarkdown(ul,level,out){
+  Array.from(ul.children).forEach(function(li){
+    if(li.tagName!=="LI")return;
+    let line="";Array.from(li.childNodes).forEach(function(ch){if(ch.nodeType===1&&(ch.tagName==="UL"||ch.tagName==="OL"))return;line+=minuteInlineToMarkdown(ch);});
+    out.push("  ".repeat(level)+"- "+line.trim());
+    Array.from(li.children).forEach(function(ch){if(ch.tagName==="UL"||ch.tagName==="OL")minuteListToMarkdown(ch,level+1,out);});
+  });
+}
+function minuteRichValue(id){
+  const el=document.getElementById(id);if(!el)return "";
+  const out=[];
+  Array.from(el.childNodes).forEach(function(node){
+    if(node.nodeType===3){const t=(node.nodeValue||"").trimEnd();if(t)out.push(t);return;}
+    if(node.nodeType!==1)return;
+    if(node.tagName==="UL"||node.tagName==="OL"){minuteListToMarkdown(node,0,out);return;}
+    if(node.tagName==="DIV"||node.tagName==="P"){out.push(minuteInlineToMarkdown(node));return;}
+    out.push(minuteInlineToMarkdown(node));
+  });
+  return out.join("\n").replace(/\n{3,}/g,"\n\n").trimEnd();
+}
+function minuteEditorHtml(text){
+  text=String(text||"").replace(/\r/g,"");
+  if(!text)return "<div><br></div>";
+  const root=document.createElement("div");
+  const lines=text.split("\n");
+  let stack=[];let lastLi=[];
+  lines.forEach(function(line){
+    const m=line.match(/^(\s*)-\s+(.*)$/);
+    if(!m){stack=[];lastLi=[];const d=document.createElement("div");d.innerHTML=m===null&&line?mdRender(line):"<br>";root.appendChild(d);return;}
+    const raw=m[1].replace(/\t/g,"  ").length;let level=Math.floor(raw/2);
+    if(level>stack.length)level=stack.length;
+    while(stack.length>level+1)stack.pop();
+    if(stack.length<level+1){
+      const ul=document.createElement("ul");
+      if(level===0)root.appendChild(ul);else{const parent=lastLi[level-1];if(parent)parent.appendChild(ul);else root.appendChild(ul);}
+      stack.push(ul);
+    }
+    const li=document.createElement("li");li.innerHTML=mdRender(m[2]);stack[level].appendChild(li);lastLi[level]=li;lastLi.length=level+1;
+  });
+  return root.innerHTML;
+}
+function minuteRichCommand(cmd){
+  if(!minuteLastRich)return;
+  minuteLastRich.focus();
+  document.execCommand(cmd,false,null);
+  minuteLastRich.dispatchEvent(new Event("input",{bubbles:true}));
+}
+function minuteRichCaretTo(el){
+  const r=document.createRange(),sel=window.getSelection();r.selectNodeContents(el);r.collapse(true);sel.removeAllRanges();sel.addRange(r);el.focus();
+}
+function minuteRichDashToList(el){
+  const sel=window.getSelection();if(!sel||!sel.rangeCount)return false;
+  let node=sel.anchorNode;let block=node&&node.nodeType===1?node:node&&node.parentElement;
+  if(!block)return false;
+  block=block.closest("div,p");
+  if(!block||block===el||!el.contains(block)||block.textContent.trim()!=="-")return false;
+  const ul=document.createElement("ul"),li=document.createElement("li");li.appendChild(document.createElement("br"));ul.appendChild(li);block.replaceWith(ul);minuteRichCaretTo(li);el.dispatchEvent(new Event("input",{bubbles:true}));return true;
+}
+function bindMinuteRichEditors(){
+  document.querySelectorAll(".minute-rich").forEach(function(el){
+    el.addEventListener("focus",function(){minuteLastRich=el;});
+    el.addEventListener("keydown",function(e){
+      const ctrl=e.ctrlKey||e.metaKey;
+      if(ctrl&&!e.shiftKey&&["b","u","i"].includes(e.key.toLowerCase())){e.preventDefault();minuteLastRich=el;minuteRichCommand(e.key.toLowerCase()==="b"?"bold":e.key.toLowerCase()==="u"?"underline":"italic");return;}
+      const li=(window.getSelection()&&window.getSelection().anchorNode&&window.getSelection().anchorNode.parentElement)?window.getSelection().anchorNode.parentElement.closest("li"):null;
+      if(e.key==="Tab"&&li&&el.contains(li)){e.preventDefault();minuteLastRich=el;minuteRichCommand(e.shiftKey?"outdent":"indent");return;}
+      if(e.key===" "&&!e.shiftKey&&!ctrl){if(minuteRichDashToList(el)){e.preventDefault();return;}}
+    });
+  });
+}
 function openMinute(id){
   const base=id?minutes.find(x=>x.id===id):{id:"",date:todayISO(),kind:"온라인",host:"",heartOpen:"",notice:"",agenda:"",heartClose:"",nextDate:"",nextHost:"",nextNote:"",reminderDays:[]};
   const draft=minuteDraftLoad(id);
   const m=draft&&draft.data?Object.assign({},base,draft.data):base;
   let h=`<div class="grab"></div><h3>${id?"회의록 수정":"새 회의록"}</h3>
-    <div style="display:flex;align-items:center;gap:8px;margin:-9px 0 14px"><span id="minuteDraftStatus" style="font-size:11.5px;color:var(--ink-soft)">${draft?"✓ 임시저장본 자동 복구":"입력하면 이 기기에 자동 임시저장"}</span>${draft?`<button class="btn ghost sm" style="margin-left:auto;padding:4px 8px;font-size:11px" onclick="discardMinuteDraft()">임시글 버리기</button>`:""}</div><div style="font-size:11.5px;color:var(--ink-soft);margin:-7px 0 13px;line-height:1.55">Ctrl+B 굵게 · Ctrl+U 밑줄 · Ctrl+I 기울임 · <b>-</b> 말머리 · Tab/Shift+Tab 들여쓰기</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:-9px 0 14px"><span id="minuteDraftStatus" style="font-size:11.5px;color:var(--ink-soft)">${draft?"✓ 임시저장본 자동 복구":"입력하면 이 기기에 자동 임시저장"}</span>${draft?`<button class="btn ghost sm" style="margin-left:auto;padding:4px 8px;font-size:11px" onclick="discardMinuteDraft()">임시글 버리기</button>`:""}</div><div style="font-size:11.5px;color:var(--ink-soft);margin:-7px 0 8px;line-height:1.55">선택한 글자에 Ctrl+B · Ctrl+U · Ctrl+I / 줄 처음에 <b>-</b> + Space → 말머리 / 목록에서 Tab · Shift+Tab</div><div class="minute-toolbar"><button type="button" onmousedown="event.preventDefault();minuteRichCommand('bold')"><b>B</b></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('underline')"><u>U</u></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('italic')"><i>I</i></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('insertUnorderedList')">•</button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('outdent')">←</button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('indent')">→</button></div>
     <div class="row2">
       <div class="field"><label>날짜</label><input type="date" id="f-date" value="${m.date}"></div>
       <div class="field"><label>형식</label><select id="f-kind">
         <option ${m.kind==="온라인"?"selected":""}>온라인</option>
         <option ${m.kind==="오프라인"?"selected":""}>오프라인</option></select></div></div>
     <div class="field"><label>진행한 사람</label><input id="f-host" value="${esc(m.host)}" placeholder="이번 달 진행 집사"></div>`;
-  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
+  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><div class="minute-rich" id="f-${b.key}" contenteditable="true">${minuteEditorHtml(m[b.key])}</div></div>`;});
   h+=`<div class="field"><label>📅 다음 회의 <span style="font-weight:400">— 등록하면 일정 캘린더에 자동으로 올라갑니다</span></label>
     <div class="row2"><input type="date" id="f-nextDate" value="${m.nextDate||""}">
     <input id="f-nextHost" value="${esc(m.nextHost)}" placeholder="진행자"></div>
     <input id="f-nextNote" value="${esc(m.nextNote)}" placeholder="메모 (예: 오프라인, 무엇을 준비)" style="margin-top:8px"></div>
     <div class="field"><label>🔔 다음 회의 알림 <span style="font-weight:400">— 날짜를 채운 경우에만 동작해요</span></label>
     ${reminderCheckboxes("f-remind",m.reminderDays||[])}</div>`;
-  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
+  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><div class="minute-rich" id="f-${b.key}" contenteditable="true">${minuteEditorHtml(m[b.key])}</div></div>`;});
   h+=`<div class="modal-actions">
       ${id?`<button class="btn ghost" onclick="delMinute('${id}')">삭제</button>`:""}
       <button class="btn" onclick="saveMinute('${m.id}')">저장</button></div>`;
   showModal(h);
-  minuteEditing=true;minuteEditId=id||"";document.documentElement.classList.add("minute-editing");bindMinuteDraftAutosave();
+  minuteEditing=true;minuteEditId=id||"";document.documentElement.classList.add("minute-editing");bindMinuteRichEditors();bindMinuteDraftAutosave();
 }
 function saveMinute(id){
-  const o={date:val("f-date"),kind:val("f-kind"),host:val("f-host"),
-    heartOpen:val("f-heartOpen"),notice:val("f-notice"),agenda:val("f-agenda"),heartClose:val("f-heartClose"),
-    nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote"),
-    reminderDays:readReminderCheckboxes("f-remind")};
+  const o=minuteFormData();
+  if(!o){toast("회의록 내용을 읽지 못했어요");return;}
   o.updatedAt=Date.now();
   let item;
   if(id){ item=minutes.find(x=>x.id===id); Object.assign(item,o); }
@@ -3232,10 +3321,6 @@ function minuteListKey(e,el){
 document.addEventListener("keydown",e=>{
   if(e.target.tagName!=="TEXTAREA") return;
   const el=e.target;
-  if(minuteEditing){
-    if(e.key==="Tab"){e.preventDefault();indentMinuteLines(el,e.shiftKey);return;}
-    if(minuteListKey(e,el))return;
-  }
   const ctrl=e.ctrlKey||e.metaKey;
   if(!ctrl) return;
   if(!e.shiftKey && e.key.toLowerCase()==="b"){ e.preventDefault(); wrapSelection(el,"**","**"); }
