@@ -644,6 +644,15 @@ const GUARD_PHOTOS = [
   {k:"boiler",label:"보일러 전원 끈 사진"},
   {k:"elec",  label:"복도 전기판넬 코드 뺀 사진"},
 ];
+const GUEST_PHOTO_FILE_LABEL={gas:"가스",wifi:"와이파이",boiler:"보일러",elec:"전기"};
+function guestPhotoNamePart(v,fallback){
+  return String(v||fallback||"").trim().replace(/[\\/:*?"<>|#%]/g,"-").replace(/\s+/g,"").slice(0,32)||String(fallback||"사진");
+}
+function guestPhotoShortId(){return String((checkoutId||"")+Date.now()).replace(/[^a-zA-Z0-9]/g,"").slice(-6)||String(Date.now()).slice(-6);}
+function guestPhotoFilename(g){
+  const date=ymd(new Date()), who=guestPhotoNamePart(myVisit&&myVisit.name,"방문자");
+  return `${date}_${who}_방문자퇴실_${GUEST_PHOTO_FILE_LABEL[g.k]||g.k}_${guestPhotoShortId()}.jpg`;
+}
 
 /* ============================================================
    안내서 챕터 — 캔바 원본(공간 사용 안내서) 문구를 그대로 옮김.
@@ -1563,9 +1572,11 @@ function delCo(i){ ensureConf('checkout').splice(i,1); renderCheckout(); }
 function addCo(){ ensureConf('checkout').push('새 항목'); renderCheckout(); }
 function pickPhoto(k, input){
   const file=input.files&&input.files[0]; if(!file) return;
+  const prev=checkoutState.photos[k];
+  const previousUrl=prev&&prev.uploadedUrl?prev.uploadedUrl:"";
   const reader=new FileReader();
   reader.onload=()=>{
-    checkoutState.photos[k]={dataUrl:reader.result, mime:file.type, status:'uploading', uploadedUrl:null};
+    checkoutState.photos[k]={dataUrl:reader.result, mime:file.type, status:'uploading', uploadedUrl:null, previousUrl};
     renderCheckout();
     uploadPhotoNow(k); // 찍는 즉시 드라이브로 올림 — 저장이 확인돼야만 보내기가 열림
   };
@@ -1577,8 +1588,11 @@ async function uploadPhotoNow(k){
   const url=await uploadOnePhoto(g, p);
   const cur=checkoutState.photos[k];
   if(!cur || cur.dataUrl!==p.dataUrl) return; // 그 사이 다시 찍었으면 옛 결과는 버림
-  if(url){ cur.uploadedUrl=url; cur.status='saved'; }
-  else{ cur.status='failed'; }
+  if(url){
+    const old=cur.previousUrl||"";
+    cur.uploadedUrl=url; cur.status='saved'; cur.previousUrl="";
+    if(old && old!==url) deleteRemotePhoto(old); // 재촬영한 옛 파일은 Drive 휴지통으로
+  }else{ cur.status='failed'; }
   renderCheckout();
 }
 function retryPhoto(k){
@@ -1586,14 +1600,22 @@ function retryPhoto(k){
   p.status='uploading'; renderCheckout();
   uploadPhotoNow(k);
 }
+async function deleteRemotePhoto(url){
+  if(TEST_MODE || !SYNC_URL || !url || String(url).startsWith("data:")) return;
+  try{
+    await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({resource:'photo',op:'delete',url})});
+  }catch(e){}
+}
 async function uploadOnePhoto(g, p){
   if(TEST_MODE) return p.dataUrl; // 테스트판에서는 운영 드라이브에 올리지 않음
   // 실패 시 두 번까지 다시 시도 — 시골 인터넷이 느려 한 번에 안 올라가는 경우가 잦음
   const base64=p.dataUrl.split(',')[1];
+  const date=ymd(new Date());
   for(let attempt=1; attempt<=3; attempt++){
     try{
       const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({resource:'photo',op:'upload',filename:g.k+'_'+Date.now()+'.jpg',mime:p.mime||'image/jpeg',dataBase64:base64})});
+        body:JSON.stringify({resource:'photo',op:'upload',filename:guestPhotoFilename(g),folderKind:'정리',year:date.slice(0,4),mime:p.mime||'image/jpeg',dataBase64:base64})});
       const j=await res.json();
       if(j && j.url) return j.url;
     }catch(e){}
