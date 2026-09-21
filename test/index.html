@@ -34,6 +34,8 @@ body{
 h1,h2,h3,h4{font-weight:700;letter-spacing:-.02em;margin:0}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,textarea,select{font-family:inherit;font-size:16px;color:var(--ink)}
+/* 회의록 편집 중 PC 브라우저의 좌우 과도 드래그/트랙패드가 뒤로가기 제스처로 이어지는 것을 막음 */
+html.minute-editing,html.minute-editing body,html.minute-editing #modalBox{overscroll-behavior-x:none}
 
 /* 햇살 장식 (안내서 모티프) */
 .sunburst{position:absolute;width:40px;height:40px;pointer-events:none;opacity:.9}
@@ -1148,7 +1150,7 @@ function minuteDraftSaveNow(){
 }
 function scheduleMinuteDraftSave(){if(!minuteEditing)return;minuteDraftStatus("● 작성 중…",true);clearTimeout(minuteDraftTimer);minuteDraftTimer=setTimeout(minuteDraftSaveNow,700);}
 function bindMinuteDraftAutosave(){const root=document.getElementById("modalBox");if(!root)return;root.querySelectorAll("input,textarea,select").forEach(function(el){el.addEventListener("input",scheduleMinuteDraftSave);el.addEventListener("change",scheduleMinuteDraftSave);});}
-function resetMinuteEditorState(){clearTimeout(minuteDraftTimer);minuteDraftTimer=null;minuteEditing=false;minuteEditId="";}
+function resetMinuteEditorState(){clearTimeout(minuteDraftTimer);minuteDraftTimer=null;minuteEditing=false;minuteEditId="";document.documentElement.classList.remove("minute-editing");}
 function canLeaveMinuteEditor(){
   if(!minuteEditing)return true;
   minuteDraftSaveNow();
@@ -1164,6 +1166,7 @@ function discardMinuteDraft(){
 }
 window.addEventListener("beforeunload",function(e){if(!minuteEditing)return;minuteDraftSaveNow();e.preventDefault();e.returnValue="";});
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden"&&minuteEditing)minuteDraftSaveNow();});
+window.addEventListener("wheel",function(e){if(minuteEditing&&Math.abs(e.deltaX)>Math.abs(e.deltaY)){e.preventDefault();}},{passive:false});
 /* ============================================================
    화면 2 — 회의록 (다섯 칸 + 다음 회의)
    ============================================================ */
@@ -1243,7 +1246,7 @@ function openMinute(id){
       ${id?`<button class="btn ghost" onclick="delMinute('${id}')">삭제</button>`:""}
       <button class="btn" onclick="saveMinute('${m.id}')">저장</button></div>`;
   showModal(h);
-  minuteEditing=true;minuteEditId=id||"";bindMinuteDraftAutosave();
+  minuteEditing=true;minuteEditId=id||"";document.documentElement.classList.add("minute-editing");bindMinuteDraftAutosave();
 }
 function saveMinute(id){
   const o={date:val("f-date"),kind:val("f-kind"),host:val("f-host"),
