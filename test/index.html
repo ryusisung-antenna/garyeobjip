@@ -2,7 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FBF8F1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="가볍집">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
 <title>[TEST] 가볍집 집사</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css">
 <style>
@@ -52,6 +59,19 @@ header{padding:20px 20px 12px;position:sticky;top:0;z-index:30;
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
 .hdr-search:active{transform:scale(.94);background:var(--paper-2)}
 .hdr-search svg{width:19px;height:19px}
+.hdr-search i{font-size:19px}
+.pwa-install-head{display:none}
+.pwa-install-head.show{display:flex}
+.pwa-banner{display:none;position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  width:min(calc(100% - 24px),640px);z-index:65;background:rgba(255,255,255,.97);border:1px solid var(--line);
+  border-radius:16px;padding:11px 12px 11px 14px;box-shadow:0 12px 34px rgba(58,53,46,.16);
+  align-items:center;gap:10px;backdrop-filter:blur(14px)}
+.pwa-banner.show{display:flex}
+.pwa-banner-copy{flex:1;min-width:0}
+.pwa-banner-copy b{display:block;font-size:13.5px;color:var(--ink);margin-bottom:1px}
+.pwa-banner-copy span{display:block;font-size:11.5px;color:var(--ink-soft);line-height:1.45}
+.pwa-banner-close{width:30px;height:30px;flex:none;border-radius:50%;font-size:19px;color:var(--ink-soft);display:flex;align-items:center;justify-content:center}
+.pwa-banner-close:active{background:var(--paper-2)}
 .srch-bar{display:flex;align-items:center;gap:9px;background:var(--card);
   border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:12px}
 .srch-bar input{flex:1;border:none;background:none;outline:none;font-size:15px;font-family:inherit;color:var(--ink);min-width:0}
@@ -420,6 +440,9 @@ nav button .ic.blob i{font-size:16px}
       <div class="mark">가볍집 집사 <span style="font-size:10px;vertical-align:3px;background:var(--clay);color:#fff;padding:2px 6px;border-radius:7px;letter-spacing:0">TEST</span></div>
       <div class="sub">테스트판 · 실제 운영데이터와 분리됨</div>
     </div>
+    <button class="hdr-search pwa-install-head" id="pwaInstallHead" onclick="pwaInstall()" aria-label="가볍집 설치">
+      <i class="ti ti-device-mobile-plus"></i>
+    </button>
     <button class="hdr-search" onclick="openSearch()" aria-label="찾기">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
     </button>
@@ -429,6 +452,15 @@ nav button .ic.blob i{font-size:16px}
     <span class="sync-dot" id="syncDot"><i></i><span id="syncTxt"></span></span>
   </div>
 </header>
+
+<div class="pwa-banner" id="pwaBanner">
+  <div class="pwa-banner-copy">
+    <b>가볍집을 앱처럼 설치</b>
+    <span id="pwaBannerText">홈 화면 아이콘으로 바로 열 수 있어요.</span>
+  </div>
+  <button class="btn sm" onclick="pwaInstall()">설치</button>
+  <button class="pwa-banner-close" onclick="pwaDismiss()" aria-label="설치 안내 닫기">×</button>
+</div>
 
 <div class="name-gate" id="nameGate"></div>
 
@@ -467,6 +499,90 @@ nav button .ic.blob i{font-size:16px}
    ============================================================ */
 const TEST_MODE = true;
 const SYNC_URL = ""; // TEST: 운영 Google Sheet와 분리. 수정 내용은 이 기기에만 저장.
+
+/* ── PWA 설치 ──
+   실제 회의/방문/회계 데이터는 service worker에 캐시하지 않고,
+   앱 껍데기만 오프라인 fallback으로 유지한다. */
+let pwaDeferredPrompt=null;
+function pwaIsStandalone(){
+  return (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
+}
+function pwaIsIOS(){
+  const ua=navigator.userAgent||"";
+  return /iPad|iPhone|iPod/i.test(ua) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+}
+function pwaHideUI(){
+  document.getElementById("pwaInstallHead")?.classList.remove("show");
+  document.getElementById("pwaBanner")?.classList.remove("show");
+}
+function pwaDismiss(){
+  document.getElementById("pwaBanner")?.classList.remove("show");
+  try{localStorage.setItem("gbj_test_pwa_nudge_after",String(Date.now()+24*60*60*1000));}catch(e){}
+}
+function pwaShowUI(autoBanner){
+  if(pwaIsStandalone()){pwaHideUI();return;}
+  const available=!!pwaDeferredPrompt||pwaIsIOS();
+  document.getElementById("pwaInstallHead")?.classList.toggle("show",available);
+  if(!autoBanner||!available)return;
+  let allowed=true;
+  try{allowed=Date.now()>=Number(localStorage.getItem("gbj_test_pwa_nudge_after")||0);}catch(e){}
+  if(allowed){
+    const txt=document.getElementById("pwaBannerText");
+    if(txt)txt.textContent=pwaIsIOS()?"Safari에서 홈 화면에 추가하면 앱처럼 열려요.":"홈 화면 아이콘으로 바로 열 수 있어요.";
+    document.getElementById("pwaBanner")?.classList.add("show");
+  }
+}
+async function pwaInstall(){
+  if(pwaIsStandalone()){toast("이미 앱으로 실행 중이에요");pwaHideUI();return;}
+  if(pwaDeferredPrompt){
+    const ev=pwaDeferredPrompt;
+    pwaDeferredPrompt=null;
+    document.getElementById("pwaBanner")?.classList.remove("show");
+    try{
+      await ev.prompt();
+      const choice=await ev.userChoice;
+      if(choice&&choice.outcome==="accepted")toast("가볍집 설치를 시작했어요");
+      else toast("설치를 취소했어요");
+    }catch(e){toast("브라우저 메뉴에서 ‘앱 설치’를 선택해주세요");}
+    pwaShowUI(false);
+    return;
+  }
+  if(pwaIsIOS()){
+    showModal(`<div class="grab"></div><h3>가볍집을 홈 화면에 설치</h3>
+      <div class="note" style="font-size:13px;line-height:1.75;color:var(--ink-soft)">
+        <b style="color:var(--ink)">iPhone · iPad Safari</b><br>
+        1. Safari의 <b>공유</b> 버튼을 누르기<br>
+        2. <b>홈 화면에 추가</b> 선택<br>
+        3. <b>웹 앱으로 열기</b>를 켜고 <b>추가</b><br><br>
+        설치가 끝나면 홈 화면의 <b>가볍집</b> 아이콘을 눌러 바로 열 수 있어요.
+      </div>
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">확인</button></div>`);
+    return;
+  }
+  showModal(`<div class="grab"></div><h3>가볍집 설치</h3>
+    <div class="note" style="font-size:13px;line-height:1.75;color:var(--ink-soft)">
+      이 브라우저에서 자동 설치창을 아직 사용할 수 없어요.<br>
+      Chrome 메뉴에서 <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 선택해주세요.
+    </div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">확인</button></div>`);
+}
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();
+  pwaDeferredPrompt=e;
+  setTimeout(()=>pwaShowUI(true),250);
+});
+window.addEventListener("appinstalled",()=>{
+  pwaDeferredPrompt=null;pwaHideUI();
+  try{localStorage.setItem("gbj_test_pwa_installed","1");}catch(e){}
+  toast("가볍집이 홈 화면에 설치됐어요");
+});
+function initPWA(){
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("./service-worker.js",{scope:"./"}).catch(e=>console.warn("SW register failed",e));
+  }
+  if(pwaIsStandalone()){pwaHideUI();return;}
+  if(pwaIsIOS())setTimeout(()=>pwaShowUI(true),900);
+}
 
 /* ── 고정 타임라인 (2023~2024, 지난 기록) ── */
 const TIMELINE_FIXED = [
@@ -3870,6 +3986,7 @@ document.querySelectorAll("nav button").forEach(b=>{
   b.addEventListener("click",()=>{goTab(b.dataset.tab);});
 });
 
+initPWA();
 loadMe();
 loadCache(); // 폰에 저장해둔 마지막 상태를 먼저 보여줌 — "초기화됐다 다시 뜨는" 느낌 없애기
 applyHistoricalMinutesV3(); // 공유회의록 DOCX 11건을 원문 보존 형태로 1회 반영
