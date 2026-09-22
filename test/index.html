@@ -511,6 +511,9 @@ function pwaIsIOS(){
   const ua=navigator.userAgent||"";
   return /iPad|iPhone|iPod/i.test(ua) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
 }
+function pwaIsSamsungInternet(){
+  return /SamsungBrowser/i.test(navigator.userAgent||"");
+}
 function pwaHideUI(){
   document.getElementById("pwaInstallHead")?.classList.remove("show");
   document.getElementById("pwaBanner")?.classList.remove("show");
@@ -521,14 +524,20 @@ function pwaDismiss(){
 }
 function pwaShowUI(autoBanner){
   if(pwaIsStandalone()){pwaHideUI();return;}
-  const available=!!pwaDeferredPrompt||pwaIsIOS();
+  const available=!!pwaDeferredPrompt||pwaIsIOS()||pwaIsSamsungInternet();
   document.getElementById("pwaInstallHead")?.classList.toggle("show",available);
   if(!autoBanner||!available)return;
   let allowed=true;
   try{allowed=Date.now()>=Number(localStorage.getItem("gbj_test_pwa_nudge_after")||0);}catch(e){}
   if(allowed){
     const txt=document.getElementById("pwaBannerText");
-    if(txt)txt.textContent=pwaIsIOS()?"Safari에서 홈 화면에 추가하면 앱처럼 열려요.":"홈 화면 아이콘으로 바로 열 수 있어요.";
+    if(txt){
+      txt.textContent=pwaIsIOS()
+        ?"Safari에서 홈 화면에 추가하면 앱처럼 열려요."
+        :pwaIsSamsungInternet()
+          ?"삼성 인터넷에서도 가볍집을 앱처럼 설치할 수 있어요."
+          :"홈 화면 아이콘으로 바로 열 수 있어요.";
+    }
     document.getElementById("pwaBanner")?.classList.add("show");
   }
 }
@@ -559,6 +568,20 @@ async function pwaInstall(){
       <div class="modal-actions"><button class="btn" onclick="closeModal()">확인</button></div>`);
     return;
   }
+  if(pwaIsSamsungInternet()){
+    showModal(`<div class="grab"></div><h3>삼성 인터넷에서 가볍집 설치</h3>
+      <div class="note" style="font-size:13px;line-height:1.75;color:var(--ink-soft)">
+        <b style="color:var(--ink)">Samsung Internet</b><br>
+        1. 아래쪽 또는 오른쪽의 <b>메뉴(≡)</b>를 누르기<br>
+        2. <b>현재 페이지 추가</b> 또는 <b>홈 화면에 추가</b> 선택<br>
+        3. 보이는 경우 <b>앱 화면</b> 또는 <b>웹 앱 설치</b>를 선택<br>
+        4. <b>추가/설치</b>를 누르기<br><br>
+        삼성 인터넷 버전에 따라 메뉴 이름은 조금 다를 수 있어요.<br>
+        설치가 끝나면 홈 화면의 <b>가볍집</b> 아이콘으로 바로 열 수 있습니다.
+      </div>
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">확인</button></div>`);
+    return;
+  }
   showModal(`<div class="grab"></div><h3>가볍집 설치</h3>
     <div class="note" style="font-size:13px;line-height:1.75;color:var(--ink-soft)">
       이 브라우저에서 자동 설치창을 아직 사용할 수 없어요.<br>
@@ -581,7 +604,7 @@ function initPWA(){
     navigator.serviceWorker.register("./service-worker.js",{scope:"./"}).catch(e=>console.warn("SW register failed",e));
   }
   if(pwaIsStandalone()){pwaHideUI();return;}
-  if(pwaIsIOS())setTimeout(()=>pwaShowUI(true),900);
+  if(pwaIsIOS()||pwaIsSamsungInternet())setTimeout(()=>pwaShowUI(true),900);
 }
 
 /* ── 고정 타임라인 (2023~2024, 지난 기록) ── */
