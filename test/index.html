@@ -1201,11 +1201,60 @@ window.addEventListener("wheel",function(e){if(minuteEditing&&Math.abs(e.deltaX)
 /* ============================================================
    화면 2 — 회의록 (다섯 칸 + 다음 회의)
    ============================================================ */
+function openMinutesBackup(){
+  if(!TEST_MODE)return;
+  showModal(`<div class="grab"></div><h3>회의록 백업 · 복원</h3>
+    <div class="note" style="font-size:12.5px;color:var(--ink-soft);line-height:1.65;margin-bottom:14px">
+      테스트판에서 수정한 회의록은 <b>지금 이 브라우저에만 저장</b>됩니다.<br>
+      최종 운영판으로 옮길 때는 아래 백업파일 하나만 보내주면, 지금 수정한 내용 그대로 이전할 수 있어요.
+    </div>
+    <button class="btn" style="width:100%;justify-content:center;margin-bottom:10px" onclick="exportTestMinutes()">↓ 현재 회의록 백업파일 받기</button>
+    <div class="field" style="margin-top:14px"><label>백업파일로 복원 <span style="font-weight:400">(필요할 때만)</span></label>
+      <input type="file" id="minutes-backup-file" accept=".json,application/json" onchange="importTestMinutes(this)">
+    </div>
+    <div style="font-size:11.5px;color:var(--ink-soft);line-height:1.55">복원은 같은 id의 회의록을 백업 내용으로 바꾸고, 없는 회의록은 추가합니다.</div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">닫기</button></div>`);
+}
+function exportTestMinutes(){
+  if(!TEST_MODE)return;
+  const payload={format:"garyeobjip-minutes-v1",exportedAt:new Date().toISOString(),minutes:minutes};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json;charset=utf-8"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download="garyeobjip_minutes_test_"+todayISO()+".json";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast("회의록 백업파일을 만들었어요");
+}
+function importTestMinutes(input){
+  if(!TEST_MODE)return;
+  const file=input.files&&input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(){
+    try{
+      const d=JSON.parse(reader.result);
+      const arr=Array.isArray(d)?d:d&&Array.isArray(d.minutes)?d.minutes:null;
+      if(!arr)throw new Error("회의록 목록 없음");
+      if(!confirm(`백업파일의 회의록 ${arr.length}건을 이 테스트판에 복원할까요?\n\n같은 회의록은 백업 내용으로 교체됩니다.`))return;
+      arr.forEach(src=>{
+        if(!src||!src.id)return;
+        const copy=JSON.parse(JSON.stringify(src));
+        const idx=minutes.findIndex(m=>m.id===copy.id);
+        if(idx>=0)minutes[idx]=copy;else minutes.push(copy);
+      });
+      saveCache();closeModal(true);renderMinutes();renderTimeline();renderVisits();renderHome();
+      toast("회의록 백업을 복원했어요");
+    }catch(e){alert("이 파일에서는 회의록 백업을 읽지 못했어요.");}
+  };
+  reader.readAsText(file);
+}
+
 function renderMinutes(){
   const v=document.getElementById("view-minutes");
   let h=`<div class="view-head"><div><div class="t">회의록</div>
     <div class="d">매달 한 번, 마음과 안건을 남깁니다</div></div>
-    <button class="btn" onclick="openMinute()">＋ 새 회의록</button></div>`;
+    <div style="display:flex;gap:6px;align-items:center">
+      ${TEST_MODE?`<button class="btn ghost sm" onclick="openMinutesBackup()">백업</button>`:""}
+      <button class="btn" onclick="openMinute()">＋ 새 회의록</button>
+    </div></div>`;
   // 다음 회의 안내(가장 최근 회의록의 next)
   const latest=[...minutes].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
   if(latest&&latest.nextDate){
@@ -1321,12 +1370,34 @@ function minuteRichCaretTo(el){
   const r=document.createRange(),sel=window.getSelection();r.selectNodeContents(el);r.collapse(true);sel.removeAllRanges();sel.addRange(r);el.focus();
 }
 function minuteRichDashToList(el){
-  const sel=window.getSelection();if(!sel||!sel.rangeCount)return false;
-  let node=sel.anchorNode;let block=node&&node.nodeType===1?node:node&&node.parentElement;
+  const sel=window.getSelection();if(!sel||!sel.rangeCount||!sel.isCollapsed)return false;
+  const range=sel.getRangeAt(0);
+  let node=sel.anchorNode;
+  let block=node&&node.nodeType===1?node:node&&node.parentElement;
   if(!block)return false;
   block=block.closest("div,p");
-  if(!block||block===el||!el.contains(block)||block.textContent.trim()!=="-")return false;
-  const ul=document.createElement("ul"),li=document.createElement("li");li.appendChild(document.createElement("br"));ul.appendChild(li);block.replaceWith(ul);minuteRichCaretTo(li);el.dispatchEvent(new Event("input",{bubbles:true}));return true;
+  if(!block||block===el||!el.contains(block)||block.closest("li"))return false;
+
+  // 현재 줄 시작부터 커서까지가 '-' 하나뿐이면 목록 시작으로 판단.
+  // 그래서 빈 줄뿐 아니라 이미 문장이 있는 줄의 맨 앞에 '-'+Space를 넣어도 변환됨.
+  const prefix=document.createRange();
+  try{
+    prefix.setStart(block,0);
+    prefix.setEnd(range.endContainer,range.endOffset);
+  }catch(e){return false;}
+  if(!/^\s*-\s*$/.test(prefix.toString()))return false;
+
+  // 입력한 '-'와 앞쪽 공백만 지우고 기존 문장/서식은 그대로 li 안으로 옮김
+  prefix.deleteContents();
+  const ul=document.createElement("ul"),li=document.createElement("li");
+  while(block.firstChild)li.appendChild(block.firstChild);
+  if(!li.textContent.trim()&&!li.querySelector("br"))li.appendChild(document.createElement("br"));
+  ul.appendChild(li);block.replaceWith(ul);
+
+  // 기존 문장 앞에서 계속 입력할 수 있도록 말머리 뒤, 문장 맨 앞에 커서를 둠
+  minuteRichCaretTo(li);
+  el.dispatchEvent(new Event("input",{bubbles:true}));
+  return true;
 }
 function bindMinuteRichEditors(){
   document.querySelectorAll(".minute-rich").forEach(function(el){
@@ -1357,7 +1428,7 @@ function openMinute(id){
   const draft=minuteDraftLoad(id);
   const m=draft&&draft.data?Object.assign({},base,draft.data):base;
   let h=`<div class="grab"></div><h3>${id?"회의록 수정":"새 회의록"}</h3>
-    <div style="display:flex;align-items:center;gap:8px;margin:-9px 0 14px"><span id="minuteDraftStatus" style="font-size:11.5px;color:var(--ink-soft)">${draft?"✓ 임시저장본 자동 복구":"입력하면 이 기기에 자동 임시저장"}</span>${draft?`<button class="btn ghost sm" style="margin-left:auto;padding:4px 8px;font-size:11px" onclick="discardMinuteDraft()">임시글 버리기</button>`:""}</div><div style="font-size:11.5px;color:var(--ink-soft);margin:-7px 0 8px;line-height:1.55">선택한 글자에 Ctrl+B · Ctrl+U · Ctrl+I / 줄 처음에 <b>-</b> + Space → 말머리 / 목록에서 Tab · Shift+Tab</div><div class="minute-toolbar"><button type="button" onmousedown="event.preventDefault();minuteRichCommand('bold')"><b>B</b></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('underline')"><u>U</u></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('italic')"><i>I</i></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('insertUnorderedList')">•</button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('outdent')">←</button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('indent')">→</button></div>
+    <div style="display:flex;align-items:center;gap:8px;margin:-9px 0 14px"><span id="minuteDraftStatus" style="font-size:11.5px;color:var(--ink-soft)">${draft?"✓ 임시저장본 자동 복구":"입력하면 이 기기에 자동 임시저장"}</span>${draft?`<button class="btn ghost sm" style="margin-left:auto;padding:4px 8px;font-size:11px" onclick="discardMinuteDraft()">임시글 버리기</button>`:""}</div><div style="font-size:11.5px;color:var(--ink-soft);margin:-7px 0 8px;line-height:1.55">선택한 글자에 Ctrl+B · Ctrl+U · Ctrl+I / 새 줄이나 기존 문장 맨 앞에서 <b>-</b> + Space → 말머리 / 목록에서 Tab · Shift+Tab</div><div class="minute-toolbar"><button type="button" onmousedown="event.preventDefault();minuteRichCommand('bold')"><b>B</b></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('underline')"><u>U</u></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('italic')"><i>I</i></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('insertUnorderedList')">•</button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('outdent')">←</button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('indent')">→</button></div>
     <div class="row2">
       <div class="field"><label>날짜</label><input type="date" id="f-date" value="${m.date}"></div>
       <div class="field"><label>형식</label><select id="f-kind">
