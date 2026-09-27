@@ -2,7 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FBF8F1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="가볍집">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
 <title>가볍집 집사</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css">
 <style>
@@ -24,7 +31,7 @@
   --shadow:0 1px 2px rgba(58,53,46,.04),0 10px 30px rgba(58,53,46,.06);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;overscroll-behavior-x:none}
 body{
   background:var(--paper);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
@@ -34,6 +41,8 @@ body{
 h1,h2,h3,h4{font-weight:700;letter-spacing:-.02em;margin:0}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,textarea,select{font-family:inherit;font-size:16px;color:var(--ink)}
+/* 좌우 히스토리 스와이프는 앱 전체에서 차단. 회의록 텍스트 선택과 충돌하지 않게 함 */
+#modalBox{overscroll-behavior-x:none}
 
 /* 햇살 장식 (안내서 모티프) */
 .sunburst{position:absolute;width:40px;height:40px;pointer-events:none;opacity:.9}
@@ -50,6 +59,19 @@ header{padding:20px 20px 12px;position:sticky;top:0;z-index:30;
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
 .hdr-search:active{transform:scale(.94);background:var(--paper-2)}
 .hdr-search svg{width:19px;height:19px}
+.hdr-search i{font-size:19px}
+.pwa-install-head{display:none}
+.pwa-install-head.show{display:flex}
+.pwa-banner{display:none;position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  width:min(calc(100% - 24px),640px);z-index:65;background:rgba(255,255,255,.97);border:1px solid var(--line);
+  border-radius:16px;padding:11px 12px 11px 14px;box-shadow:0 12px 34px rgba(58,53,46,.16);
+  align-items:center;gap:10px;backdrop-filter:blur(14px)}
+.pwa-banner.show{display:flex}
+.pwa-banner-copy{flex:1;min-width:0}
+.pwa-banner-copy b{display:block;font-size:13.5px;color:var(--ink);margin-bottom:1px}
+.pwa-banner-copy span{display:block;font-size:11.5px;color:var(--ink-soft);line-height:1.45}
+.pwa-banner-close{width:30px;height:30px;flex:none;border-radius:50%;font-size:19px;color:var(--ink-soft);display:flex;align-items:center;justify-content:center}
+.pwa-banner-close:active{background:var(--paper-2)}
 .srch-bar{display:flex;align-items:center;gap:9px;background:var(--card);
   border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:12px}
 .srch-bar input{flex:1;border:none;background:none;outline:none;font-size:15px;font-family:inherit;color:var(--ink);min-width:0}
@@ -249,6 +271,13 @@ nav button .ic.blob i{font-size:16px}
 .field input,.field textarea,.field select{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--card);outline:none;transition:border-color .2s}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--moss)}
 .field textarea{resize:none;overflow:hidden;min-height:70px;line-height:1.6}
+.minute-rich{width:100%;min-height:96px;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--card);outline:none;font-size:16px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;transition:border-color .2s}
+.minute-rich:focus{border-color:var(--moss)}
+.minute-rich ul{margin:5px 0 5px 1.2em;padding-left:1.1em}
+.minute-rich li{margin:2px 0;padding-left:2px}
+.minute-toolbar{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 12px}
+.minute-toolbar button{min-width:34px;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:13px;font-weight:700;color:var(--ink-soft)}
+.minute-toolbar button:active{background:var(--paper-2)}
 .field .hint{font-size:11px;color:var(--ink-soft);margin-top:4px}
 .row2{display:flex;gap:10px}.row2>*{flex:1}
 .modal-actions{display:flex;gap:10px;margin-top:20px}
@@ -283,6 +312,13 @@ nav button .ic.blob i{font-size:16px}
 .log-line.no .log-mark{background:var(--clay)}
 .log-line.ok .log-txt{color:var(--ink)}
 .log-line.no .log-txt{color:#A85E38;font-weight:600}
+.handoff-box{background:rgba(95,169,214,.07);border:1px solid rgba(95,169,214,.18);border-radius:13px;padding:12px;margin-top:14px}
+.handoff-row{display:flex;gap:7px;align-items:flex-start;margin-top:7px}
+.handoff-row input{flex:1;min-width:0;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff;font:inherit;font-size:14px;color:var(--ink)}
+.handoff-del{flex:none;width:32px;height:32px;border-radius:8px;background:var(--paper-2);color:var(--ink-soft);font-size:18px}
+.handoff-view{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;background:rgba(95,169,214,.07);border-radius:10px;margin-bottom:7px}
+.handoff-view .txt{flex:1;min-width:0;font-size:14px;line-height:1.55;white-space:pre-wrap}
+.handoff-view .sent{font-size:11.5px;color:var(--moss-deep);font-weight:700;white-space:nowrap}
 
 /* 홈 */
 .home-hello{padding:10px 4px 18px}
@@ -383,7 +419,18 @@ nav button .ic.blob i{font-size:16px}
 .acct-row-item{flex:1;color:var(--ink)}
 .acct-row-amt{font-weight:700;color:var(--ink);white-space:nowrap}
 .acct-row-empty{padding:12px 16px;font-size:12px;color:var(--ink-soft);border-top:1px solid var(--paper-2)}
+.acct-import-card{background:rgba(95,169,214,.07);border:1px solid rgba(95,169,214,.18);border-radius:14px;padding:13px 14px;margin-bottom:14px}
+.acct-import-title{font-size:13.5px;font-weight:800;color:#3F7CA0}
+.acct-import-desc{font-size:11.5px;color:var(--ink-soft);line-height:1.55;margin:3px 0 10px}
+.acct-import-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+.acct-import-summary>div{background:var(--paper-2);border-radius:10px;padding:8px 4px;text-align:center}
+.acct-import-summary .k{font-size:9.5px;color:var(--ink-soft)}
+.acct-import-summary .v{font-size:12.5px;font-weight:800;margin-top:2px}
+.acct-import-ok{background:rgba(142,176,78,.12);color:var(--moss-deep);border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.55;margin:9px 0}
+.acct-import-warn{background:rgba(208,139,99,.12);color:#A85E38;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.55;margin:9px 0}
+.acct-import-cat{font-size:11.5px;color:var(--ink-soft);line-height:1.65;margin:8px 2px}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <header>
@@ -393,6 +440,9 @@ nav button .ic.blob i{font-size:16px}
       <div class="mark">가볍집 집사</div>
       <div class="sub">가볍게 왔다 가볍게 가는 집</div>
     </div>
+    <button class="hdr-search pwa-install-head" id="pwaInstallHead" onclick="pwaInstall()" aria-label="가볍집 설치">
+      <i class="ti ti-device-mobile-plus"></i>
+    </button>
     <button class="hdr-search" onclick="openSearch()" aria-label="찾기">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
     </button>
@@ -402,6 +452,15 @@ nav button .ic.blob i{font-size:16px}
     <span class="sync-dot" id="syncDot"><i></i><span id="syncTxt"></span></span>
   </div>
 </header>
+
+<div class="pwa-banner" id="pwaBanner">
+  <div class="pwa-banner-copy">
+    <b>가볍집을 앱처럼 설치</b>
+    <span id="pwaBannerText">홈 화면 아이콘으로 바로 열 수 있어요.</span>
+  </div>
+  <button class="btn sm" onclick="pwaInstall()">설치</button>
+  <button class="pwa-banner-close" onclick="pwaDismiss()" aria-label="설치 안내 닫기">×</button>
+</div>
 
 <div class="name-gate" id="nameGate"></div>
 
@@ -438,7 +497,115 @@ nav button .ic.blob i{font-size:16px}
    걸어온 길 · 회의록 · 방문 · 살림(체크리스트+퇴실사진) · 할 일
    저장: 지금은 이 기기. SYNC_URL 채우면 동기화 전환.
    ============================================================ */
+const TEST_MODE = false;
 const SYNC_URL = "https://script.google.com/macros/s/AKfycbzsoEA0W9w7B62qQ2V8K4UyRRHus8bqzUJlEns62IzZEOUh6mow0dLmpZtxGuRRV3f7/exec"; // 가볍집 공용 구글시트
+
+/* ── PWA 설치 ──
+   실제 회의/방문/회계 데이터는 service worker에 캐시하지 않고,
+   앱 껍데기만 오프라인 fallback으로 유지한다. */
+let pwaDeferredPrompt=null;
+function pwaIsStandalone(){
+  return (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true;
+}
+function pwaIsIOS(){
+  const ua=navigator.userAgent||"";
+  return /iPad|iPhone|iPod/i.test(ua) || (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+}
+function pwaIsSamsungInternet(){
+  return /SamsungBrowser/i.test(navigator.userAgent||"");
+}
+function pwaHideUI(){
+  document.getElementById("pwaInstallHead")?.classList.remove("show");
+  document.getElementById("pwaBanner")?.classList.remove("show");
+}
+function pwaDismiss(){
+  document.getElementById("pwaBanner")?.classList.remove("show");
+  try{localStorage.setItem("gbj_pwa_nudge_after",String(Date.now()+24*60*60*1000));}catch(e){}
+}
+function pwaShowUI(autoBanner){
+  if(pwaIsStandalone()){pwaHideUI();return;}
+  const available=!!pwaDeferredPrompt||pwaIsIOS()||pwaIsSamsungInternet();
+  document.getElementById("pwaInstallHead")?.classList.toggle("show",available);
+  if(!autoBanner||!available)return;
+  let allowed=true;
+  try{allowed=Date.now()>=Number(localStorage.getItem("gbj_pwa_nudge_after")||0);}catch(e){}
+  if(allowed){
+    const txt=document.getElementById("pwaBannerText");
+    if(txt){
+      txt.textContent=pwaIsIOS()
+        ?"Safari에서 홈 화면에 추가하면 앱처럼 열려요."
+        :pwaIsSamsungInternet()
+          ?"삼성 인터넷에서도 가볍집을 앱처럼 설치할 수 있어요."
+          :"홈 화면 아이콘으로 바로 열 수 있어요.";
+    }
+    document.getElementById("pwaBanner")?.classList.add("show");
+  }
+}
+async function pwaInstall(){
+  if(pwaIsStandalone()){toast("이미 앱으로 실행 중이에요");pwaHideUI();return;}
+  if(pwaDeferredPrompt){
+    const ev=pwaDeferredPrompt;
+    pwaDeferredPrompt=null;
+    document.getElementById("pwaBanner")?.classList.remove("show");
+    try{
+      await ev.prompt();
+      const choice=await ev.userChoice;
+      if(choice&&choice.outcome==="accepted")toast("가볍집 설치를 시작했어요");
+      else toast("설치를 취소했어요");
+    }catch(e){toast("브라우저 메뉴에서 ‘앱 설치’를 선택해주세요");}
+    pwaShowUI(false);
+    return;
+  }
+  if(pwaIsIOS()){
+    showModal(`<div class="grab"></div><h3>가볍집을 홈 화면에 설치</h3>
+      <div class="note" style="font-size:13px;line-height:1.75;color:var(--ink-soft)">
+        <b style="color:var(--ink)">iPhone · iPad Safari</b><br>
+        1. Safari의 <b>공유</b> 버튼을 누르기<br>
+        2. <b>홈 화면에 추가</b> 선택<br>
+        3. <b>웹 앱으로 열기</b>를 켜고 <b>추가</b><br><br>
+        설치가 끝나면 홈 화면의 <b>가볍집</b> 아이콘을 눌러 바로 열 수 있어요.
+      </div>
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">확인</button></div>`);
+    return;
+  }
+  if(pwaIsSamsungInternet()){
+    showModal(`<div class="grab"></div><h3>삼성 인터넷에서 가볍집 설치</h3>
+      <div class="note" style="font-size:13px;line-height:1.75;color:var(--ink-soft)">
+        <b style="color:var(--ink)">Samsung Internet</b><br>
+        1. 아래쪽 또는 오른쪽의 <b>메뉴(≡)</b>를 누르기<br>
+        2. <b>현재 페이지 추가</b> 또는 <b>홈 화면에 추가</b> 선택<br>
+        3. 보이는 경우 <b>앱 화면</b> 또는 <b>웹 앱 설치</b>를 선택<br>
+        4. <b>추가/설치</b>를 누르기<br><br>
+        삼성 인터넷 버전에 따라 메뉴 이름은 조금 다를 수 있어요.<br>
+        설치가 끝나면 홈 화면의 <b>가볍집</b> 아이콘으로 바로 열 수 있습니다.
+      </div>
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">확인</button></div>`);
+    return;
+  }
+  showModal(`<div class="grab"></div><h3>가볍집 설치</h3>
+    <div class="note" style="font-size:13px;line-height:1.75;color:var(--ink-soft)">
+      이 브라우저에서 자동 설치창을 아직 사용할 수 없어요.<br>
+      Chrome 메뉴에서 <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 선택해주세요.
+    </div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">확인</button></div>`);
+}
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();
+  pwaDeferredPrompt=e;
+  setTimeout(()=>pwaShowUI(true),250);
+});
+window.addEventListener("appinstalled",()=>{
+  pwaDeferredPrompt=null;pwaHideUI();
+  try{localStorage.setItem("gbj_pwa_installed","1");}catch(e){}
+  toast("가볍집이 홈 화면에 설치됐어요");
+});
+function initPWA(){
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("./service-worker.js",{scope:"./"}).catch(e=>console.warn("SW register failed",e));
+  }
+  if(pwaIsStandalone()){pwaHideUI();return;}
+  if(pwaIsIOS()||pwaIsSamsungInternet())setTimeout(()=>pwaShowUI(true),900);
+}
 
 /* ── 고정 타임라인 (2023~2024, 지난 기록) ── */
 const TIMELINE_FIXED = [
@@ -484,32 +651,32 @@ const MT_BLOCKS_AFTER = [
 ];
 const MT_BLOCKS = [...MT_BLOCKS_BEFORE, ...MT_BLOCKS_AFTER];
 
-let minutes = [
-  { id:"m1", date:"2024-12-29", kind:"오프라인", host:"",
-    heartOpen:"자리를 잡아가고 있음 — 가볍집 사용설명서 보람차다.\n준비된 것 위에서 우리가 지향하는 방향으로 조금 나아가보는 연습.\n하드웨어가 갖춰졌으니 이제 소프트웨어를 고민하자.",
-    notice:"",
-    agenda:"· 기부 — 매달 5만원. 자주기금/나마스떼하동 중 결정\n· 사용평가 설문서로 연락처 수집 → 활동 홍보 루트\n· 공동 울력 달력(2월 대청소 / 4월 찻잎 / 6월 매실 / 8월 침구 / 10월 감 / 12월 비누·치약)\n· 회의: 온1·오프1 유지, 진행 매달 돌아가며\n· 회의 기록 저장소 — 구글독스",
-    heartClose:"",
-    nextDate:"2025-02-02", nextHost:"송혜경", nextNote:"고엔카 책 3~6장 읽어오기" },
-  { id:"m2", date:"2025-02-02", kind:"온라인", host:"송혜경",
-    heartOpen:"",
-    notice:"",
-    agenda:"〈고엔카의 위빳사나〉 3~6장 나눔.\n· 기부 — 16일 류시성 제안서\n· 〈토지〉 온라인 모임 아이디어(김해숙)\n· 가볍집 운영원칙 — '가볍다'를 치유·여유·사유·자유·공유와 연결(송혜경 보완)\n· 감정 나누기 — 포살과 자자(류시성)/다른 방안(유성희)",
-    heartClose:"",
-    nextDate:"2025-02-16", nextHost:"", nextNote:"오프라인 · 제안서 가져오기" },
-  { id:"m3", date:"2025-02-16", kind:"오프라인", host:"",
-    heartOpen:"30분 명상 후 — 가볍고 편안합니다.",
-    notice:"",
-    agenda:"· 기부 제안서(류시성) — 매달 5만원, 자주기금부터. 운영은 자주서당과 가볍집 회계\n· 〈토지〉 읽기 모임(김해숙) — '가볍다·생명·자연·치유'로\n· 비움 프로젝트(류시성) — 옷캔 기부, 여름 1박2일\n· 감정 해소 — 가볍집만의 계율? 적용범위는 집사까지. 퀘이커 신뢰위원회 연구(김해숙)",
-    heartClose:"",
-    nextDate:"2025-03-11", nextHost:"유성희", nextNote:"온라인 / 오프라인 3/16 대청소" },
-  { id:"m4", date:"2025-03-11", kind:"온라인", host:"유성희",
-    heartOpen:"",
-    notice:"",
-    agenda:"〈고엔카〉 9장~끝 나눔. 신성한 무관심과 무관심의 차이. 감정이 일어나고 사라짐을 바라보기. 기름 사러간 3형제 이야기. '오늘 굶었나, 벗고 잤나, 길에서 잤나 — 실제는 문제 없는데 불편 하나에 매몰되었네'.",
-    heartClose:"",
-    nextDate:"", nextHost:"", nextNote:"" },
-];
+const HISTORICAL_MINUTES_V3 = [{"id":"m1","date":"2024-12-29","kind":"미표기","host":"","heartOpen":"**공통된 의견**\n- 자리를 잡아가고 있음 - 가볍집 사용설명서 보람차다.\n- 이제는 준비된 것 위에서 우리가 지향하는 방향으로 조금 나아가보는 연습.\n- 하드웨어가 대강 갖추어졌으니 소프트웨어에 대해서 고민해보자.","agenda":"**결정 및 결의 사항**\n- 가볍집 회계에서 기부 활동\n  - 금액 = 1달 5만원 기부.\n  - 기부처 = 자주기금, 나마스테하동 중 결정 필요\n- 사용 평가 설문서로 연락처 수집\n  - 추후 가볍집에서 열리는 활동 홍보를 위한 공식적인 루트 만들기.\n- 가볍집 공동 울력 달력 만들기\n  - 2월 : 입춘맞이 대청소\n  - 4월 : 찻잎 따기 & 찻잎 음식 대잔치\n  - 6월 : 매실 담그기\n  - 8월 : 입추맞이 대청소 (침구류)\n  - 10월 : 감 수확하고 나누기\n  - 12월: 비누, 치약 등 환경 관련 제품 만들기.\n  - 👍아이디어 추가 접수중!!\n- 가볍집 회의 관련\n  - 2024년과 동일하게 1번 온라인, 1번 오프라인 회의 방식 유지.\n  - 온라인 회의 시 공통 텍스트 읽기 지속.\n  - 회의 진행 : 매달 돌아가면서 진행.\n    - 2월: 송혜경\n    - 2/2: 온라인 회의 (고엔카 책 3, 4, 5, 6장 읽어오기).\n    - 2/16: 오프라인 회의 (입춘맞이 대청소).\n    - 3월: 유성희\n    - 4월: 이흥선\n    - 5월: 김해숙\n    - 6월: 류시성\n  - 회의 기록 저장소 마련 - 구글독스\n\n**제안 및 아이디어**\n- @류시성\n  - 가볍집 비움 행사 기획 : 안 입는 옷, 안 쓰는 물건을 가볍집으로 가져와 옷캔에 보내는 주기적인 행사.\n  - 가볍집 걷기 대회 기획 : 정신 건강 증진을 위한 걷기 대회.\n  - 공간 안내 영상 제작\n- @김해숙\n  - 온라인 토지 읽기 모임 기획 : 하동 여행을 포함한 답사 1회 진행.\n\n**2025년 함께 고민해볼 것들**\n- 가볍집의 방향성 - 그것에 기반하는 활동 기획과 검토\n  - 다시 원론적인 이야기이지만 - 어쩌면 가장 중요한 것\n  - 우리 뭐하려고 이 아까운 시간, 물자, 공간을 쓰고 있는 것인가\n  - 그 방향에 맞는 방법은 무엇인지 찾고 연구해가고 있는 것인가\n  - 그것에 비추어 우리들의 활동방향과 활동방식을 점검하고 검토하는 것\n- 제안-제안서-검토 협의-실제 행동 프로세스 정립에 대해 토론하기\n  - 구두 제안 → 제안서 작성 → 검토 → 실행 → 결과 보고서 작성\n    - 저 이런 거 해보고 싶어요 - 구두 제안\n    - 그것을 제안서의 형태로 정리해서 가져오기 - 제안서 작성\n    - 그 제안서의 방향과 방법과 실천이 우리의 방향과 부합하는지 - 검토\n    - 이 과정을 거친 것들을 실제행동으로 옮겨보기 - 실행\n    - 실제로 해보고 난 뒤에 느낀 경험들 - 결과보고서로 작성해보기\n- 모든 것을 내가 주도해야 한다는 생각에서 조금은 자유로워지기\n  - 여태 우리는 ‘내것’을 활용해서 누군가를 이끌어가는 훈련만 해왔는지도 모름\n  - 이제는 반대로 '뒷것'으로 물러나 장을 만드는 역할 훈련이 필요한지도…\n- 감정 나누기 및 부딪힘 해소방안 연구하기\n  - 우리 안에 쌓여가고 있는 것들을 해소하고 화합의 방향으로 나아갈 수 있는 방법 연구하기 *쌓여가는 것들이 결국엔 편견이 되고, 단정이 되고, 감정이 되고, 이성이 된다\n  - @류시성 - 불교의 포살과 자자에 대해서 조사해보기\n  - @유성희 - 감정나누고 해소하는 다른 방법에 대해서 조사해보기\n  - @다른멤버들 - 이 문제가 우리의 장애물이 되고 있다면 내 문제이므로 그 해결방안을 고민하고 찾고 같이 연구해나가기\n\n**다음 번 오프라인 회의 준비 사항**\n- 각자가 냈던 아이디어들에 대해서 - 제안서를 작성해보기","notice":"","heartClose":"","nextDate":"2025-02-02","nextHost":"송혜경","nextNote":"온라인 회의 (고엔카 책 3, 4, 5, 6장 읽어오기) / 2월 16일 오프라인 회의 (입춘맞이 대청소)","reminderDays":[],"updatedAt":1790049019601},{"id":"m2","date":"2025-02-02","kind":"온라인","host":"송혜경","heartOpen":"","agenda":"**<고엔카의 윗빳사나 명상> 3~6장 읽고 이야기 나누기**\n- 명상을 왜 하는지 알게 되었다.\n- 계율을 지키는 것에 대해서 다시 생각해보게 되었다. 방향성으로 이해해보게 되었다. 실라 즉 말, 행동, 직업 어떻게 해야지 나의 습관을 바꿀 수 있을까.\n- 괴로움이라는 문제를 이렇게 집요하게 다루는 책이 있을까, 고통을 직면하고 해결하는 방법에 대해.\n- 무지에 대한 편견, 무지의 반대가 전지전능이 아니라 자각하지 못하는 상태라는 것. / 의식이 계속 흐르고 있는 상태 즉 자연법 모르고 반응, 집착하는 것 / 자연법에 따른 원인과 결과를 잇지 못할 때 (96페이지 참고)\n- ’무지’하다는 것을 어떻게 다른 사람에게 알릴 수 있었을까? 정직함, 솔직함, 타협 없음이 아닐까? 고행해도 고통이 사라지지 않는다는 것을 솔직하게 인정하는 것.\n- 반응하지 않는다는 것은 과거의 깜마에 따르지 않고 새로운 깜마를 만드는 것 아닐까? 깜마는 ‘경영해야 한다’는 개념으로.\n- 팔정도가 무지, 무의식적 습관을 없애는 체계적 방편으로 보였다.\n- 우리 마음의 본질은 긍정적이고 평정심이 가득한 마음이라는 것에 대한 확신을 주는 부분이었다.\n- 명상은 고통을 객관적으로 바라보는 방법이다. 고통이 왔다가 간다는 시간적 이해, 고통의 공간적 이해를 몸으로 했던 명상의 경험이 떠올랐다. 고통에 대해서 화내고 짜증내는 반응만 했는데 행동을 선택할 수 있는 존재로 되어가는 것이 명상이 아닐까 싶다.\n\n**안건 회의**\n- 기부 : 16일에 류시성 제안서 가지고 오기로 함\n- <토지> 온라인 모임 대략적 아이디어: 김해숙\n- 2주일에 1권 / 1주일에 1번 / 1년에 1번 답사 길잡이 / 답사를 언제할지 고민 중 / 치유?? 등 방향성을 고민 중 / 3월 20일 정도 시작 / 2월 16일에 제안서를 가져가 볼 계획\n\n__**가볍집 운영 원칙 정하기 :**__\n- ’무거운 것을 가벼워지게 하는 활동’ 즉 ‘가볍다’ 말을 잘 활용해서 다른 것과 연결하면 좋을 것 같다. 오늘 읽은 책에서 ‘자연에는 집착이 없다.’ 는 표현에서 힌트를 얻어봄. 가벼워진다는 말을 치유, 여유, 사유, 자유, 공유와 연결하면 좋을 것 같다. 가벼운 편안함을 지향하는 활동을 만들어보면 어떨까.\n- <삶으로 다시 떠오르기>라는 책이 떠올랐다. 가벼움과 연결해 우리 용어를 만들어가면 좋을 것 같다.\n- 송혜경이 맡아서 이 안건을 계속 수정 보완하기로 함\n\n__**공동체 감정 나누기 및 해소 방향 연구**__\n- 불교의 포살과 자자 : 류시성 앞으로 자료 공유 계획\n- 불교 외 다른 감정 해소 방안 : 유성희\n- 이흥선이 맡아서 이 안건을 계속 수정 보완하기로 함\n\n**__2월 16일 전까지 할 일 / 3월 모임 준비__**\n- 다음주 안에 2월 오프라인 회의 시간 정하기 /  다음주 안에 3월 회의 온라인으로 미리 날짜 정하기\n- 제안서 포맷 공유하기(류시성)\n- 3월에는 <고엔카의 위빳사나 명상> 7~8장 읽고 얘기하기로 함","notice":"","heartClose":"","nextDate":"2025-02-16","nextHost":"","nextNote":"오프라인 회의 · 제안서 가져오기 / 3월 모임 일정 미리 정하기","reminderDays":[],"updatedAt":1790049132970},{"id":"m3","date":"2025-02-16","kind":"오프라인","host":"","heartOpen":"30분 명상 후 가볍고 편안합니다.","agenda":"**기부 제안서**\n- 제안자 류시성\n- 내용 : 가볍집 회계에서 매달 5만원 기부\n- 이유 : 가볍집 취지, 세상에서 받은 것을 조금이라도 돌려주자는 취지\n- 의견 수합\n- 의견 결정\n\n**프로그램 제안서**\n__가. 2025 <토지> 읽기 모임__\n- 제안자 : 김해숙\n- 의견 수합\n\n__나. 비움 프로젝트__\n- 제안자 : 류시성\n- 내용 : <옷캔>을 통해 안 입는 옷 기부\n- 의견 수합\n\n__다. 감정 나누기 및 부딪힘 해소 방안 연구하기__\n- 제안자 : 이흥선\n- 자료 발표 : 불교의 포살과 자자(류시성)\n- 의견 및 요지\n- 가볍집 사용설명서에 준해서 계율을 정할 수 있을듯\n- 몇 가지 원칙을 설문 초반에 포함하면 좋을 것 같다.\n\n- 아직까지 자자의 부분은 좀 어려울 수 있을 것 같다.\n- 계율 적용 범위는 가볍집사들까지. 게스트들의 문제는 안건으로 삼아서 얘기할 수 있음.\n- 자본주의, 환대와 서비스 정신과 다르다는 것을 연습해야 한다.\n- 뒷정리를 하고 가는 이유는 내 다음 사람을 노예로 만들지 않겠다는 생각, 배려의 의미가 있기 때문에, 손님과 오더라도 굳이 대접할 필요는 없다.\n- 우리의 정체성과 원칙이 연결되어 있음을 인지하고, 더 좋은 방법이 있는지 자료 조사를 더 해올 것.(유성희)\n- 추가로 퀘이커 교도의 신뢰위원회를 연구해보고 싶다.(김해숙)","notice":"","heartClose":"","nextDate":"2025-03-11","nextHost":"유성희","nextNote":"3. 3월 회의-온라인 : 3월 11일(화) 7시 30분-오프라인 : 3월 16일(일), 대청소 예정-회의 진행 : 유성희","reminderDays":[],"updatedAt":1790049375116},{"id":"m4","date":"2025-03-11","kind":"온라인","host":"유성희","heartOpen":"","agenda":"**〈고엔카〉 9장~끝 나눔**\n- 신성한 무관심과 무관심의 차이. 감정이 일어나고 사라짐을 바라보기.\n- 기름 사러간 3형제 이야기.\n- '오늘 굶었나, 벗고 잤나, 길에서 잤나 — 실제는 문제 없는데 불편 하나에 매몰되었네'.","notice":"","heartClose":"","nextDate":"","nextHost":"","nextNote":"","reminderDays":[],"updatedAt":1790049432669},{"id":"m5","date":"2025-06-15","kind":"미표기","host":"","heartOpen":"","agenda":"**지난 회의 안건 중 논의사항**\n- 안건 : 게스트용 - <나서기 전 체크리스트> 검토 & 의견교환\n- 논의사항 :\n\n**이번 회의의 안건들**\n__안건 1 : 정기회계발표__\n- 회계자료 발표(첨부파일링크 - 클릭: https://docs.google.com/spreadsheets/d/1zqN12Q-qEqaRthBv6ZKhCx-AyFG6sgrc/edit?usp=sharing&ouid=115641259923108380898&rtpof=true&sd=true)\n- 현재 잔액 = 1,332,685\n\n__안건 2 : 회의진행방식의 형식화__\n- 회의진행방식 초안 발표(첨부파일링크 - 클릭: https://drive.google.com/file/d/1GSO4AnllDC1g8VxxxzK6pnRVvOCpH86i/view?usp=sharing)\n- 나눔의견들\n\n__안건 3 : 소통의 절차 - 그 가이드라인 만들기__\n- 소통절차 초안 발표(첨부파일링크 - 클릭: https://drive.google.com/file/d/1skEkEqJLBiiWqMcSLAgoL-ynqkiEL4cW/view?usp=sharing)\n- 나눔의견들","notice":"**기타 공지사항들**\n- 제습기, 에어컨 작동법 간략하게 만들어서 붙여두면 좋을 듯\n- 매실엑기스 담기 - 2주 뒤쯤 가능할 듯\n- 방문자 가운데 유제품을 드시지 못하는 것을 힘들어하는 부분도 있었다는 점\n- 김해숙, 송혜경 - 7월 23일~8월 3일 담마코리아 명상수련(화이팅!!)\n\n*회의진행자는 이 포멧을 가지고 회의를 진행해보고, 정리해나가면 어떨까요? - 이 부분도 다음 회의에서 한번 해보고 - 확정하면 좋을 거 같습니다.","heartClose":"","nextDate":"","nextHost":"송혜경","nextNote":"일정 = 2026. 7. 19-20장소 = 가볍집에서 오프라인 모임진행진행자 = 송혜경*준비사항 = 가볍집에서 함께 약속하고, 지켜갔으면 하는 것들을 메모해서 가지고 오기(미리 받는 것이 좋을 거 같습니다… 숙제는 미리미리^^)","reminderDays":[],"updatedAt":1790049589399},{"id":"m6","date":"2025-08-17","kind":"미표기","host":"","heartOpen":"반가운 마음\n성희샘 손녀 생김 \n해숙샘 담마코리아 다녀오심 \n흥선샘 번뇌 수련 중 \n혜경 허리 치유하며 <주체의 해석학> 시성과 세미나 중 \n시성 은퇴자의 삶^^","agenda":"**지난 회의 안건 중 논의사항**\n안건 1. 정기 회계 발표\n안건 2. 회의 진행 방식 형식화\n안건 3. 소통 절차 가이드 라인 만들기\n안건 4. 기타 논의 - 제습기, 에어컨 작동법 부착\n                              매실 엑기스 담기, 담마코리아 참가 예정자\n논의사항 :\n- 회의 형식화 진행(회의록 보면서 하면 진행하기)\n- 소통 절차는 개인톡으로 먼저 알리고, 전체 회의에서 톡 받은 사람이 스스로 전체 멤버에게 알리기\n- 제습기, 에어컨 작동법 다음 번에 붙이기, 올해 매실 농사가 잘 안 돼서 매실 엑기스는 못 담금\n\n**이번 회의의 안건들**\n__안건 1 : 가볍집 집사용 체크리스트 만들기__\n- 나눔의견들\n\n__안건 2 : 가볍집 사용 안내서 수정__\n- 나눔의견들\n\n__안건 3 : 기타 의견__\n- 가볍집 다녀온 사람들의 후기 중\n- 감나무 가지치기\n- 빨래비누, 세탁세제 리필하기\n- 두유, 참깨, 누룽지 리필하기\n- 담마코리아 다녀오신 해숙샘 : 이번에 큰 덕을 느꼈다. 두번째 방문하니 많은 부분이 정리되었고 명상을 왜 해야되는지, 명상이 자연학에서 나왔다는 부분이 이해가 되었다.","notice":"**기타 공지사항들**\n- 다음 회의 9월에 회계 발표 있음(3/6/9/12월)\n- 마을에 수해나서 상수도 공사를 했고, 우리가 없는 동안 감나무, 밭에 풀도 깎아주셔서 마을 기금으로 20만원으로 내면 어떨까? - 모두 OK!\n- 해인네 야외 솥과 가스 시간 날 때 실어가시면 될듯","heartClose":"","nextDate":"2025-09-14","nextHost":"유성희","nextNote":"일정 = 2025. 9. 14.(일) 오후 7시온라인 진행진행자 = 유성희*준비사항 =","reminderDays":[],"updatedAt":1790049910655},{"id":"m7","date":"2025-10-19","kind":"미표기","host":"","heartOpen":"- 반가움, 오랜 친구를 만난 것 같다(혜경)\n- 저녁을 많이 먹어서 졸리다. 마음은 편안하다(시성)\n- 시인 상담후 에너지 소진, 복잡한 마음, 친구 모임인 것 같다.(해숙)\n- 회의 하는 것을 깜빡해서 마음이 불편하다(흥선)","agenda":"**지난 달 가볍집 다녀간 사람들의 소감 나누기:**\n- 혜경샘의 어머님이 다녀가셨는데 날씨도 좋고 주울 것들이 많아서 무척 좋아하셨다. 혜경샘은 어머니의 모습에서 자신의 모습이 보였다. 요즘 가볍집에 지내가 출현한다고 한다. 주의 요망!!\n- 해숙샘 지인들(양철호 교수님)후기 작성을 하지 않은. 설명서를 보내고 후기 작성 하도록 유도하는 것이 필요. 링크를 보내주기\n- 공지사항에 문구를 수정 ‘후기를 작성해주세요’라는 것이 필요\n\n**지난 한달 동안 어떻게 보냈는가?**\n- 해경샘: 학교 일로 바빴다. 학생들과 에티카를 읽고 있는데 책을 읽지 않는 날에도 학생들이 찾아 올 정도\n- 시성샘: 계속해서 편안해 지는 것 같다.\n- 유성희: 지난 화요일 한달에 한번 하던 모임을 20개월 만에 갔는데 사람들이 많이 늙었고 지쳐 보였다. 행복하게 늙어가는 것 같지 않음이 느껴졌다. 11월 30일 막내 아드님 결혼식도 있단다.\n- 해숙샘: 엄마와 사는 것, 부부가 백년회로 하는 것도 쉬운 일이 아니다. 변화의 한가운데 혼자 있는 시간을 보냈다. 요즘은 찾아오는 사람들이 달라졌다. 주변이 활성화 되는 것 같고 마음이 고요해 지는 것 같다. 추석에 며느리가 다녀갔는데 공감대 형성이 되었다. 해인네에서 한기호 선생님과 글쓰기 시작했고 감이당에서 고미숙선생님과 글쓰기도 시작했다.\n- 흥선: 상근직 근무하는 둘째 아들과 생화, 가까운 지인이 부정적인 부분때문에 거리 두기를 하고 있다.","notice":"**공지사항**\n- 내년 2월이면 가볍집 만기다. 12월에는 계약 연장을 하든, 뭘 하든 연락을 해야 한다. 11월에 만나서 이야기 나누자.\n- 담마 동기 이경화님 가볍집 맴버가 되고 싶다.에 대한 내용 논의\n- 시성샘은 앞으로 2년은 월세 지원을 받을 수 있다.\n- 해인네 김장은 11월29일~30 5kg\n- 조만간 솥, 가스 작년 김장김치 가져올 예정\n- 2년후 향후 계획은 다음 달에 논의 하기로 함\n- 다음 달 온라인 회의는 11월 16일 오후 7시\n- 라마스데하동 분들이 담마코리아 다녀오신분들이 많은데 우리가 가볍집을 쓰지 않은때 수령장소로 빌려 주는 것","heartClose":"끝마음 나누기\n- 성희샘: 가볍집이 공유되고 있는 것 같아 뿌듯, 진화하고 있는 것 같다. 많이 친해진 것 같고, 따뜻하다.\n- 시성샘: 가볍집이 있어서 이야기 나눔이 가능하다. 유형의 공간이 있는 것이 장점, 가자지구 건물이 90% 정도 허물어 졌다. 우리는 서로를 미워하고 비단 이불을 덮고 악몽을 꾸는 격이다.\n- 해숙샘: 방향을 잡고 체계를 잡아서 운영을 잘 하는 것 같다. 작은 일이지만 체계가 잡혀가고 있는 것 같다.","nextDate":"2025-11-16","nextHost":"","nextNote":"다음 달 온라인 회의는 11월 16일 오후 7시","reminderDays":[],"updatedAt":1790050053403},{"id":"m8","date":"2025-12-27","kind":"미표기","host":"","heartOpen":"- 봄날씨 같은 화개에서 걷는 것만으로도 행복해지는 시간(혜경&시성)\n- 정리해야할 것들이 많아서 조금은 멍한 상태(해숙)\n- 일하고 돌아와서 씻고 청소하고 나니 조금은 열이 나고 들뜨는 느낌(흥선)","agenda":"**지난 회의 안건 브리핑**\n안건 : \n- 지난 2년 - 가볍집에서 보낸 소감들 나누기\n- 향후 2년 계획에 대한 이야기 나누기\n- 새로운 회원에 대한 의견들 나누기\n\n**이번 회의의 안건들**\n__안건 1 : 정기회계발표__\n- 회계자료 발표(첨부파일링크 - 클릭: https://docs.google.com/spreadsheets/d/1HlerK72hrb-gzJUE4yh4lPUTtd2N8qeY/edit?usp=drive_link&ouid=115641259923108380898&rtpof=true&sd=true)\n- 현재 회계 잔액 = 3,811,909원(*실제 통장잔고와는 차이 있음. 1월 회비로 납부된 금액과 다른 분기 회계로 잡혀야할 부분들은 제외해서 생긴 차이임.)\n- 이번 회계에서 주목해볼 것들\n- 청년주거비 지원 2회 수령\n\n__안건 2 : 방문인들의 사용평사설문서 공유하고 브리핑하기__\n- 나눔의견들\n\n__안건 3 : 새로운 회원 참여에 대한 의견 나누기__\n- 나눔의견들\n\n**안건 4 : 앞으로 새롭게 2년의 운영방향들 생각 나누기**\n- 나눔의견들","notice":"**기타 공지사항들**\n- 겨울 대비 준비사항들\n- 보일러 기름 - 가득 채워놓을 예정(1-2월에 사용)\n- 보일러 상태 - 1월에는 외출로 놓고 다니기(회원들이 방문인들에게 공지해주기)\n- 온열기 꺼내놓은 것 - 늘 잘 끄고, 코드도 잘 뽑아두는 것에 신경쓸 것\n- 바깥쪽 수도 - 동파방지를 위해서 잠궈놓은 상태\n- 시성 집에서 안 쓰는 제기들\n- 출입문 옆 체크리스트 활용이 안 되는 상황\n- 나가기 전 체크해야할 사항들이 나열되어 있으므로 하나하나 체크하면서 빠진 것이 없이 정리할 수 있도록 하면 좋을 듯\n- 현재 가볍집에 수건이 부족한 상태\n- 혹시 방문하시는 분들이 있는 경우 - 수건 부족에 대한 공지를 해주면 좋을 듯…","heartClose":"- 이렇게 또 이야기 나누니 마음이 편안해졌다(해숙)\n- 회의 진행이 느릿느릿해서 조금 답답했는데… 지금은 편안해졌다(혜경)\n- 이렇게 정기적으로 회의를 하면서 가볍집에 대해서 생각해보고, 이야기해보는 시간이 있는 것이 좋다(시성)\n- 인터넷이 끊겨서 아쉽게도 흥선쌤 나누기는 듣지 못함.","nextDate":"2026-02-08","nextHost":"송혜경","nextNote":"일정 = 2026. 2. 8장소 = 온라인 모임진행자 = 송혜경*회의사항 = 3월 오프라인 모임 가능 일정을 논의할 예정(3월 오프라인 모임에서 같이 대청소 예정)새로운 회원을 받는 것에 대한 어느 정도의 결정2026년 가볍집을 어떻게 쓸 것인가에 대한 생각 모으기","reminderDays":[],"updatedAt":1790050390881},{"id":"m9","date":"2026-02-08","kind":"온라인","host":"송혜경","heartOpen":"해숙 - 별 생각 없다. 약간 마음이 안 좋고 부담이 살짝 있는 상태\n시성 - 별 생각이 없는 상태. 반가움.\n흥선 - 어벙벙한 상태.\n성희 - 인생 선배 얘기 들으면서 인생공부하고 왔다.\n혜경 - 반가운 마음.","agenda":"**이번 회의의 안건들**\n__안건 1 : 방문인들의 사용평사설문서 공유하고 브리핑하기__\n- 다들 편안하게 이용하고 간 건 같아서 뿌듯한 마음\n- 함께 온 지인들이 일회용품에 대해서 깨어있지 않을 경우 약간 불편한 마음도 올라온다는 분의 의견도 있었음\n\n__안건 2 : 새로운 회원 참여에 대한 의견 나누기__\n- 성희 - 비슷한 생각. 회원을 받으려면 뭔가를 해야 하는데, 지금 우리가 하는 활동처럼 가볍게 하는 게 좋을 것 같다. 우리가 뭔가 하지 않아도 다른 사람들이 가볍집을 잘 누리는 것 같다. 그런데 다른 사람들이 원하면 그 의견을 따르도록 하겠다.\n- 해숙 -  제안하셨던 분들도 지금까지 그 마음이 있을까 싶다.\n- **결론 - 일단은 이 안건은 이대로 남겨두자.**\n\n__안건 3 : 앞으로 새롭게 2년의 운영방향들 생각 나누기__\n- 성희 - 휴식 여유의 공간으로서 생각. 처음에는 뭔가를 해야한다는 의무감이 있었는데, 이름대로 가볍고 편안하게 지금처럼 운영하면 좋을 것 같다.\n- **결론 - 안건을 열어두기**\n\n__안건 4 : 이용 횟수에 대해서__\n- 혜경 - 예약이 늘어나서 우리가 이용할 시간을 픽스하면 어떨까\n- 성희 - 한달에 2주 정도는 우리가 이용하면 어떨까\n- 시성 - 비어있을 때 가면 좋겠다고 생각한다. 우리가 정비할 시간이 필요하지 않을까 한다. 정례화 하기보다 비어있을 때 가면 좋을듯.\n- 한달에 1번 정도는 정비 기간으로 가지는 게 필요할듯.\n- **결론 - 정례화 하지는 않아도 정비 기간은 필요하다는 것에 공감을 했으니 너무 예약이 꽉 찰 경우는 같이 얘기해서 정하면 좋겠다.**","notice":"**기타 공지사항들**\n- 톡방 캘린더에 일정 등록하기\n- 사전에 이용 동의를 구하고 물어본 사람이 입력하기\n- 3월 회의에서는 1년치 회계를 볼 것\n- 집주인과 통화해서 월세를 내려달라는 요구를 했는데 받아들여지지 않았음. 월세 세금 환급을 받을 수 있는 지 알아보고 회의 때 말씀 드리겠음. 도배를 할 수 있는 지도 알아봐야겠다.","heartClose":"- 성희 - 혹시 도배를 하게 될 경우 가볍집이 변할 것 같은데 기대된다. 관계도 깊어지는 기분이 든다. 공간을 공유하는 일이 멋진 일처럼 느껴진다.\n- 흥선 - 이제야 좀 깨어나는 것 같고 반가운 마음이 든다.\n- 시성 - 가볍집이 공통의 화두인 것 같아서 공간이 있는 게 연결선 같이 느껴져서 좋다. 오셨다 가신 분들 얘기를 들어보니 잘했다는 생각이 든다. 우리 가족분들이 자주 이용했으면 좋겠다는 생각이 든다.\n- 해숙 - 막상 모이니 할 얘기가 많다는 생각\n- 혜경 - 공통의 화제가 있으니 계속 만나고 마음을 살피게 되는 것이 좋다.","nextDate":"2026-03-15","nextHost":"유성희","nextNote":"다음 모임 2026년 3월 15일 오후 7시 온라인 회의 / 유성희샘 사회","reminderDays":[],"updatedAt":1790051139134},{"id":"m10","date":"2026-05-10","kind":"미표기","host":"","heartOpen":"- 해숙 -나쁘지도 좋지도 않은 상태\n- 시성 - 4월 말 담마 다녀오심\n- 혜경: 가볍집에서 이것 저것 정리하느라 약간 멍한 상태.\n- 흥선 - 조금 가벼워 짐\n- 성희 - 지금 평화로운 상태.","agenda":"**가볍집 소식**\n- 메실을 망친듯 잔가지를 가을에 잘라줘야 한다.\n- 차를 따서 홍차를 만들 예정\n- 지금 마을은 연두 연두한다\n- 혜경샘은 밭정리 청소하기로 분주한 상태\n- 선배 선생님들이 일곱분이 다녀가셨는데 동네를 좋아했다고\n\n**2달 동안 다녀가신 분들이 13명의 의견**\n- 햇빛 가리개, 욕실 문이 불편\n- 먹거리 제한(우유, 요거트, 계란) 정도는 먹었으면\n- 이불장 정리 사진은 붙여 놨으면\n\n시성샘 담마 다녀오신 이야기 나눔","notice":"**기타 공지사항들**\n- 보일러 기름 1드럼 (32만원) 넣음\n- 시성샘 청년 주거지 지원금 신청예정 올해도 가능할 듯\n- 시성샘 경남 도민이라 지원 10만원\n- 시성샘 드럼통 기부해서 정리해둔 나무 태운다고\n- 시성샘 고유가 지원금 25만원 받으시면 생필품 산다고 함\n- 하절기에 와이파이 꼭 꽂아 두기(물주기, 제습기)\n- 다음 주 유성희 선생님 친구들 6명 방문 예정\n- 냉장고 술 우리 취지에 맞지 않지만 보관해야 하는 점 이해바람\n- 냉장고 보리쌀 드세요.\n- 성희샘도 찹쌀을 사 놨어요","heartClose":"죄송합니다. 이 부분은 기록하지 않았네요~~~","nextDate":"","nextHost":"","nextNote":"","reminderDays":[],"updatedAt":1790051224060},{"id":"m11","date":"2026-06-21","kind":"미표기","host":"","heartOpen":"","agenda":"**재정 보고**\n- 올해 두번쩨 회계 회의 잔액 4.653.001원\n\n**안건-특별한 건 없고**\n- 시성 혜경 쓰레기통 못비우고 떠났는데 성희샘이 치워주셨습니다 감사와 미안^^\n- 여름 7-8월 가볍집 사용: 현재 7월말 박은영 샘 팀만 신청해놓은 상태\n- 김해숙 팀은? 이번 주말 결정하기로!\n- 가볍집 후기 2건 읽음-가볍집에 대해 좋은 인상 받고 다시 또 오고 싶음\n- 매실 거두기-올해는 부실. 이번주 시성혜경샘이 내려가서 조금이라도 거두기로 함\n- 가볍집 앞 고로 수도관 공사 해서 길이 포장됨\n- 밭농사: 물을 주기적으로 주니까 식물들이 잘 자라고 있음","notice":"","heartClose":"- 혜경_흥선샘 하고싶은 것 미뤄놓고 사는 모습 대단해 보인다. 가볍집은 대신 잘 지키겠다.\n- 시성-가볍집을 5월에 가고 못 갔다. 그 때 지리산 다른 마을을 돌아보았는데 가볍집 있는 마을이 좋긴 좋았다. 정금차밭과 길 등 코스 좋은 마을인 듯하다. 해숙 흥선샘도 다녀가시면 좋을 듯. 좋은 자연과 기분전환에 가볍집은 좋은 점을 주는 것 같다.","nextDate":"2026-07-19","nextHost":"","nextNote":"7월 회의 : 7월19일 저녁7시(성희샘 가능?)","reminderDays":[],"updatedAt":1790051296515}];
+let minutes = HISTORICAL_MINUTES_V3.map(x=>JSON.parse(JSON.stringify(x)));
+
+function restoreSourceMinute20241229(){
+  if(!TEST_MODE)return;
+  const key="gbj_test_restore_m1_docx_v1";
+  try{if(localStorage.getItem(key))return;}catch(e){}
+  const src=HISTORICAL_MINUTES_V3.find(x=>x.id==="m1");if(!src)return;
+  const copy=JSON.parse(JSON.stringify(src));
+  const i=minutes.findIndex(x=>x.id==="m1");
+  if(i>=0)minutes[i]=copy;else minutes.push(copy);
+  try{localStorage.setItem(key,"1");}catch(e){}
+  try{saveCache();}catch(e){}
+}
+function applyHistoricalMinutesV3(){
+  if(!TEST_MODE)return;
+  const key="gbj_test_minutes_docx_v3";
+  try{ if(localStorage.getItem(key))return; }catch(e){}
+  HISTORICAL_MINUTES_V3.forEach(src=>{
+    const copy=JSON.parse(JSON.stringify(src));
+    const idx=minutes.findIndex(m=>m.id===copy.id);
+    if(idx>=0) minutes[idx]=copy; else minutes.push(copy);
+  });
+  try{localStorage.setItem(key,"1");}catch(e){}
+  try{saveCache();}catch(e){}
+}
 
 /* ── 방문 ── */
 let visits = [];
@@ -551,6 +718,22 @@ const PHOTO4 = [
   {key:"boiler",label:"보일러 전원 끈"},
   {key:"elec",  label:"복도 전기판넬 코드 뺀"},
 ];
+const PHOTO_FILE_LABEL={gas:"가스",wifi:"와이파이",boiler:"보일러",elec:"전기"};
+function photoNamePart(v,fallback){
+  return String(v||fallback||"").trim().replace(/[\\/:*?"<>|#%]/g,"-").replace(/\s+/g,"").slice(0,32)||String(fallback||"사진");
+}
+function photoShortId(id){return String(id||Date.now()).replace(/[^a-zA-Z0-9]/g,"").slice(-6)||String(Date.now()).slice(-6);}
+function carePhotoFilename(log,key){
+  const date=(log&&log.date)||todayISO();
+  const who=photoNamePart(log&&log.who,"이름없음");
+  const kind=log&&log.owner==="guest"?"방문자퇴실":"정리";
+  const label=PHOTO_FILE_LABEL[key]||photoNamePart(key,"사진");
+  return `${date}_${who}_${kind}_${label}_${photoShortId(log&&log.id)}.jpg`;
+}
+function notePhotoFilename(note){
+  const date=String(note&&note.createdAt||todayISO()).slice(0,10);
+  return `${date}_${photoNamePart(note&&note.who,"익명")}_사랑방_${photoShortId(note&&note.id)}.jpg`;
+}
 let visitLogs = []; // {id, date, who, checks:{}, photos:{}}
 
 /* ── 할 일 게시판 ── */
@@ -649,11 +832,56 @@ let careTab = "checklist";
 
 /* ── 저장/동기화 — 항목 하나씩 주고받기 (충돌·경합 방지) ── */
 let syncBusy=false;
-const CACHE_KEY="garyeobjip_cache_v1";
+const CACHE_KEY=TEST_MODE?"garyeobjip_test_cache_v1":"garyeobjip_cache_v1";
 
 // 방금 이 기기에서 만들거나 고친 항목엔 표시를 남겨서,
 // 서버가 아직 못 받았을 때 20초 주기가 그걸 지워버리지 않게 막음
 function markPending(item){ item.__pending=Date.now(); }
+
+const MINUTES_PROMOTION_KEY="minutesMigration20260927";
+async function promoteBackedUpMinutesOnce(){
+  if(!SYNC_URL||TEST_MODE)return false;
+  const check=await fetch(SYNC_URL);
+  const current=normalizeFromServer(await check.json());
+  const done=(current.config||[]).find(c=>c&&c.key===MINUTES_PROMOTION_KEY&&String(c.value||"")==="done");
+  if(done)return false;
+
+  const now=Date.now();
+  const promoted=HISTORICAL_MINUTES_V3.map((src,i)=>{
+    const item=JSON.parse(JSON.stringify(src));
+    delete item.__pending;
+    item.updatedAt=now+i;
+    return item;
+  });
+
+  for(const item of promoted){
+    const r=await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"minutes",op:"upsert",item,actor:me})});
+    const j=await r.json();
+    if(!j||j.ok===false)throw new Error((j&&j.error)||"회의록 서버 반영 실패");
+  }
+  const marker={id:MINUTES_PROMOTION_KEY,key:MINUTES_PROMOTION_KEY,value:"done",updatedAt:Date.now()};
+  const mr=await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"config",op:"upsert",item:marker,actor:me})});
+  const mj=await mr.json();
+  if(!mj||mj.ok===false)throw new Error((mj&&mj.error)||"회의록 이전 완료표시 실패");
+
+  minutes=promoted;
+  const mi=(config||[]).findIndex(c=>c.id===marker.id);
+  if(mi>=0)config[mi]=marker;else config.push(marker);
+  saveCache();
+  safeRenderAll();
+  return true;
+}
+async function startProductionSync(){
+  try{
+    const moved=await promoteBackedUpMinutesOnce();
+    if(moved)toast("테스트에서 정리한 회의록 11건을 운영판에 옮겼어요");
+  }catch(e){
+    console.error("minutes promotion failed",e);
+    setSync(false,"회의록 이전 확인 필요");
+  }
+  await syncPullAll();
+  startPolling();
+}
 
 async function syncUpsert(resource,item){
   saveCache(); // 네트워크 결과와 상관없이 지금 이 기기 상태는 바로 저장해둠
@@ -811,12 +1039,13 @@ async function syncPullAll(silent){
     tryOpenPendingReport();
   }catch(e){if(!silent)setSync(false,"동기화 실패");}
 }
-async function syncUploadPhoto(dataUrl,filename){
+async function syncUploadPhoto(dataUrl,filename,folderKind,dateISO){
   if(!SYNC_URL)return null;
   try{
     const [head,base64]=dataUrl.split(",");
     const mime=(head.match(/data:(.*?);/)||[])[1]||"image/jpeg";
-    const r=await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"photo",op:"upload",filename,mime,dataBase64:base64})});
+    const year=String(dateISO||todayISO()).slice(0,4);
+    const r=await fetch(SYNC_URL,{method:"POST",body:JSON.stringify({resource:"photo",op:"upload",filename,mime,dataBase64:base64,folderKind:folderKind||"기타",year})});
     const d=await r.json();
     return d.url||null;
   }catch(e){return null;}
@@ -985,6 +1214,7 @@ function renderHome(){
 }
 function fmtShort(iso){const p=iso.split("-");return p.length<3?iso:`${+p[1]}.${+p[2]} (${dow(iso)})`;}
 function goTab(tab,fromHistory){
+  if(minuteEditing&&document.getElementById("modalBg").classList.contains("on")){if(!closeModal())return;}
   document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));
   const navBtn=document.querySelector(`nav button[data-tab="${tab}"]`);
@@ -1124,14 +1354,148 @@ function saveTL(id){
 function delTL(id){if(!confirm("이 기록을 지울까요?"))return;
   timelineManual=timelineManual.filter(t=>t.id!==id);syncDelete("timelineManual",id);closeModal();renderTimeline();}
 
+/* ── 회의록 작성 보호: 자동 임시저장 · 자동 복구 · 나가기 경고 ── */
+const MINUTE_DRAFT_PREFIX="gbj_minute_draft_v1:";
+let minuteEditing=false;
+let minuteEditId="";
+let minuteDraftTimer=null;
+function minuteDraftKey(id){return MINUTE_DRAFT_PREFIX+(id||"new");}
+function minuteDraftLoad(id){try{const raw=localStorage.getItem(minuteDraftKey(id));return raw?JSON.parse(raw):null;}catch(e){return null;}}
+function minuteDraftClear(id){try{localStorage.removeItem(minuteDraftKey(id));}catch(e){}}
+function minuteDraftClock(ms){if(!ms)return "";const d=new Date(ms);return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");}
+function minuteFormData(){
+  if(!document.getElementById("f-date"))return null;
+  return {date:val("f-date"),kind:val("f-kind"),host:val("f-host"),heartOpen:minuteRichValue("f-heartOpen"),notice:minuteRichValue("f-notice"),agenda:minuteRichValue("f-agenda"),heartClose:minuteRichValue("f-heartClose"),nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote"),reminderDays:readReminderCheckboxes("f-remind")};
+}
+function minuteDraftStatus(txt,busy){const el=document.getElementById("minuteDraftStatus");if(!el)return;el.textContent=txt;el.style.color=busy?"var(--clay)":"var(--moss-deep)";}
+function minuteDraftSaveNow(){
+  if(!minuteEditing)return;
+  const data=minuteFormData();if(!data)return;
+  const savedAt=Date.now();
+  try{localStorage.setItem(minuteDraftKey(minuteEditId),JSON.stringify({savedAt:savedAt,data:data}));minuteDraftStatus("✓ 임시저장됨 · "+minuteDraftClock(savedAt),false);}catch(e){minuteDraftStatus("임시저장 실패",true);}
+}
+function scheduleMinuteDraftSave(){if(!minuteEditing)return;minuteDraftStatus("● 작성 중…",true);clearTimeout(minuteDraftTimer);minuteDraftTimer=setTimeout(minuteDraftSaveNow,700);}
+function bindMinuteDraftAutosave(){const root=document.getElementById("modalBox");if(!root)return;root.querySelectorAll("input,textarea,select,.minute-rich").forEach(function(el){el.addEventListener("input",scheduleMinuteDraftSave);el.addEventListener("change",scheduleMinuteDraftSave);});}
+function resetMinuteEditorState(){clearTimeout(minuteDraftTimer);minuteDraftTimer=null;minuteEditing=false;minuteEditId="";document.documentElement.classList.remove("minute-editing");}
+function canLeaveMinuteEditor(){
+  if(!minuteEditing)return true;
+  minuteDraftSaveNow();
+  const ok=confirm("작성 중인 회의록은 이 기기에 임시저장되어 있습니다.\n\n이 화면을 나갈까요?\n다시 회의록을 열면 이어서 작성할 수 있습니다.");
+  if(ok)resetMinuteEditorState();
+  return ok;
+}
+function discardMinuteDraft(){
+  if(!minuteEditing)return;
+  if(!confirm("임시저장된 작성 내용을 버리고 처음 상태로 돌아갈까요?"))return;
+  const id=minuteEditId;
+  minuteDraftClear(id);resetMinuteEditorState();closeModal(true);openMinute(id);
+}
+window.addEventListener("beforeunload",function(e){if(!minuteEditing)return;minuteDraftSaveNow();e.preventDefault();e.returnValue="";});
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden"&&minuteEditing)minuteDraftSaveNow();});
+window.addEventListener("wheel",function(e){if(minuteEditing&&Math.abs(e.deltaX)>Math.abs(e.deltaY)){e.preventDefault();}},{passive:false});
 /* ============================================================
    화면 2 — 회의록 (다섯 칸 + 다음 회의)
    ============================================================ */
+function openMinutesBackup(){
+  if(!TEST_MODE)return;
+  showModal(`<div class="grab"></div><h3>회의록 백업 · 복원</h3>
+    <div class="note" style="font-size:12.5px;color:var(--ink-soft);line-height:1.65;margin-bottom:14px">
+      테스트판에서 수정한 회의록은 <b>지금 이 브라우저에만 저장</b>됩니다.<br>
+      최종 운영판으로 옮길 때는 아래 백업파일 하나만 보내주면, 지금 수정한 내용 그대로 이전할 수 있어요.
+    </div>
+    <button class="btn" style="width:100%;justify-content:center;margin-bottom:10px" onclick="exportTestMinutes()">↓ 현재 회의록 백업파일 받기</button>
+    <div class="field" style="margin-top:14px"><label>백업파일로 복원 <span style="font-weight:400">(필요할 때만)</span></label>
+      <input type="file" id="minutes-backup-file" accept=".json,application/json" onchange="importTestMinutes(this)">
+    </div>
+    <div style="font-size:11.5px;color:var(--ink-soft);line-height:1.55">복원은 같은 id의 회의록을 백업 내용으로 바꾸고, 없는 회의록은 추가합니다.</div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">닫기</button></div>`);
+}
+function exportTestMinutes(){
+  if(!TEST_MODE)return;
+  const payload={format:"garyeobjip-minutes-v1",exportedAt:new Date().toISOString(),minutes:minutes};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json;charset=utf-8"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download="garyeobjip_minutes_test_"+todayISO()+".json";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast("회의록 백업파일을 만들었어요");
+}
+function importTestMinutes(input){
+  if(!TEST_MODE)return;
+  const file=input.files&&input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(){
+    try{
+      const d=JSON.parse(reader.result);
+      const arr=Array.isArray(d)?d:d&&Array.isArray(d.minutes)?d.minutes:null;
+      if(!arr)throw new Error("회의록 목록 없음");
+      if(!confirm(`백업파일의 회의록 ${arr.length}건을 이 테스트판에 복원할까요?\n\n같은 회의록은 백업 내용으로 교체됩니다.`))return;
+      arr.forEach(src=>{
+        if(!src||!src.id)return;
+        const copy=JSON.parse(JSON.stringify(src));
+        const idx=minutes.findIndex(m=>m.id===copy.id);
+        if(idx>=0)minutes[idx]=copy;else minutes.push(copy);
+      });
+      saveCache();closeModal(true);renderMinutes();renderTimeline();renderVisits();renderHome();
+      toast("회의록 백업을 복원했어요");
+    }catch(e){alert("이 파일에서는 회의록 백업을 읽지 못했어요.");}
+  };
+  reader.readAsText(file);
+}
+
+function minuteSummaryClean(line){
+  return String(line||"")
+    .replace(/https:\/\/\S+/g,"")
+    .replace(/\*\*/g,"")
+    .replace(/^\s*[-•○●■]+\s*/,"")
+    .replace(/^\s*\d+[.)]\s*/,"")
+    .replace(/\s+/g," ")
+    .trim();
+}
+function minuteCardSummary(m){
+  const raw=[m.agenda||"",m.notice||""].filter(Boolean).join("\n");
+  const lines=raw.split("\n").filter(x=>x.trim());
+  if(!lines.length)return minuteSummaryClean(m.heartOpen||"")||"내용 없음";
+
+  let start=lines.findIndex(x=>/결정 및 결의|안건 회의|이번 회의의 안건|이번 회의 안건/.test(minuteSummaryClean(x)));
+  const scope=start>=0?lines.slice(start+1):lines;
+  const picked=[];
+  const add=x=>{
+    const t=minuteSummaryClean(x);
+    if(!t||t.length<3||picked.includes(t))return;
+    if(/^(정리|작성|나눔의견들|논의사항|공지사항|기타 공지사항들|지난 회의)/.test(t))return;
+    picked.push(t);
+  };
+
+  // 사용자가 말머리로 정리한 최상위 항목을 가장 우선.
+  scope.forEach(x=>{if(/^\s*-\s+\S/.test(x)&&!/^\s{2,}-/.test(x))add(x);});
+  // 옛 회의록처럼 평문으로 남은 안건 제목도 자동으로 잡음.
+  scope.forEach(x=>{
+    const t=minuteSummaryClean(x);
+    if(/^안건\s*\d*\s*[:.)-]/.test(t)||
+       /^결론\s*[-:]/.test(t)||
+       /^기부\s*[:：]/.test(t)||
+       /^<[^>]+>.*(모임|읽기)/.test(t)||
+       /(운영 원칙|감정 나누기|공동 울력|사용 평가 설문|회원 참여|운영방향|이용 횟수)/.test(t)) add(x);
+  });
+  // 그래도 부족하면 짧고 제목 같은 줄을 보충.
+  if(picked.length<3){
+    scope.forEach(x=>{
+      const t=minuteSummaryClean(x);
+      if(t.length>=5&&t.length<=58&&!/[.!?。]$/.test(t)&&!/^[-:]/.test(t))add(x);
+    });
+  }
+  if(!picked.length)scope.slice(0,3).forEach(add);
+  return picked.slice(0,4).join(" · ");
+}
+
 function renderMinutes(){
   const v=document.getElementById("view-minutes");
   let h=`<div class="view-head"><div><div class="t">회의록</div>
     <div class="d">매달 한 번, 마음과 안건을 남깁니다</div></div>
-    <button class="btn" onclick="openMinute()">＋ 새 회의록</button></div>`;
+    <div style="display:flex;gap:6px;align-items:center">
+      ${TEST_MODE?`<button class="btn ghost sm" onclick="openMinutesBackup()">백업</button>`:""}
+      <button class="btn" onclick="openMinute()">＋ 새 회의록</button>
+    </div></div>`;
   // 다음 회의 안내(가장 최근 회의록의 next)
   const latest=[...minutes].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
   if(latest&&latest.nextDate){
@@ -1142,7 +1506,7 @@ function renderMinutes(){
   if(!minutes.length){h+=`<div class="empty"><div class="big">📝</div>아직 회의록이 없습니다.</div>`;}
   else{
     [...minutes].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).forEach(m=>{
-      const prev=[m.heartOpen,m.notice,m.agenda,m.heartClose].filter(Boolean).join(" · ").slice(0,84);
+      const prev=minuteCardSummary(m);
       h+=`<div class="card mt-card" onclick="readMinute('${m.id}')">
         <div class="mt-top"><span class="mt-date">${fmtDate(m.date)}</span>
           ${m.kind?`<span class="mt-kind">${esc(m.kind)}</span>`:""}
@@ -1162,7 +1526,10 @@ function readMinute(id){
     ${m.host?`<div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:6px">진행 ${esc(m.host)}</div>`:""}
     <div class="mt-read">`;
   MT_BLOCKS_BEFORE.forEach(b=>{if(m[b.key])h+=`<h4>${b.label}</h4><div class="body">${mdRender(m[b.key])}</div>`;});
-  if(m.nextDate)h+=`<h4>다음 회의</h4><div class="body">${fmtDate(m.nextDate)} (${dow(m.nextDate)})${m.nextHost?` · 진행 ${esc(m.nextHost)}`:""}${m.nextNote?`\n${esc(m.nextNote)}`:""}</div>`;
+  if(m.nextDate||m.nextHost||m.nextNote){
+    const head=[m.nextDate?`${fmtDate(m.nextDate)} (${dow(m.nextDate)})`:"",m.nextHost?`진행 ${esc(m.nextHost)}`:""].filter(Boolean).join(" · ");
+    h+=`<h4>다음 회의</h4><div class="body">${head}${m.nextNote?`${head?"\n":""}${mdRender(m.nextNote)}`:""}</div>`;
+  }
   MT_BLOCKS_AFTER.forEach(b=>{if(m[b.key])h+=`<h4>${b.label}</h4><div class="body">${mdRender(m[b.key])}</div>`;});
   h+=`</div>`;
   showModal(h);
@@ -1179,40 +1546,165 @@ function reminderCheckboxes(prefix,selectedDays){
 function readReminderCheckboxes(prefix){
   return [7,3,1].filter(d=>{ const el=document.getElementById(`${prefix}-${d}`); return el&&el.checked; });
 }
+let minuteLastRich=null;
+function minuteInlineToMarkdown(node){
+  if(node.nodeType===3)return node.nodeValue||"";
+  if(node.nodeType!==1)return "";
+  const tag=node.tagName;
+  if(tag==="BR")return "";
+  if(tag==="UL"||tag==="OL")return "";
+  let inner="";Array.from(node.childNodes).forEach(function(ch){if(ch.nodeType===1&&(ch.tagName==="UL"||ch.tagName==="OL"))return;inner+=minuteInlineToMarkdown(ch);});
+  if(tag==="B"||tag==="STRONG")return "**"+inner+"**";
+  if(tag==="U")return "__"+inner+"__";
+  if(tag==="I"||tag==="EM")return "*"+inner+"*";
+  if(tag==="S"||tag==="STRIKE"||tag==="DEL")return "~~"+inner+"~~";
+  return inner;
+}
+function minuteListToMarkdown(ul,level,out){
+  Array.from(ul.children).forEach(function(li){
+    if(li.tagName!=="LI")return;
+    let line="";Array.from(li.childNodes).forEach(function(ch){if(ch.nodeType===1&&(ch.tagName==="UL"||ch.tagName==="OL"))return;line+=minuteInlineToMarkdown(ch);});
+    out.push("  ".repeat(level)+"- "+line.trim());
+    Array.from(li.children).forEach(function(ch){if(ch.tagName==="UL"||ch.tagName==="OL")minuteListToMarkdown(ch,level+1,out);});
+  });
+}
+function minuteRichValue(id){
+  const el=document.getElementById(id);if(!el)return "";
+  const out=[];
+  Array.from(el.childNodes).forEach(function(node){
+    if(node.nodeType===3){const t=(node.nodeValue||"").trimEnd();if(t)out.push(t);return;}
+    if(node.nodeType!==1)return;
+    if(node.tagName==="UL"||node.tagName==="OL"){minuteListToMarkdown(node,0,out);return;}
+    if(node.tagName==="DIV"||node.tagName==="P"){out.push(minuteInlineToMarkdown(node));return;}
+    out.push(minuteInlineToMarkdown(node));
+  });
+  return out.join("\n").replace(/\n{3,}/g,"\n\n").trimEnd();
+}
+function minuteEditorHtml(text){
+  text=String(text||"").replace(/\r/g,"");
+  if(!text)return "<div><br></div>";
+  const root=document.createElement("div");
+  const lines=text.split("\n");
+  let stack=[];let lastLi=[];
+  lines.forEach(function(line){
+    const m=line.match(/^(\s*)-\s+(.*)$/);
+    if(!m){stack=[];lastLi=[];const d=document.createElement("div");d.innerHTML=m===null&&line?mdRender(line):"<br>";root.appendChild(d);return;}
+    const raw=m[1].replace(/\t/g,"  ").length;let level=Math.floor(raw/2);
+    if(level>stack.length)level=stack.length;
+    while(stack.length>level+1)stack.pop();
+    if(stack.length<level+1){
+      const ul=document.createElement("ul");
+      if(level===0)root.appendChild(ul);else{const parent=lastLi[level-1];if(parent)parent.appendChild(ul);else root.appendChild(ul);}
+      stack.push(ul);
+    }
+    const li=document.createElement("li");li.innerHTML=mdRender(m[2]);stack[level].appendChild(li);lastLi[level]=li;lastLi.length=level+1;
+  });
+  return root.innerHTML;
+}
+function minuteRichCommand(cmd){
+  if(!minuteLastRich)return;
+  minuteLastRich.focus();
+  document.execCommand(cmd,false,null);
+  minuteLastRich.dispatchEvent(new Event("input",{bubbles:true}));
+}
+function minuteRichCaretTo(el){
+  const r=document.createRange(),sel=window.getSelection();r.selectNodeContents(el);r.collapse(true);sel.removeAllRanges();sel.addRange(r);el.focus();
+}
+function minuteRichDashToList(el){
+  const sel=window.getSelection();if(!sel||!sel.rangeCount||!sel.isCollapsed)return false;
+  const range=sel.getRangeAt(0);
+  let node=sel.anchorNode;
+  let block=node&&node.nodeType===1?node:node&&node.parentElement;
+  if(!block)return false;
+  block=block.closest("div,p");
+  if(!block||block===el||!el.contains(block)||block.closest("li"))return false;
+
+  // 현재 줄 시작부터 커서까지가 '-' 하나뿐이면 목록 시작으로 판단.
+  // 그래서 빈 줄뿐 아니라 이미 문장이 있는 줄의 맨 앞에 '-'+Space를 넣어도 변환됨.
+  const prefix=document.createRange();
+  try{
+    prefix.setStart(block,0);
+    prefix.setEnd(range.endContainer,range.endOffset);
+  }catch(e){return false;}
+  if(!/^\s*-\s*$/.test(prefix.toString()))return false;
+
+  // 입력한 '-'와 앞쪽 공백만 지우고 기존 문장/서식은 그대로 li 안으로 옮김
+  prefix.deleteContents();
+  const ul=document.createElement("ul"),li=document.createElement("li");
+  while(block.firstChild)li.appendChild(block.firstChild);
+  if(!li.textContent.trim()&&!li.querySelector("br"))li.appendChild(document.createElement("br"));
+  ul.appendChild(li);block.replaceWith(ul);
+
+  // 기존 문장 앞에서 계속 입력할 수 있도록 말머리 뒤, 문장 맨 앞에 커서를 둠
+  minuteRichCaretTo(li);
+  el.dispatchEvent(new Event("input",{bubbles:true}));
+  return true;
+}
+function bindMinuteRichEditors(){
+  document.querySelectorAll(".minute-rich").forEach(function(el){
+    el.addEventListener("focus",function(){minuteLastRich=el;});
+    el.addEventListener("keydown",function(e){
+      const ctrl=e.ctrlKey||e.metaKey;
+      if(ctrl&&!e.shiftKey&&["b","u","i"].includes(e.key.toLowerCase())){e.preventDefault();minuteLastRich=el;minuteRichCommand(e.key.toLowerCase()==="b"?"bold":e.key.toLowerCase()==="u"?"underline":"italic");return;}
+      const sel=window.getSelection();
+      const anchor=sel&&sel.anchorNode;
+      let anchorEl=null;
+      if(anchor){
+        anchorEl=anchor.nodeType===1?anchor:anchor.parentElement;
+      }
+      const li=anchorEl&&anchorEl.closest?anchorEl.closest("li"):null;
+      if(e.key==="Tab"&&li&&el.contains(li)){
+        e.preventDefault();
+        e.stopPropagation();
+        minuteLastRich=el;
+        minuteRichCommand(e.shiftKey?"outdent":"indent");
+        return;
+      }
+      if(e.key===" "&&!e.shiftKey&&!ctrl){if(minuteRichDashToList(el)){e.preventDefault();return;}}
+    });
+  });
+}
 function openMinute(id){
-  const m=id?minutes.find(x=>x.id===id):{id:"",date:todayISO(),kind:"온라인",host:"",heartOpen:"",notice:"",agenda:"",heartClose:"",nextDate:"",nextHost:"",nextNote:"",reminderDays:[]};
+  const base=id?minutes.find(x=>x.id===id):{id:"",date:todayISO(),kind:"온라인",host:"",heartOpen:"",notice:"",agenda:"",heartClose:"",nextDate:"",nextHost:"",nextNote:"",reminderDays:[]};
+  const draft=minuteDraftLoad(id);
+  const m=draft&&draft.data?Object.assign({},base,draft.data):base;
   let h=`<div class="grab"></div><h3>${id?"회의록 수정":"새 회의록"}</h3>
+    <div style="display:flex;align-items:center;gap:8px;margin:-9px 0 14px"><span id="minuteDraftStatus" style="font-size:11.5px;color:var(--ink-soft)">${draft?"✓ 임시저장본 자동 복구":"입력하면 이 기기에 자동 임시저장"}</span>${draft?`<button class="btn ghost sm" style="margin-left:auto;padding:4px 8px;font-size:11px" onclick="discardMinuteDraft()">임시글 버리기</button>`:""}</div><div style="font-size:11.5px;color:var(--ink-soft);margin:-7px 0 8px;line-height:1.55">선택한 글자에 Ctrl+B · Ctrl+U · Ctrl+I / 새 줄이나 기존 문장 맨 앞에서 <b>-</b> + Space → 말머리 / 목록에서 Tab · Shift+Tab</div><div class="minute-toolbar"><button type="button" onmousedown="event.preventDefault();minuteRichCommand('bold')"><b>B</b></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('underline')"><u>U</u></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('italic')"><i>I</i></button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('insertUnorderedList')">•</button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('outdent')">←</button><button type="button" onmousedown="event.preventDefault();minuteRichCommand('indent')">→</button></div>
     <div class="row2">
       <div class="field"><label>날짜</label><input type="date" id="f-date" value="${m.date}"></div>
       <div class="field"><label>형식</label><select id="f-kind">
         <option ${m.kind==="온라인"?"selected":""}>온라인</option>
-        <option ${m.kind==="오프라인"?"selected":""}>오프라인</option></select></div></div>
+        <option ${m.kind==="오프라인"?"selected":""}>오프라인</option>
+        <option ${m.kind==="미표기"?"selected":""}>미표기</option></select></div></div>
     <div class="field"><label>진행한 사람</label><input id="f-host" value="${esc(m.host)}" placeholder="이번 달 진행 집사"></div>`;
-  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
+  MT_BLOCKS_BEFORE.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><div class="minute-rich" id="f-${b.key}" contenteditable="true">${minuteEditorHtml(m[b.key])}</div></div>`;});
   h+=`<div class="field"><label>📅 다음 회의 <span style="font-weight:400">— 등록하면 일정 캘린더에 자동으로 올라갑니다</span></label>
     <div class="row2"><input type="date" id="f-nextDate" value="${m.nextDate||""}">
     <input id="f-nextHost" value="${esc(m.nextHost)}" placeholder="진행자"></div>
     <input id="f-nextNote" value="${esc(m.nextNote)}" placeholder="메모 (예: 오프라인, 무엇을 준비)" style="margin-top:8px"></div>
     <div class="field"><label>🔔 다음 회의 알림 <span style="font-weight:400">— 날짜를 채운 경우에만 동작해요</span></label>
     ${reminderCheckboxes("f-remind",m.reminderDays||[])}</div>`;
-  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><textarea id="f-${b.key}" placeholder="${b.label}…">${esc(m[b.key])}</textarea></div>`;});
+  MT_BLOCKS_AFTER.forEach(b=>{h+=`<div class="field"><label>${b.label}</label><div class="minute-rich" id="f-${b.key}" contenteditable="true">${minuteEditorHtml(m[b.key])}</div></div>`;});
   h+=`<div class="modal-actions">
       ${id?`<button class="btn ghost" onclick="delMinute('${id}')">삭제</button>`:""}
       <button class="btn" onclick="saveMinute('${m.id}')">저장</button></div>`;
   showModal(h);
+  minuteEditing=true;minuteEditId=id||"";document.documentElement.classList.add("minute-editing");bindMinuteRichEditors();bindMinuteDraftAutosave();
 }
 function saveMinute(id){
-  const o={date:val("f-date"),kind:val("f-kind"),host:val("f-host"),
-    heartOpen:val("f-heartOpen"),notice:val("f-notice"),agenda:val("f-agenda"),heartClose:val("f-heartClose"),
-    nextDate:val("f-nextDate"),nextHost:val("f-nextHost"),nextNote:val("f-nextNote"),
-    reminderDays:readReminderCheckboxes("f-remind")};
+  const o=minuteFormData();
+  if(!o){toast("회의록 내용을 읽지 못했어요");return;}
+  o.updatedAt=Date.now();
   let item;
   if(id){ item=minutes.find(x=>x.id===id); Object.assign(item,o); }
   else{ o.id=uid(); minutes.push(o); item=o; }
-  markPending(item);syncUpsert("minutes",item);closeModal();renderMinutes();renderTimeline();renderVisits();
+  minuteDraftClear(id);resetMinuteEditorState();
+  markPending(item);syncUpsert("minutes",item);closeModal(true);renderMinutes();renderTimeline();renderVisits();renderHome();
+  if(TEST_MODE)toast("테스트판에 저장됨 · 운영 데이터에는 반영되지 않아요");
 }
 function delMinute(id){if(!confirm("이 회의록을 삭제할까요?"))return;
-  minutes=minutes.filter(x=>x.id!==id);syncDelete("minutes",id);closeModal();renderMinutes();renderTimeline();renderVisits();}
+  minuteDraftClear(id);resetMinuteEditorState();
+  minutes=minutes.filter(x=>x.id!==id);syncDelete("minutes",id);closeModal(true);renderMinutes();renderTimeline();renderVisits();renderHome();}
 /* ============================================================
    화면 3 — 일정 (방문 + 회의가 한 캘린더에)
    ============================================================ */
@@ -1455,6 +1947,7 @@ function delActivity(id){if(!confirm("이 모임·활동을 삭제할까요?"))r
    화면 4 — 살림 (퇴실 체크리스트 + 4가지 단속 사진)
    ============================================================ */
 function renderCare(){
+  pullTestGuestCareLogs();
   const v=document.getElementById("view-care");
   let h=`<div class="view-head"><div><div class="t">살림</div>
     <div class="d">가볍집을 청정하게 — 떠나기 전 정리</div></div></div>
@@ -1474,6 +1967,52 @@ function activeLog(){
   const mine=visitLogs.filter(l=>!l.closed && (!l.owner || l.owner===me));
   mine.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   return mine[0];
+}
+function normalizeCareHandoffs(log){
+  if(!log)return [];
+  let raw=log.handoffs;
+  if(typeof raw==="string"){try{raw=JSON.parse(raw);}catch(e){raw=raw.split("\n");}}
+  if(!Array.isArray(raw))raw=[];
+  log.handoffs=raw.map(function(x){
+    if(typeof x==="string")x={text:x};
+    x=x||{};
+    return {id:x.id||uid(),text:String(x.text||""),todoId:x.todoId||"",todoSentAt:x.todoSentAt||""};
+  });
+  return log.handoffs;
+}
+function activeCareHandoffRows(log){
+  const hs=normalizeCareHandoffs(log);
+  let h=`<div class="handoff-box"><div style="font-size:13px;font-weight:800;color:var(--sky)">📣 다음 사람에게 전할 말</div><div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:2px">비품 부족, 고장, 집 상태, 먹어도 되는 작물처럼 다음 방문자나 집사에게 알려둘 내용을 남겨주세요. 없어도 괜찮아요.</div>`;
+  hs.forEach(function(x,i){h+=`<div class="handoff-row"><input value="${esc(x.text)}" placeholder="예: 주방비누가 다 떨어졌어요" oninput="setCareHandoff(\'${log.id}\',${i},this.value)"><button class="handoff-del" onclick="removeCareHandoff(\'${log.id}\',${i})">×</button></div>`;});
+  h+=`<button class="btn ghost sm" style="margin-top:9px" onclick="addCareHandoff(\'${log.id}\')">＋ 전달사항 추가</button></div>`;
+  return h;
+}
+function setCareHandoff(id,i,text){const log=visitLogs.find(x=>x.id===id);if(!log)return;const hs=normalizeCareHandoffs(log);if(!hs[i])return;hs[i].text=text;markPending(log);saveCache();}
+function addCareHandoff(id){const log=visitLogs.find(x=>x.id===id);if(!log)return;normalizeCareHandoffs(log).push({id:uid(),text:"",todoId:"",todoSentAt:""});markPending(log);saveCache();renderCare();setTimeout(function(){const rows=document.querySelectorAll(".handoff-row input");if(rows.length)rows[rows.length-1].focus();},0);}
+function removeCareHandoff(id,i){const log=visitLogs.find(x=>x.id===id);if(!log)return;normalizeCareHandoffs(log).splice(i,1);markPending(log);saveCache();renderCare();}
+function pullTestGuestCareLogs(){
+  if(!TEST_MODE)return;
+  try{
+    const raw=localStorage.getItem("gbj_test_guest_visitlogs");if(!raw)return;
+    const rows=JSON.parse(raw);if(!Array.isArray(rows))return;
+    let changed=false;
+    rows.forEach(function(g){
+      if(!g||!g.id)return;
+      const found=visitLogs.find(x=>x.id===g.id);
+      if(found){if(Number(g.updatedAt||0)>Number(found.updatedAt||0)){Object.assign(found,g);changed=true;}}
+      else{visitLogs.push(g);changed=true;}
+    });
+    if(changed)saveCache();
+  }catch(e){}
+}
+function sendCareHandoffToTodo(logId,handoffId){
+  const log=visitLogs.find(x=>x.id===logId);if(!log)return;
+  const h=normalizeCareHandoffs(log).find(x=>x.id===handoffId);if(!h||!h.text.trim())return;
+  if(h.todoId&&todos.some(t=>t.id===h.todoId)){toast("이미 할 일로 보냈어요");return;}
+  const item={id:uid(),text:h.text.trim(),who:me||log.who||"",done:false,doneBy:"",createdAt:new Date().toISOString(),updatedAt:Date.now()};
+  todos.push(item);h.todoId=item.id;h.todoSentAt=new Date().toISOString();log.updatedAt=Date.now();
+  markPending(item);syncUpsert("todos",item);markPending(log);syncUpsert("visitLogs",log);
+  renderTodo();renderHome();viewCareLog(logId);toast("할 일로 보냈어요");
 }
 function careActive(){
   const log=activeLog();
@@ -1521,6 +2060,7 @@ function careActive(){
     }
   });
   h+=`</div></div>`;
+  h+=activeCareHandoffRows(log);
   const pct=total?Math.round(done/total*100):0;
   h+=`<div class="vlog-prog"><i style="width:${pct}%"></i></div>
     <div style="text-align:center;font-size:12px;color:var(--ink-soft);margin-top:6px">${done} / ${total} 완료</div>
@@ -1535,7 +2075,7 @@ function discardCare(id){
   saveCache();renderCare();renderHome();
 }
 function startCare(){
-  const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},closed:false};
+  const log={id:uid(),date:todayISO(),who:me||"",owner:me||"",checks:{},photos:{},handoffs:[],closed:false};
   markPending(log); // 서버엔 안 보내지만, 자동 새로고침이 이 로컬 진행분을 지우지 못하게 보호
   visitLogs.push(log);saveCache();renderCare();renderHome();
 }
@@ -1591,11 +2131,13 @@ async function closeCare(id){
       const v=log.photos[p.key];
       return v && v!=="__loading__" && v.startsWith("data:");
     }).map(async p=>{
-      const url=await syncUploadPhoto(log.photos[p.key],`care_${id}_${p.key}_${Date.now()}.jpg`);
+      const url=await syncUploadPhoto(log.photos[p.key],carePhotoFilename(log,p.key),"정리",log.date);
       if(url) log.photos[p.key]=url;
     });
     if(jobs.length) await Promise.all(jobs);
   }
+  // 빈 전달사항은 버리고 최종 상태를 저장
+  log.handoffs=normalizeCareHandoffs(log).filter(x=>x.text.trim()).map(x=>({...x,text:x.text.trim()}));
   // 최종 상태를 서버에 딱 한 번 저장
   log.closed=true;log.updatedAt=Date.now();
   markPending(log);
@@ -1623,6 +2165,7 @@ function careHistory(){
         <b style="font-size:15px">${fmtDate(log.date)}</b>
         <span style="font-size:12.5px;color:var(--ink-soft)">${esc(log.who||"이름 없음")}</span>
         ${isGuest?`<span style="font-size:10.5px;font-weight:700;color:var(--lilac-deep);background:rgba(201,182,220,.18);padding:2px 8px;border-radius:7px">손님 제출</span>`:""}
+        ${normalizeCareHandoffs(log).filter(x=>x.text.trim()).length?`<span style="font-size:10.5px;font-weight:700;color:#3F7CA0;background:rgba(95,169,214,.12);padding:2px 8px;border-radius:7px">전달 ${normalizeCareHandoffs(log).filter(x=>x.text.trim()).length}</span>`:""}
         <span style="margin-left:auto;font-size:12px;color:var(--moss-deep)">단속사진 ${photoCount}/4</span></div>
       <div class="vlog-prog"><i style="width:${pct}%"></i></div></div>`;
   });
@@ -1665,6 +2208,13 @@ function viewCareLog(id){
       });
     });
   }
+  const handoffs=normalizeCareHandoffs(log).filter(x=>x.text.trim());
+  if(handoffs.length){
+    h+=`<div style="font-size:12.5px;color:var(--sky);font-weight:800;margin:17px 2px 8px">📣 전달사항</div>`;
+    handoffs.forEach(function(x){
+      h+=`<div class="handoff-view"><div class="txt">${esc(x.text)}</div>${x.todoId?`<span class="sent">✓ 할 일로 보냄</span>`:`<button class="btn ghost sm" onclick="sendCareHandoffToTodo(\'${log.id}\',\'${x.id}\')">할 일로 보내기</button>`}</div>`;
+    });
+  }
   // 사진
   const pc=PHOTO4.filter(p=>log.photos[p.key]).length;
   h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">4가지 단속 사진 — ${pc}/4</div>
@@ -1701,6 +2251,10 @@ function editCareLog(id){
       h+=`</div>`;
     });
   }
+  const ehs=normalizeCareHandoffs(log);
+  h+=`<div style="font-size:12.5px;color:var(--sky);font-weight:800;margin:16px 2px 7px">📣 전달사항</div>`;
+  if(!ehs.length)h+=`<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">남긴 전달사항 없음</div>`;
+  ehs.forEach(function(x,i){h+=`<div class="field"><input id="ec-handoff-${i}" value="${esc(x.text)}" placeholder="전달사항"></div>`;});
   h+=`<div style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 7px">4가지 단속 사진 — 눌러서 새로 올리기</div><div class="photo4">`;
   PHOTO4.forEach(p=>{
     const img=log.photos[p.key];
@@ -1757,13 +2311,15 @@ async function saveCareLogEdit(id){
   const dEl=document.getElementById("ec-date"), wEl=document.getElementById("ec-who");
   if(dEl && dEl.value) log.date=dEl.value;
   if(wEl) log.who=wEl.value.trim();
+  normalizeCareHandoffs(log).forEach(function(x,i){const el=document.getElementById(`ec-handoff-${i}`);if(el)x.text=el.value.trim();});
+  log.handoffs=normalizeCareHandoffs(log).filter(x=>x.text.trim());
   // 새로 올린 사진(아직 이 기기 안에만 있는 것)을 드라이브로 올림
   if(SYNC_URL){
     const jobs=PHOTO4.filter(p=>{
       const v=log.photos[p.key];
       return v && typeof v==="string" && v.startsWith("data:");
     }).map(async p=>{
-      const url=await syncUploadPhoto(log.photos[p.key],`care_${id}_${p.key}_${Date.now()}.jpg`);
+      const url=await syncUploadPhoto(log.photos[p.key],carePhotoFilename(log,p.key),"정리",log.date);
       if(url) log.photos[p.key]=url;
     });
     if(jobs.length) await Promise.all(jobs);
@@ -1787,7 +2343,7 @@ function delCareLog(id){
   const log=visitLogs.find(l=>l.id===id);
   const who=log&&(log.who||"이름 없음"), when=log&&fmtDate(log.date);
   const pc=log?PHOTO4.filter(p=>log.photos&&log.photos[p.key]).length:0;
-  if(!confirm(`${when} · ${who}\n단속사진 ${pc}장이 담긴 이 기록을 삭제할까요?\n\n되돌릴 수 없어요.`))return;
+  if(!confirm(`${when} · ${who}\n단속사진 ${pc}장이 담긴 이 기록을 삭제할까요?\n\n연결된 Drive 사진도 휴지통으로 이동합니다.`))return;
   visitLogs=visitLogs.filter(l=>l.id!==id);syncDelete("visitLogs",id);closeModal();renderCare();
 }
 
@@ -1890,12 +2446,12 @@ async function saveNote(){
   notes.push(o);markPending(o);
   closeModal();renderNotes();renderHome(); // 우선 이 기기에 바로 보이게
   if(o.photo){
-    const url=await syncUploadPhoto(o.photo,`note_${o.id}.jpg`);
+    const url=await syncUploadPhoto(o.photo,notePhotoFilename(o),"사랑방",String(o.createdAt||todayISO()).slice(0,10));
     if(url){o.photo=url;renderNotes();}
   }
   markPending(o);syncUpsert("notes",o);
 }
-function delNote(id){if(!confirm("이 글을 지울까요?"))return;notes=notes.filter(n=>n.id!==id);syncDelete("notes",id);renderNotes();renderHome();}
+function delNote(id){if(!confirm("이 글과 연결된 사진도 함께 정리할까요?\n\nDrive 사진은 영구삭제하지 않고 휴지통으로 이동합니다."))return;notes=notes.filter(n=>n.id!==id);syncDelete("notes",id);renderNotes();renderHome();}
 
 /* ============================================================
    화면 — 방문 신청 (방문자 앱에서 들어온 신청을 승인·거절)
@@ -2197,6 +2753,245 @@ function acctManagerBar(){
 }
 
 let acctReportSub="quarter"; // 'quarter' | 'year' — 보고서 목록 안 세그먼트
+let acctImportState=null; // 엑셀은 브라우저 안에서만 읽고, 최종 확인 때 보고서 데이터만 저장
+
+function acctExcelImportCard(type){
+  if(!isAcctManager()) return "";
+  const isYear=type==="year";
+  return `<div class="acct-import-card">
+    <div class="acct-import-title">📥 엑셀에서 ${isYear?"1년":"분기"} 회계보고서 만들기</div>
+    <div class="acct-import-desc">${isYear
+      ?"1년에 한 번 정리한 연간 회계파일을 읽어 보고서로 만듭니다. 여러 연도 시트가 있으면 올릴 시트를 고를 수 있어요."
+      :"평소 작성하던 기간별 회계 엑셀을 읽어 지금 보고서 형식으로 정리합니다."}<br>
+      파일은 먼저 이 기기에서 분석하고, <b>‘이대로 등록’</b>을 눌러야 저장돼요.</div>
+    <button class="btn ghost sm" style="width:100%;justify-content:center;color:#3F7CA0" onclick="openAcctExcelImport('${type}')">엑셀파일 선택</button>
+  </div>`;
+}
+function openAcctExcelImport(type){
+  if(!isAcctManager()){ alert("회계 담당자만 할 수 있어요."); return; }
+  if(typeof XLSX==="undefined"){ alert("엑셀 읽기 기능을 불러오지 못했어요. 인터넷 연결을 확인한 뒤 새로고침해주세요."); return; }
+  acctImportState={type};
+  const isYear=type==="year";
+  showModal(`<div class="grab"></div><h3>${isYear?"1년":"분기"} 회계 엑셀 불러오기</h3>
+    <div class="note" style="font-size:12.5px;color:var(--ink-soft);line-height:1.65;margin-bottom:12px">
+      ${isYear?"연간 회계정산 파일을 선택해주세요. 한 파일 안에 여러 연도 시트가 있어도 괜찮아요.":"완료한 기간별 회계파일을 선택해주세요."}<br>
+      <b>원본 엑셀파일 자체는 서버에 업로드하지 않습니다.</b> 이 브라우저에서 내용을 읽어 미리 보여준 뒤, 확인한 보고서 데이터만 저장합니다.
+    </div>
+    <div class="field"><label>엑셀파일</label><input id="acct-xlsx-file" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onchange="acctExcelFilePicked(this,'${type}')"></div>
+    <div id="acct-import-status" style="font-size:12px;color:var(--ink-soft)"></div>`);
+}
+async function acctExcelFilePicked(input,type){
+  const file=input.files&&input.files[0]; if(!file)return;
+  const st=document.getElementById("acct-import-status"); if(st)st.textContent="파일을 읽는 중…";
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:"array"});
+    acctImportState={type,fileName:file.name,wb};
+    if(!wb.SheetNames||!wb.SheetNames.length) throw new Error("시트가 없습니다.");
+    if(wb.SheetNames.length===1) acctExcelChooseSheet(0);
+    else acctExcelShowSheetPicker();
+  }catch(err){
+    console.error(err);
+    if(st)st.textContent="";
+    alert("엑셀파일을 읽지 못했어요. 파일이 손상되지 않았는지 확인해주세요.");
+  }
+}
+function acctExcelShowSheetPicker(){
+  const st=acctImportState;if(!st||!st.wb)return;
+  const isYear=st.type==="year";
+  let h=`<div class="grab"></div><h3>어느 시트를 읽을까요?</h3>
+    <div class="note" style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px">${esc(st.fileName||"")}<br>${isYear?"올릴 연도의 시트를 하나 선택해주세요.":"회계가 들어있는 시트를 선택해주세요."}</div>`;
+  st.wb.SheetNames.forEach((name,i)=>{
+    h+=`<button class="acct-archive-item" style="width:100%;text-align:left" onclick="acctExcelChooseSheet(${i})"><div><div class="al">${esc(name)}</div><div class="as">이 시트 분석하기</div></div><span>›</span></button>`;
+  });
+  showModal(h);
+}
+function acctCellText(v){
+  return String(v==null?"":v).replace(/\u00a0/g," ").trim();
+}
+function acctCellNumber(v){
+  if(typeof v==="number" && Number.isFinite(v))return v;
+  const t=acctCellText(v).replace(/[,원\s]/g,"");
+  if(!t || !/^-?\d+(?:\.\d+)?$/.test(t))return null;
+  const n=Number(t);return Number.isFinite(n)?n:null;
+}
+function acctIsoDate(y,m,d){return String(y).padStart(4,"0")+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
+function acctExtractPeriod(rows){
+  const txt=(rows||[]).slice(0,12).flat().map(acctCellText).filter(Boolean).join(" ");
+  const m=txt.match(/(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?\s*~\s*(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/);
+  return m?{start:acctIsoDate(m[1],m[2],m[3]),end:acctIsoDate(m[4],m[5],m[6])}:null;
+}
+function acctSummaryValue(rows,label){
+  const max=Math.min(16,(rows||[]).length);
+  for(let i=0;i<max;i++){
+    const row=rows[i]||[];
+    for(let j=0;j<row.length;j++){
+      if(acctCellText(row[j])===label){
+        for(let k=j+1;k<row.length;k++){const n=acctCellNumber(row[k]);if(n!==null)return n;}
+      }
+    }
+  }
+  return null;
+}
+function acctImportIncomeCategory(item,section){
+  const sec=acctCellText(section), txt=(sec+" "+acctCellText(item)).toLowerCase();
+  if(sec.includes("회비"))return "회비";
+  if(sec.includes("숙박비"))return "숙박비";
+  if(txt.includes("회비"))return "회비";
+  if(["숙박비","워크샵","명상수련","공간이용료"].some(k=>txt.includes(k)))return "숙박비";
+  if(txt.includes("지원"))return "지원금";
+  if(txt.includes("이자"))return "이자";
+  return "기타수입";
+}
+function acctImportExpenseCategory(item,section){
+  const sec=acctCellText(section), txt=(sec+" "+acctCellText(item)).toLowerCase();
+  // 연간파일은 사람이 이미 나눈 큰 묶음을 우선 존중
+  if(sec.includes("초기정착"))return "초기정착비";
+  if(sec.includes("월세"))return "월세";
+  if(sec.includes("유지비"))return "유지비";
+  if(sec.replace(/\s/g,"").includes("기타잡비"))return "기타잡비";
+  const purchase=["냉장고","세탁기","에어컨","가스레인지","전자레인지","선반","옷걸이","행거","이불","드라이기","의자","건조대","냄비","바구니","찜기","조리도구","칼세트","쓰레기통","밥솥","정리함","구둣주걱","차판","청테이프","무방","led","조명","칫솔꽂이","매트","행주걸이","비누","세제","물품"];
+  if(purchase.some(k=>txt.includes(k)))return "물품비";
+  if(txt.includes("월세"))return "월세";
+  if(["전기","인터넷","수도","가스","기름","주유"].some(k=>txt.includes(k)))return "유지비";
+  if(["보증금","초기"].some(k=>txt.includes(k)))return "초기정착비";
+  return "기타잡비";
+}
+function acctDefaultImportTitle(type,fileName,rows,sheetName,period){
+  if(type==="year"){
+    for(let i=0;i<Math.min(4,rows.length);i++){
+      const t=(rows[i]||[]).map(acctCellText).find(x=>x&&x.includes("회계"));
+      if(t)return t;
+    }
+    const y=(sheetName.match(/20\d{2}/)||[])[0]||(period?period.start.slice(0,4):"");
+    return y?y+" 가볍집 - 1년 회계정산":"가볍집 1년 회계정산";
+  }
+  let base=String(fileName||"").replace(/\.[^.]+$/,"").trim();
+  base=base.replace(/\s*-\s*20\d{2}[.]\d{1,2}[.]\d{1,2}.*$/,"").trim();
+  if(base)return base;
+  return period?`${period.start.replace(/-/g,".")} ~ ${period.end.replace(/-/g,".")} 회계`:"가볍집 회계";
+}
+function acctParseExcelRows(rows,type,fileName,sheetName){
+  const errors=[],warnings=[];
+  const period=acctExtractPeriod(rows);
+  if(!period)errors.push("보고 기간을 찾지 못했어요. 상단에 ‘2026.6.22 ~ 2026.9.13’ 같은 기간 표기가 필요해요.");
+  let header=-1;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i]||[];
+    if(acctCellText(r[0])==="항목" && acctCellText(r[1])==="날짜" && acctCellText(r[2])==="내용" && acctCellText(r[3])==="금액"){header=i;break;}
+  }
+  if(header<0)errors.push("‘항목 / 날짜 / 내용 / 금액’ 표 머리글을 찾지 못했어요.");
+  let state="",section="",last=[null,null,null,null,null];
+  const incomes=[],expenses=[],gifts=[];
+  if(header>=0){
+    for(let i=header+1;i<rows.length;i++){
+      const src=rows[i]||[], cells=[0,1,2,3,4].map(j=>src[j]==null?null:src[j]);
+      for(let j=0;j<5;j++){ if(acctCellText(cells[j])==='"') cells[j]=last[j]; }
+      const a=acctCellText(cells[0]), b=acctCellText(cells[1]), c=acctCellText(cells[2]), note=acctCellText(cells[4]);
+      const amount=acctCellNumber(cells[3]);
+      if(a==="수입"){state="income";section="";}
+      else if(a==="지출"){state="expense";section="";}
+      else if(/선물.*나눔.*공유/.test(a)){state="gift";section="";}
+      // 연간 회계의 카테고리 제목 행: 날짜 칸에 제목이 있고 내용·금액이 비어 있음
+      if((state==="income"||state==="expense") && b && !c && amount===null){section=b;last=cells;continue;}
+      if(c==="합계"||c==="소계"){last=cells;continue;}
+      if(state==="gift"){
+        if(c)gifts.push({date:b,item:c,note});
+      }else if((state==="income"||state==="expense") && c && amount!==null){
+        const row={date:b,item:c,category:state==="income"?acctImportIncomeCategory(c,section):acctImportExpenseCategory(c,section),amount,note};
+        (state==="income"?incomes:expenses).push(row);
+      }
+      last=cells;
+    }
+  }
+  const income=incomes.reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+  const expense=expenses.reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+  const srcCarry=acctSummaryValue(rows,"이월금");
+  const srcIncome=acctSummaryValue(rows,"수입");
+  const srcExpense=acctSummaryValue(rows,"지출");
+  const srcBalance=acctSummaryValue(rows,"잔액");
+  const carry=srcCarry==null?0:srcCarry, balance=carry+income-expense;
+  if(srcIncome!=null && srcIncome!==income)errors.push(`수입 합계가 달라요 — 엑셀 상단 ${Number(srcIncome).toLocaleString()}원 / 세부내역 합계 ${income.toLocaleString()}원`);
+  if(srcExpense!=null && srcExpense!==expense)errors.push(`지출 합계가 달라요 — 엑셀 상단 ${Number(srcExpense).toLocaleString()}원 / 세부내역 합계 ${expense.toLocaleString()}원`);
+  if(srcBalance!=null && srcBalance!==balance)errors.push(`잔액이 달라요 — 엑셀 상단 ${Number(srcBalance).toLocaleString()}원 / 계산값 ${balance.toLocaleString()}원`);
+  if(srcCarry==null)warnings.push("이월금을 찾지 못해 0원으로 읽었어요.");
+  if(!incomes.length&&!expenses.length&&!gifts.length)errors.push("세부 회계내역을 한 건도 읽지 못했어요.");
+  const report={
+    type,draft:false,
+    title:acctDefaultImportTitle(type,fileName,rows,sheetName,period),
+    start:period?period.start:"",end:period?period.end:"",
+    summary:{carry,income,expense,balance},
+    incomes,expenses,gifts,createdAt:Date.now(),updatedAt:Date.now()
+  };
+  return {report,errors,warnings,fileName,sheetName,source:{carry:srcCarry,income:srcIncome,expense:srcExpense,balance:srcBalance}};
+}
+function acctExcelChooseSheet(index){
+  const st=acctImportState;if(!st||!st.wb)return;
+  const name=st.wb.SheetNames[index], ws=st.wb.Sheets[name];
+  try{
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+    const parsed=acctParseExcelRows(rows,st.type,st.fileName,name);
+    acctImportState={...st,sheetName:name,parsed};
+    acctShowImportPreview();
+  }catch(err){
+    console.error(err);alert("이 시트를 분석하지 못했어요.");
+  }
+}
+function acctImportDuplicate(parsed){
+  if(!parsed||!parsed.report)return null;
+  const r=parsed.report;
+  if(r.type==="quarter")return acctReports.find(x=>x.type==="quarter"&&!x.draft&&x.start===r.start&&x.end===r.end)||null;
+  const y=(r.start||"").slice(0,4);
+  return acctReports.find(x=>x.type==="year"&&String(x.start||"").slice(0,4)===y)||null;
+}
+function acctImportCatSummary(items){
+  const m={};(items||[]).forEach(x=>{const c=x.category||"기타";if(!m[c])m[c]={n:0,sum:0};m[c].n++;m[c].sum+=Number(x.amount)||0;});
+  return Object.entries(m).map(([c,v])=>`${esc(c)} ${v.n}건 · ${v.sum.toLocaleString()}원`).join("<br>")||"없음";
+}
+function acctShowImportPreview(){
+  const st=acctImportState,p=st&&st.parsed;if(!p)return;
+  const r=p.report, dup=acctImportDuplicate(p), blocked=p.errors.length>0;
+  let h=`<div class="grab"></div><h3>엑셀 분석 결과</h3>
+    <div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:10px">${esc(p.fileName)} · ${esc(p.sheetName)}</div>
+    <div class="field"><label>보고서 제목 <span style="font-weight:400">— 필요하면 고쳐도 돼요</span></label><input id="ai-title" value="${esc(r.title)}"></div>
+    <div style="font-size:13px;font-weight:700;margin:2px 0 8px">${r.start?fmtDate(r.start):"기간 미확인"} ~ ${r.end?fmtDate(r.end):"기간 미확인"}</div>
+    <div class="acct-import-summary">
+      <div><div class="k">이월금</div><div class="v">${Number(r.summary.carry).toLocaleString()}</div></div>
+      <div><div class="k">수입</div><div class="v" style="color:var(--moss-deep)">+${Number(r.summary.income).toLocaleString()}</div></div>
+      <div><div class="k">지출</div><div class="v" style="color:var(--clay)">-${Number(r.summary.expense).toLocaleString()}</div></div>
+      <div><div class="k">잔액</div><div class="v">${Number(r.summary.balance).toLocaleString()}</div></div>
+    </div>
+    <div class="acct-import-ok">읽은 내역 — 수입 <b>${r.incomes.length}건</b> · 지출 <b>${r.expenses.length}건</b> · 선물·나눔 <b>${r.gifts.length}건</b></div>`;
+  if(p.errors.length)h+=`<div class="acct-import-warn"><b>⚠ 등록하기 전에 원본 확인이 필요해요.</b><br>${p.errors.map(esc).join("<br>")}</div>`;
+  else h+=`<div class="acct-import-ok">✓ 엑셀 상단 합계와 세부내역 계산이 맞습니다.</div>`;
+  if(p.warnings.length)h+=`<div class="acct-import-warn">${p.warnings.map(esc).join("<br>")}</div>`;
+  if(dup)h+=`<div class="acct-import-warn"><b>같은 ${r.type==="year"?(r.start||"").slice(0,4)+"년":"기간"} 보고서가 이미 있어요.</b><br>등록하면 새 보고서를 하나 더 만들지 않고 기존 보고서를 이 파일 내용으로 교체합니다.</div>`;
+  h+=`<details style="margin:10px 0"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">카테고리별 분석 보기</summary>
+    <div class="acct-import-cat"><b>수입</b><br>${acctImportCatSummary(r.incomes)}<br><br><b>지출</b><br>${acctImportCatSummary(r.expenses)}<br><br><b>선물·나눔</b> ${r.gifts.length}건</div></details>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="openAcctExcelImport('${st.type}')">다른 파일</button>
+      <button class="btn lilac" ${blocked?"disabled style='opacity:.45'":""} onclick="acctConfirmExcelImport()">${dup?"기존 보고서 교체":"이대로 등록"}</button>
+    </div>`;
+  showModal(h);
+}
+function acctConfirmExcelImport(){
+  const st=acctImportState,p=st&&st.parsed;if(!p||p.errors.length)return;
+  const src=p.report, dup=acctImportDuplicate(p);
+  const title=(document.getElementById("ai-title")?.value||src.title).trim()||src.title;
+  let rec;
+  if(dup){
+    rec=dup;
+    const createdAt=rec.createdAt||Date.now(), id=rec.id;
+    Object.assign(rec,JSON.parse(JSON.stringify(src)),{id,title,createdAt,updatedAt:Date.now(),draft:false});
+  }else{
+    rec=JSON.parse(JSON.stringify(src));
+    rec.id=uid();rec.title=title;rec.createdAt=Date.now();rec.updatedAt=Date.now();rec.draft=false;
+    acctReports.push(rec);
+  }
+  markPending(rec);syncUpsert("acctReports",rec);
+  closeModal();acctHubTab="report";acctReportSub=rec.type;renderAcctHub();openAcctReport(rec.id);
+  toast(dup?"기존 회계보고서를 엑셀 내용으로 교체했어요":"엑셀에서 회계보고서를 만들었어요");
+}
 function openAcctHub(tab){
   acctHubTab=tab||"ledger";
   goTab("ledger");
@@ -2258,6 +3053,7 @@ function renderReportPanel(){
     <button class="${acctReportSub==='quarter'?'on':''}" onclick="setAcctReportSub('quarter')">분기 회계보고</button>
     <button class="${acctReportSub==='year'?'on':''}" onclick="setAcctReportSub('year')">1년 회계보고</button>
   </div>`;
+  h+=acctExcelImportCard(acctReportSub);
   if(acctReportSub==="quarter"){
     // 진행 중인 회계 — 직전 마감 다음날부터 지금까지, 마감 전까지 계속 쌓임
     if(draft){
@@ -3133,15 +3929,61 @@ function wrapSelection(el,before,after){
   el.setSelectionRange(cs,ce);
   el.focus();
   autoGrowTextarea(el);
+  el.dispatchEvent(new Event("input",{bubbles:true}));
+}
+function replaceTextareaRange(el,start,end,text,selStart,selEnd){
+  const v=el.value;
+  el.value=v.slice(0,start)+text+v.slice(end);
+  const a=selStart==null?start+text.length:selStart;
+  const b=selEnd==null?a:selEnd;
+  el.setSelectionRange(a,b);
+  el.focus();autoGrowTextarea(el);el.dispatchEvent(new Event("input",{bubbles:true}));
+}
+function indentMinuteLines(el,outdent){
+  const v=el.value,s=el.selectionStart,e=el.selectionEnd;
+  const lineStart=v.lastIndexOf("\n",Math.max(0,s-1))+1;
+  let lineEnd=v.indexOf("\n",e);if(lineEnd<0)lineEnd=v.length;
+  const block=v.slice(lineStart,lineEnd);
+  const lines=block.split("\n");
+  const changed=lines.map(function(line){
+    if(outdent){if(line.startsWith("  "))return line.slice(2);if(line.startsWith("\t"))return line.slice(1);return line;}
+    return "  "+line;
+  }).join("\n");
+  const removedOrAdded=changed.length-block.length;
+  replaceTextareaRange(el,lineStart,lineEnd,changed,lineStart,Math.max(lineStart,lineEnd+removedOrAdded));
+}
+function minuteListKey(e,el){
+  const v=el.value,s=el.selectionStart,ePos=el.selectionEnd;
+  // "- "를 입력하면 동그라미 말머리로 즉시 변환
+  if(e.key===" " && s===ePos){
+    const ls=v.lastIndexOf("\n",Math.max(0,s-1))+1;
+    const before=v.slice(ls,s);
+    if(/^\s*-$/.test(before)){e.preventDefault();const indent=before.match(/^\s*/)[0];replaceTextareaRange(el,ls,s,indent+"• ");return true;}
+  }
+  // Enter: 현재 말머리를 다음 줄에도 이어주고, 빈 말머리에서는 목록 종료
+  if(e.key==="Enter" && !e.shiftKey && s===ePos){
+    const ls=v.lastIndexOf("\n",Math.max(0,s-1))+1;
+    const before=v.slice(ls,s);
+    const m=before.match(/^(\s*)(?:•|-)\s?(.*)$/);
+    if(m){
+      e.preventDefault();
+      if(!m[2].trim()){replaceTextareaRange(el,ls,s,m[1]);}
+      else replaceTextareaRange(el,s,s,"\n"+m[1]+"• ");
+      return true;
+    }
+  }
+  return false;
 }
 document.addEventListener("keydown",e=>{
   if(e.target.tagName!=="TEXTAREA") return;
+  const el=e.target;
   const ctrl=e.ctrlKey||e.metaKey;
   if(!ctrl) return;
-  if(!e.shiftKey && e.key.toLowerCase()==="b"){ e.preventDefault(); wrapSelection(e.target,"**","**"); }
-  else if(!e.shiftKey && e.key.toLowerCase()==="u"){ e.preventDefault(); wrapSelection(e.target,"__","__"); }
-  else if(e.shiftKey && e.key.toLowerCase()==="x"){ e.preventDefault(); wrapSelection(e.target,"~~","~~"); }
-  else if(e.shiftKey && MD_COLORS[e.key]){ e.preventDefault(); wrapSelection(e.target,"{{"+e.key+":","}}"); }
+  if(!e.shiftKey && e.key.toLowerCase()==="b"){ e.preventDefault(); wrapSelection(el,"**","**"); }
+  else if(!e.shiftKey && e.key.toLowerCase()==="u"){ e.preventDefault(); wrapSelection(el,"__","__"); }
+  else if(!e.shiftKey && e.key.toLowerCase()==="i"){ e.preventDefault(); wrapSelection(el,"*","*"); }
+  else if(e.shiftKey && e.key.toLowerCase()==="x"){ e.preventDefault(); wrapSelection(el,"~~","~~"); }
+  else if(e.shiftKey && MD_COLORS[e.key]){ e.preventDefault(); wrapSelection(el,"{{"+e.key+":","}}"); }
 });
 function mdRender(text){
   if(!text) return "";
@@ -3152,11 +3994,14 @@ function mdRender(text){
   s=s.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
   s=s.replace(/__([^_]+)__/g,"<u>$1</u>");
   s=s.replace(/~~([^~]+)~~/g,"<s>$1</s>");
+  s=s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,"$1<i>$2</i>");
+  s=s.replace(/(^|\n)([ \t]*)-\s+/g,"$1$2• ");
+  s=s.replace(/https:\/\/[^\s<]+/g,u=>`<a href="${u}" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:underline;word-break:break-all">${u}</a>`);
   return s;
 }
 
 function showModal(html){document.getElementById("modalBox").innerHTML=html;document.getElementById("modalBg").classList.add("on");document.getElementById("modalBox").scrollTop=0;autoGrowAllIn(document.getElementById("modalBox"));}
-function closeModal(){document.getElementById("modalBg").classList.remove("on");}
+function closeModal(force){if(!force&&!canLeaveMinuteEditor())return false;document.getElementById("modalBg").classList.remove("on");return true;}
 document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")closeModal();});
 
 function renderAll(){
@@ -3167,7 +4012,7 @@ function renderAll(){
 }
 
 /* ── 집사 이름 (이 기기에 기억) ── */
-const NAME_KEY="garyeobjip_me";
+const NAME_KEY=TEST_MODE?"garyeobjip_test_me":"garyeobjip_me";
 function loadMe(){
   try{me=localStorage.getItem(NAME_KEY)||"";}catch(e){me="";}
 }
@@ -3209,13 +4054,14 @@ document.querySelectorAll("nav button").forEach(b=>{
   b.addEventListener("click",()=>{goTab(b.dataset.tab);});
 });
 
+initPWA();
 loadMe();
 loadCache(); // 폰에 저장해둔 마지막 상태를 먼저 보여줌 — "초기화됐다 다시 뜨는" 느낌 없애기
 renderAll();
 restoreTabOnLoad(); // 브라우저 새로고침 시에도 보고 있던 탭으로 복귀
 updateHeaderMe();
 if(!me)openNameGate(false);
-if(SYNC_URL){ syncPullAll(); startPolling(); } // 초기 1회는 실패시 알려줌, 이후 주기적 폴링만 조용히
+if(SYNC_URL){ startProductionSync(); } // 회의록 1회 승격 확인 후 운영 데이터 동기화 시작
 </script>
 </body>
 </html>
